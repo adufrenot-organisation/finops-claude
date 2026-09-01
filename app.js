@@ -134,7 +134,7 @@ function renderDomainsAdmin(){const el=document.getElementById('v-domains');el.i
 function renderMenuAdmin(){
   const el=document.getElementById('v-menuadmin');if(!el)return;
   const rows=menuConfigRows();
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Configuration du menu</h3><p>Configuration globale stockée dans Grist. Fais glisser les lignes pour changer l’ordre, modifie les libellés puis enregistre l’ensemble. Cet écran est réservé à l’Owner.</p></div><div class="table-actions"><button id="saveMenuConfig" class="btn primary">Enregistrer les modifications</button><button id="resetMenuConfig" class="btn secondary">Ordre et noms par défaut</button></div></div><div class="tablewrap"><table class="menu-admin-table"><thead><tr><th class="drag-col"></th><th>Item technique</th><th>Libellé affiché</th><th>Actif</th><th>Accès</th></tr></thead><tbody id="menuAdminBody">${rows.map(r=>`<tr draggable="true" data-menu-id="${r.id||''}" data-menu-key="${esc(r.Cle)}"><td class="menu-row-grip" title="Déplacer">⋮⋮</td><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input" data-f="Libelle" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}" maxlength="60"></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td>${r.Owner_Seulement?'<span class="badge warn">Owner uniquement</span>':'<span class="badge ok">Utilisateurs autorisés</span>'}</td></tr>`).join('')}</tbody></table></div><div class="menu-admin-note">La visibilité métier reste contrôlée par les droits de l’application et les Access Rules Grist. Désactiver un item ici le masque globalement.</div></article>`;
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Configuration du menu</h3><p>Configuration globale stockée dans Grist. Tu peux changer l’ordre, le libellé, l’activation et le niveau d’accès de chaque onglet, puis enregistrer l’ensemble. Cet écran est réservé à l’Owner.</p></div><div class="table-actions"><button id="saveMenuConfig" class="btn primary">Enregistrer les modifications</button><button id="resetMenuConfig" class="btn secondary">Ordre et noms par défaut</button></div></div><div class="tablewrap"><table class="menu-admin-table"><thead><tr><th class="drag-col"></th><th>Item technique</th><th>Libellé affiché</th><th>Actif</th><th>Accès</th></tr></thead><tbody id="menuAdminBody">${rows.map(r=>`<tr draggable="true" data-menu-id="${r.id||''}" data-menu-key="${esc(r.Cle)}"><td class="menu-row-grip" title="Déplacer">⋮⋮</td><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input" data-f="Libelle" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}" maxlength="60"></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><select class="admin-input menu-access-select" data-f="Owner_Seulement"><option value="false" ${!r.Owner_Seulement?'selected':''}>Utilisateurs autorisés</option><option value="true" ${r.Owner_Seulement?'selected':''}>Owner uniquement</option></select></td></tr>`).join('')}</tbody></table></div><div class="menu-admin-note">La visibilité métier reste contrôlée par les droits de l’application et les Access Rules Grist. Désactiver un item ici le masque globalement.</div></article>`;
   initMenuAdminSorting();
   document.getElementById('saveMenuConfig').onclick=saveMenuConfig;
   document.getElementById('resetMenuConfig').onclick=resetMenuConfigDraft;
@@ -158,8 +158,8 @@ async function saveMenuConfig(){
     const key=tr.dataset.menuKey;
     const label=(tr.querySelector('[data-f="Libelle"]')?.value||'').trim()||DEFAULT_MENU_LABELS[key]||key;
     const active=!!tr.querySelector('[data-f="Actif"]')?.checked;
-    const defaultOwner=['offers','domains','rights','menuadmin'].includes(key);
-    const fields={Cle:key,Libelle:label,Ordre:(index+1)*10,Actif:active,Owner_Seulement:defaultOwner};
+    const ownerOnly=tr.querySelector('[data-f="Owner_Seulement"]')?.value==='true';
+    const fields={Cle:key,Libelle:label,Ordre:(index+1)*10,Actif:active,Owner_Seulement:ownerOnly};
     actions.push(id?["UpdateRecord",T.menu,id,fields]:["AddRecord",T.menu,null,fields]);
   });
   if(!actions.length){toast('Aucune configuration à enregistrer.');return}
@@ -172,7 +172,7 @@ function resetMenuConfigDraft(){
   ];
   const tbody=document.getElementById('menuAdminBody');if(!tbody)return;
   const byKey=Object.fromEntries([...tbody.querySelectorAll('tr[data-menu-key]')].map(tr=>[tr.dataset.menuKey,tr]));
-  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;tbody.appendChild(tr)});
+  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;const access=tr.querySelector('[data-f="Owner_Seulement"]');if(access)access.value=['offers','domains','rights','menuadmin'].includes(key)?'true':'false';tbody.appendChild(tr)});
   toast("Valeurs par défaut chargées. Clique sur Enregistrer pour les appliquer.");
 }
 

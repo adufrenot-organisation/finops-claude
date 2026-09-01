@@ -42,3 +42,7 @@ La configuration globale du menu (ordre, libellés, activation) est désormais s
 
 ## V12
 Support des utilisateurs multi-domaines via `Domaines_Autorises` (`RefList:Domaines`).
+
+
+## V13
+L'Owner peut maintenant choisir par onglet entre `Utilisateurs autorisés` et `Owner uniquement` depuis l'écran Configuration du menu.
