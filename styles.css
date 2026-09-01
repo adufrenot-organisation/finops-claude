@@ -11,3 +11,235 @@
 @media(max-width:1100px){.shell{grid-template-columns:215px 1fr}.kpis{grid-template-columns:repeat(3,1fr)}.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}}@media(max-width:760px){.shell{grid-template-columns:1fr}.sidebar{position:relative;height:auto}.content{padding:14px}.head{align-items:flex-start;flex-direction:column}.kpis{grid-template-columns:1fr 1fr}.grid3{grid-template-columns:1fr}}
 .roi-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}.kpi.roi{background:#f4fbf8}.negative{color:#b42318!important}.roi-line{margin-top:8px;font-size:12px;color:var(--muted)}
 @media(max-width:1100px){.roi-kpis{grid-template-columns:repeat(2,1fr)}}@media(max-width:760px){.roi-kpis{grid-template-columns:1fr}}
+
+/* V7 — menu rétractable + actions globales de tableau */
+.shell{transition:grid-template-columns .18s ease}
+.sidebar{transition:padding .18s ease}
+.brand{position:relative;min-width:0}
+.brandtext{min-width:0;overflow:hidden;white-space:nowrap}
+.sidebar-toggle{margin-left:auto;flex:0 0 30px;width:30px;height:30px;border-radius:8px;border:1px solid rgba(255,255,255,.18);background:rgba(255,255,255,.07);color:#fff;font-size:22px;line-height:1;display:grid;place-items:center;cursor:pointer;padding:0}
+.sidebar-toggle:hover{background:rgba(255,255,255,.14)}
+.nav button{display:flex;align-items:center;gap:10px;min-width:0;white-space:nowrap}
+.nav-icon{display:inline-grid;place-items:center;flex:0 0 22px;width:22px;font-size:15px}
+.nav-label{overflow:hidden;text-overflow:ellipsis}
+.table-actions{display:flex;gap:8px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+
+.shell.sidebar-collapsed{grid-template-columns:74px 1fr}
+.shell.sidebar-collapsed .sidebar{padding-left:10px;padding-right:10px}
+.shell.sidebar-collapsed .brand{padding-left:7px;padding-right:7px;justify-content:center}
+.shell.sidebar-collapsed .brandtext,
+.shell.sidebar-collapsed .nav-label,
+.shell.sidebar-collapsed .sidefoot{display:none}
+.shell.sidebar-collapsed .brand .logo{width:36px;height:36px;flex:0 0 36px}
+.shell.sidebar-collapsed .sidebar-toggle{position:absolute;right:-7px;top:43px;width:25px;height:25px;border-radius:50%;background:#17345e;box-shadow:0 2px 8px rgba(0,0,0,.18);z-index:2}
+.shell.sidebar-collapsed .nav button{justify-content:center;padding-left:8px;padding-right:8px}
+.shell.sidebar-collapsed .nav-icon{font-size:17px}
+.shell.sidebar-collapsed .content{padding-left:20px}
+
+@media(max-width:760px){
+  .shell.sidebar-collapsed{grid-template-columns:1fr}
+  .shell.sidebar-collapsed .brandtext,
+  .shell.sidebar-collapsed .nav-label,
+  .shell.sidebar-collapsed .sidefoot{display:block}
+  .shell.sidebar-collapsed .nav button{justify-content:flex-start}
+  .shell.sidebar-collapsed .sidebar-toggle{position:static;width:30px;height:30px;border-radius:8px;background:rgba(255,255,255,.07);box-shadow:none}
+  .cardhead{align-items:flex-start;flex-direction:column}
+  .table-actions{width:100%;justify-content:flex-start}
+}
+
+
+/* V8 — ordre du menu configurable par glisser-déposer */
+.nav-grip{
+  flex:0 0 12px;
+  width:12px;
+  margin-right:-3px;
+  color:#7f94b2;
+  font-size:12px;
+  line-height:1;
+  cursor:grab;
+  user-select:none;
+  opacity:.65;
+}
+.nav button:hover .nav-grip{opacity:1;color:#cbd8ea}
+.nav button.dragging{
+  opacity:.45;
+  background:rgba(255,255,255,.08);
+}
+.nav button.drag-over-before{box-shadow:inset 0 2px 0 #8aa8ff}
+.nav button.drag-over-after{box-shadow:inset 0 -2px 0 #8aa8ff}
+.nav.drag-active button{cursor:grabbing}
+.nav.menu-order-dirty + .menu-config .menu-config-btn:first-child{
+  background:#5b4df5;
+  border-color:#766bff;
+  color:#fff;
+}
+.menu-config{
+  margin-top:12px;
+  padding:12px 4px 0;
+  border-top:1px solid rgba(255,255,255,.10);
+  display:grid;
+  gap:6px;
+}
+.menu-config-btn{
+  width:100%;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.08);
+  color:#e6edf8;
+  border-radius:8px;
+  padding:8px 9px;
+  text-align:left;
+  font-size:11px;
+  font-weight:750;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.menu-config-btn:hover{background:rgba(255,255,255,.14)}
+.menu-config-btn.ghost{background:transparent;color:#b9c8dc}
+.shell.sidebar-collapsed .nav-grip{display:none}
+.shell.sidebar-collapsed .menu-config{
+  padding-left:0;
+  padding-right:0;
+}
+.shell.sidebar-collapsed .menu-config-btn{
+  padding:8px 0;
+  text-align:center;
+}
+.shell.sidebar-collapsed .menu-config-btn span{display:none}
+
+@media(max-width:760px){
+  .shell.sidebar-collapsed .nav-grip{display:inline-block}
+  .shell.sidebar-collapsed .menu-config-btn{text-align:left;padding:8px 9px}
+  .shell.sidebar-collapsed .menu-config-btn span{display:inline}
+}
+
+
+/* V9 — personnalisation des libellés du menu */
+.menu-modal-overlay{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  background:rgba(10,18,30,.58);
+  backdrop-filter:blur(4px);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:24px;
+}
+.menu-modal{
+  width:min(720px,96vw);
+  max-height:min(760px,92vh);
+  overflow:auto;
+  background:#fff;
+  color:#172033;
+  border-radius:16px;
+  box-shadow:0 24px 70px rgba(0,0,0,.28);
+  border:1px solid #dfe6f1;
+}
+.menu-modal-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:20px;
+  padding:20px 22px 14px;
+  border-bottom:1px solid #e8edf5;
+}
+.menu-modal-head h3{
+  margin:0 0 4px;
+  font-size:18px;
+}
+.menu-modal-head p{
+  margin:0;
+  color:#6e7c91;
+  font-size:12px;
+}
+.menu-modal-close{
+  border:0;
+  background:transparent;
+  font-size:26px;
+  line-height:1;
+  cursor:pointer;
+  color:#6b7788;
+}
+.menu-rename-list{
+  display:grid;
+  gap:8px;
+  padding:18px 22px;
+}
+.menu-rename-row{
+  display:grid;
+  grid-template-columns:28px minmax(145px, .8fr) minmax(220px, 1.4fr);
+  gap:10px;
+  align-items:center;
+}
+.menu-rename-icon{
+  text-align:center;
+  font-size:15px;
+  color:#5d6f87;
+}
+.menu-rename-default{
+  font-size:12px;
+  font-weight:750;
+  color:#36445a;
+}
+.menu-rename-row input{
+  width:100%;
+  min-width:0;
+  border:1px solid #cad4e2;
+  border-radius:8px;
+  padding:8px 10px;
+  font:inherit;
+}
+.menu-rename-row input:focus{
+  outline:2px solid rgba(91,77,245,.18);
+  border-color:#7469f5;
+}
+.menu-modal-actions{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+  padding:14px 22px 20px;
+  border-top:1px solid #e8edf5;
+}
+.menu-modal-actions-right{
+  display:flex;
+  gap:8px;
+}
+
+@media(max-width:680px){
+  .menu-rename-row{
+    grid-template-columns:26px 1fr;
+  }
+  .menu-rename-row input{
+    grid-column:1 / -1;
+  }
+  .menu-modal-actions{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .menu-modal-actions-right{
+    justify-content:flex-end;
+  }
+}
+
+
+/* V10 — configuration globale du menu dans Grist */
+.menu-admin-table .drag-col{width:34px}
+.menu-row-grip{
+  width:34px;
+  text-align:center;
+  cursor:grab;
+  user-select:none;
+  color:#72839a;
+  font-weight:900;
+  letter-spacing:-2px;
+}
+.menu-admin-table tbody tr[draggable="true"]{transition:opacity .12s ease,box-shadow .12s ease}
+.menu-admin-table tbody tr.dragging{opacity:.45}
+.menu-admin-table tbody tr.drag-over-before{box-shadow:inset 0 3px 0 #6e67ef}
+.menu-admin-table tbody tr.drag-over-after{box-shadow:inset 0 -3px 0 #6e67ef}
+.menu-admin-note{
+  padding:12px 16px 16px;
+  font-size:12px;
+  color:#68778b;
+}

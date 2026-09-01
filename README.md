@@ -26,3 +26,15 @@ Exécuter d'abord `migrate_multifournisseurs.py`, puis `migrate_roi_v5.py`.
 - Comparaison de scénarios enrichie avec les économies annuelles.
 
 Le paramètre `Nb_Jours_Ouvres_Annuels` est ajouté aux scénarios. La migration l'initialise à 218 uniquement comme valeur de départ modifiable.
+
+
+## V8
+Le menu latéral est réordonnable par glisser-déposer et son ordre peut être enregistré dans le navigateur.
+
+
+## V9
+Les libellés des items du menu latéral peuvent être renommés et sauvegardés localement depuis le bouton **Renommer les menus**.
+
+
+## V10
+La configuration globale du menu (ordre, libellés, activation) est désormais stockée dans Grist et administrée depuis un écran réservé à l'Owner.
