@@ -243,3 +243,36 @@
   font-size:12px;
   color:#68778b;
 }
+
+/* V11 — lecture seule hors Scénarios pour les utilisateurs non-Owner */
+.readonly-control{
+  background:#f5f7fa !important;
+  color:#66758a !important;
+  cursor:not-allowed !important;
+}
+
+
+/* V12 — droits utilisateurs multi-domaines */
+.domain-multiselect{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  min-width:300px;
+}
+.domain-chip{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  padding:5px 8px;
+  border:1px solid #d7dfeb;
+  border-radius:999px;
+  background:#f8fafc;
+  font-size:11px;
+  cursor:pointer;
+  white-space:nowrap;
+}
+.domain-chip:has(input:checked){
+  border-color:#8a84f4;
+  background:#f0efff;
+}
+.domain-chip input{margin:0}

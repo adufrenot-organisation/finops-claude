@@ -13,7 +13,7 @@ DEFAULTS = [
     ("simulation", "Simulation", 20, True, False),
     ("compare", "Comparaison", 30, True, False),
     ("roi", "ROI / Économies", 40, True, False),
-    ("scenarios", "Scénarios", 50, True, True),
+    ("scenarios", "Scénarios", 50, True, False),
     ("offers", "Fournisseurs & offres", 60, True, True),
     ("domains", "Domaines", 70, True, True),
     ("rights", "Droits utilisateurs", 80, True, True),

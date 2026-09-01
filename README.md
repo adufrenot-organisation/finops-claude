@@ -38,3 +38,7 @@ Les libellés des items du menu latéral peuvent être renommés et sauvegardés
 
 ## V10
 La configuration globale du menu (ordre, libellés, activation) est désormais stockée dans Grist et administrée depuis un écran réservé à l'Owner.
+
+
+## V12
+Support des utilisateurs multi-domaines via `Domaines_Autorises` (`RefList:Domaines`).

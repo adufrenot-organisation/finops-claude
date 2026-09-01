@@ -7,14 +7,15 @@ function money(v,c="USD"){return new Intl.NumberFormat("fr-FR",{style:"currency"
 function toast(m,e=false){const x=document.getElementById("toast");if(!x)return;x.textContent=m;x.className="toast show"+(e?" error":"");setTimeout(()=>x.className="toast",2400)}
 async function fetchAll(){const names=Object.values(T),raw=await Promise.all(names.map(n=>grist.docApi.fetchTable(n).catch(()=>({id:[]}))));const o={};names.forEach((n,i)=>o[n]=rows(raw[i]));o.domainById=Object.fromEntries(o[T.domains].map(r=>[r.id,r]));o.scenarioById=Object.fromEntries(o[T.scenarios].map(r=>[r.id,r]));o.providerById=Object.fromEntries(o[T.providers].map(r=>[r.id,r]));o.offerById=Object.fromEntries(o[T.offers].map(r=>[r.id,r]));return o}
 async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
-function deriveAccess(){const rr=D[T.rights].filter(r=>r.Actif!==false);if(rr.some(r=>String(r.Role_App).toLowerCase()==="admin")){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:rr};return}if(rr.length){ACCESS={role:"DOMAIN_USER",domainIds:[...new Set(rr.map(r=>+r.Domaine).filter(Boolean))],rights:rr};return}const visibleDomains=[...new Set(D[T.alloc].map(r=>+r.Domaine).filter(Boolean))];if(D[T.domains].length>1&&visibleDomains.length>1){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:[]};return}ACCESS={role:"DENIED",domainIds:[]}}
+function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
+function deriveAccess(){const rr=D[T.rights].filter(r=>r.Actif!==false);if(rr.some(r=>String(r.Role_App).toLowerCase()==="admin")){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:rr};return}if(rr.length){const ids=[];rr.forEach(r=>{const multi=refListIds(r.Domaines_Autorises);if(multi.length)ids.push(...multi);else if(+r.Domaine)ids.push(+r.Domaine)});ACCESS={role:"DOMAIN_USER",domainIds:[...new Set(ids)],rights:rr};return}const visibleDomains=[...new Set(D[T.alloc].map(r=>+r.Domaine).filter(Boolean))];if(D[T.domains].length>1&&visibleDomains.length>1){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:[]};return}ACCESS={role:"DENIED",domainIds:[]}}
 function menuConfigRows(){
   const fallback=[
     {Cle:'dashboard',Libelle:'Dashboard',Ordre:10,Actif:true,Owner_Seulement:false},
     {Cle:'simulation',Libelle:'Simulation',Ordre:20,Actif:true,Owner_Seulement:false},
     {Cle:'compare',Libelle:'Comparaison',Ordre:30,Actif:true,Owner_Seulement:false},
     {Cle:'roi',Libelle:'ROI / Économies',Ordre:40,Actif:true,Owner_Seulement:false},
-    {Cle:'scenarios',Libelle:'Scénarios',Ordre:50,Actif:true,Owner_Seulement:true},
+    {Cle:'scenarios',Libelle:'Scénarios',Ordre:50,Actif:true,Owner_Seulement:false},
     {Cle:'offers',Libelle:'Fournisseurs & offres',Ordre:60,Actif:true,Owner_Seulement:true},
     {Cle:'domains',Libelle:'Domaines',Ordre:70,Actif:true,Owner_Seulement:true},
     {Cle:'rights',Libelle:'Droits utilisateurs',Ordre:80,Actif:true,Owner_Seulement:true},
@@ -47,13 +48,35 @@ function renderShell(){
   }
   const admin=ACCESS.role==="OWNER";
   const navHtml=buildNavHtml(admin);
-  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section>${admin?'<section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
+  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-scenarios" class="view"></section>${admin?'<section id="v-offers" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
   document.getElementById('refresh').onclick=boot;
   const toggle=document.getElementById('sidebarToggle');
   const initial=localStorage.getItem('finopsSidebarCollapsed')==='1';
   setSidebarCollapsed(initial);
   toggle.onclick=()=>setSidebarCollapsed(!document.querySelector('.shell').classList.contains('sidebar-collapsed'));
+}
+
+const AUTHORIZED_CAN_EDIT_SCENARIOS=true;
+function isOwner(){return ACCESS.role==='OWNER'}
+function canEditView(view){return isOwner() || (AUTHORIZED_CAN_EDIT_SCENARIOS && view==='scenarios')}
+function enforceReadOnlyForNonOwner(){
+  if(isOwner())return;
+  document.querySelectorAll('.view').forEach(view=>{
+    const key=(view.id||'').replace(/^v-/,'');
+    if(key==='scenarios')return;
+    view.querySelectorAll('input,select,textarea,button').forEach(el=>{
+      // Keep harmless navigation/refresh controls outside views untouched.
+      if(el.closest('.read-only-exempt'))return;
+      if(el.matches('button')){
+        // Hide action buttons in non-scenario business screens for non-owner users.
+        if(!el.classList.contains('linklike')) el.style.display='none';
+      }else{
+        el.disabled=true;
+        el.classList.add('readonly-control');
+      }
+    });
+  });
 }
 
 const DEFAULT_MENU_LABELS={
@@ -85,7 +108,7 @@ for(const d of Object.values(bd)){d.budgetAnnualized=d.eur*12/months;d.baselineP
 const savingPct=baselineAnnual?savingAnnual/baselineAnnual:0;
 return{s,alloc,baseline,bd,bo,bp,fixed,included,over,total,licenses,unresolved,rate,months,baselineAnnual,budgetPeriodEUR,budgetAnnualizedEUR,baselinePeriod,savingPeriod,savingAnnual,savingPct}
 }
-function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();if(ACCESS.role==='OWNER'){renderScenarios();renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin()}}
+function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderScenarios();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin()}enforceReadOnlyForNonOwner()}
 function renderDashboard(){const m=CURRENT,el=document.getElementById('v-dashboard'),offers=Object.values(m.bo),domains=Object.values(m.bd).sort((a,b)=>b.total-a.total);const unresolved=m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:'<span class="badge ok">Tous les tarifs chiffrés</span>';el.innerHTML=`<div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':'<span class="badge ok">Chiffré</span>'}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;renderCharts()}
 function renderCharts(){const ps=Object.values(CURRENT.bp),sum=Math.max(1,CURRENT.total);let acc=0,st=[];ps.forEach((x,i)=>{const a=acc;acc+=x.total/sum*100;st.push(`${COLORS[i%COLORS.length]} ${a}% ${acc}%`)});document.getElementById('providerDonut').innerHTML=`<div class="donutwrap"><div class="donut" style="background:conic-gradient(${st.join(',')||'#e8ebf0 0 100%'})"></div><div class="donutcenter">${money(CURRENT.total)}</div></div><div class="legend">${ps.map((x,i)=>`<div class="legendrow"><span class="dot" style="background:${COLORS[i%COLORS.length]}"></span><span>${esc(x.p.Nom)}</span><b>${pct(x.total/sum)}</b></div>`).join('')}</div>`;const ds=Object.values(CURRENT.bd).sort((a,b)=>b.total-a.total),mx=Math.max(1,...ds.map(x=>x.total));document.getElementById('domainBars').innerHTML=ds.map(x=>`<div class="barrow"><span>${esc(x.d.Nom)}</span><div class="bartrack"><div class="barfill" style="width:${x.total/mx*100}%"></div></div><span class="num">${money(x.total)}</span></div>`).join('')}
 function renderSimulation(){const el=document.getElementById('v-simulation'),m=CURRENT;el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Allocations du scénario</h3><p>Une ligne = un domaine + une offre. Modifie plusieurs lignes puis enregistre-les en une seule fois.</p></div><div class="table-actions"><button id="saveAllAlloc" class="btn primary">Enregistrer les modifications</button><button id="addAlloc" class="btn secondary">+ Ajouter une allocation</button></div></div><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Mois facturés</th><th>Engagement</th><th>Tarif négocié mensuel</th><th>Tarif négocié annuel</th><th>Overage prévu /mois/lic.</th><th>Plafond overage</th><th>Total</th><th></th></tr></thead><tbody>${m.alloc.map(a=>allocRow(a)).join('')}</tbody></table></div></article><article id="newAllocCard" class="card hidden"></article>`;document.getElementById('addAlloc').onclick=showNewAlloc;document.getElementById('saveAllAlloc').onclick=saveAllAllocations;document.querySelectorAll('.delAlloc').forEach(b=>b.onclick=()=>delRecord(T.alloc,+b.dataset.id))}
@@ -135,7 +158,7 @@ async function saveMenuConfig(){
     const key=tr.dataset.menuKey;
     const label=(tr.querySelector('[data-f="Libelle"]')?.value||'').trim()||DEFAULT_MENU_LABELS[key]||key;
     const active=!!tr.querySelector('[data-f="Actif"]')?.checked;
-    const defaultOwner=['scenarios','offers','domains','rights','menuadmin'].includes(key);
+    const defaultOwner=['offers','domains','rights','menuadmin'].includes(key);
     const fields={Cle:key,Libelle:label,Ordre:(index+1)*10,Actif:active,Owner_Seulement:defaultOwner};
     actions.push(id?["UpdateRecord",T.menu,id,fields]:["AddRecord",T.menu,null,fields]);
   });
@@ -153,4 +176,21 @@ function resetMenuConfigDraft(){
   toast("Valeurs par défaut chargées. Clique sur Enregistrer pour les appliquer.");
 }
 
-function renderRightsAdmin(){const el=document.getElementById('v-rights');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>La sécurité réelle doit rester configurée dans les Access Rules Grist.</p></div><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div><div class="tablewrap"><table><thead><tr><th>Email</th><th>Domaine</th><th>Rôle</th><th>Actif</th><th>Commentaire</th></tr></thead><tbody>${D[T.rights].map(r=>`<tr data-r="${r.id}"><td><input class="admin-input" data-f="Email" value="${esc(r.Email||'')}"></td><td><select class="admin-input" data-f="Domaine">${D[T.domains].map(d=>`<option value="${d.id}" ${+r.Domaine===+d.id?'selected':''}>${esc(d.Nom)}</option>`).join('')}</select></td><td><select class="admin-input" data-f="Role_App"><option ${r.Role_App==='Domaine'?'selected':''}>Domaine</option><option ${r.Role_App==='Admin'?'selected':''}>Admin</option></select></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td></tr>`).join('')}</tbody></table></div></article>`;document.getElementById('saveAllRights').onclick=()=>saveAllGeneric('v-rights',T.rights,'tr[data-r]','data-r','droit(s) utilisateur')}
+function renderRightsAdmin(){
+  const el=document.getElementById('v-rights');
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>Un utilisateur peut être rattaché à plusieurs domaines. Coche tous les domaines auxquels il doit avoir accès.</p></div><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div><div class="tablewrap"><table><thead><tr><th>Email</th><th>Domaines autorisés</th><th>Rôle</th><th>Actif</th><th>Commentaire</th></tr></thead><tbody>${D[T.rights].map(r=>{const multi=refListIds(r.Domaines_Autorises),selected=new Set(multi.length?multi:(+r.Domaine?[+r.Domaine]:[]));return`<tr data-r="${r.id}"><td><input class="admin-input" data-f="Email" value="${esc(r.Email||'')}"></td><td><div class="domain-multiselect">${D[T.domains].filter(d=>d.Actif!==false).map(d=>`<label class="domain-chip"><input type="checkbox" data-domain-id="${d.id}" ${selected.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></td><td><select class="admin-input" data-f="Role_App"><option ${r.Role_App==='Domaine'?'selected':''}>Domaine</option><option ${r.Role_App==='Admin'?'selected':''}>Admin</option></select></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td></tr>`}).join('')}</tbody></table></div></article>`;
+  document.getElementById('saveAllRights').onclick=saveAllRightsMultiDomain;
+}
+async function saveAllRightsMultiDomain(){
+  const actions=[];
+  document.querySelectorAll('#v-rights tr[data-r]').forEach(tr=>{
+    const id=+tr.dataset.r;
+    const fields=readFields(tr,'[data-f]');
+    const ids=[...tr.querySelectorAll('input[data-domain-id]:checked')].map(x=>+x.dataset.domainId).filter(Boolean);
+    fields.Domaines_Autorises=['L',...ids];
+    fields.Domaine=ids[0]||0;
+    actions.push(["UpdateRecord",T.rights,id,fields]);
+  });
+  if(!actions.length){toast('Aucun droit utilisateur à enregistrer.');return}
+  try{await apply(actions);toast(`${actions.length} droit(s) utilisateur enregistrés.`);await reload()}catch(e){toast(e.message,true)}
+}
