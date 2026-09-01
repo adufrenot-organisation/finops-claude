@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FinOps Claude — Simulation & Restitution</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><div class="brand-mark">◫</div><div><div class="brand-title">FINOPS CLAUDE</div><div class="brand-subtitle">Simulation & restitution</div></div></div>
+    <div class="header-actions"><label class="compare-toggle"><input id="compareToggle" type="checkbox" /><span>Comparer deux scénarios</span></label><a class="ghost-btn" href="./admin.html">Administration</a></div>
+  </header>
+  <main class="page">
+    <section class="toolbar card">
+      <div class="field"><label>Scénario</label><select id="scenarioSelect"></select></div>
+      <div id="compareField" class="field hidden"><label>Comparer à</label><select id="compareScenarioSelect"></select></div>
+      <div class="meta" id="scenarioMeta"></div>
+      <button id="refreshBtn" class="secondary-btn">Actualiser</button>
+    </section>
+    <div id="status" class="status">Connexion à Grist…</div>
+    <section id="kpis" class="kpi-grid"></section>
+    <nav class="tabs">
+      <button class="tab active" data-tab="global">Vue globale</button><button class="tab" data-tab="offers">Par offre</button><button class="tab" data-tab="domains">Par domaine</button><button class="tab" data-tab="simulate">Simulation</button>
+    </nav>
+    <section id="tab-global" class="tab-panel active">
+      <div class="grid-2"><article class="card panel"><div class="panel-title">Répartition du budget</div><div id="budgetDonutWrap" class="donut-wrap"></div></article><article class="card panel"><div class="panel-title">Budget par domaine</div><div id="domainBars" class="bars"></div></article></div>
+      <article id="comparePanel" class="card panel hidden"><div class="panel-title">Comparaison de scénarios</div><div id="compareContent"></div></article>
+    </section>
+    <section id="tab-offers" class="tab-panel">
+      <article class="card panel"><div class="panel-title">Budget par offre</div><div class="table-wrap"><table><thead><tr><th>Offre</th><th>Utilisateurs</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody id="offersBody"></tbody></table></div></article>
+      <article class="card panel"><div class="panel-title">Ventilation de l’offre sélectionnée</div><div class="inline-controls"><label>Offre<select id="offerDetailSelect"><option value="Enterprise - Sièges">Enterprise - Sièges</option><option value="Enterprise - Usage">Enterprise - Usage</option><option value="Pro">Pro</option><option value="Max5x">Max 5x</option><option value="Max20x">Max 20x</option></select></label></div><div class="table-wrap"><table><thead><tr><th>Domaine</th><th>Utilisateurs</th><th>Budget USD</th><th>Budget EUR</th></tr></thead><tbody id="offerDetailBody"></tbody></table></div></article>
+    </section>
+    <section id="tab-domains" class="tab-panel"><article class="card panel"><div class="panel-title">Matrice budgétaire par domaine</div><div class="table-wrap"><table><thead><tr><th>Domaine</th><th>Enterprise sièges</th><th>Enterprise usage</th><th>Pro</th><th>Max 5x</th><th>Max 20x</th><th>Total USD</th><th>Total EUR</th></tr></thead><tbody id="domainsBody"></tbody></table></div></article></section>
+    <section id="tab-simulate" class="tab-panel"><article class="card panel"><div class="panel-head"><div><div class="panel-title">Simulation par domaine</div><div class="muted">Les modifications sont écrites directement dans Grist.</div></div><button id="saveAllBtn" class="primary-btn">Enregistrer les modifications</button></div><div class="table-wrap"><table class="simulation-table"><thead><tr><th>Domaine</th><th>Enterprise</th><th>Usage / user / mois ($)</th><th>Pro</th><th>Max 5x</th><th>Max 20x</th><th>Total estimé</th></tr></thead><tbody id="simulationBody"></tbody></table></div></article></section>
+  </main>
+  <div id="toast" class="toast"></div>
+  <script src="./grist-data.js"></script><script src="./app.js"></script>
+</body></html>
