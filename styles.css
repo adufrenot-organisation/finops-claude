@@ -281,3 +281,13 @@
 .menu-access-select{
   min-width:190px;
 }
+
+/* V14 — rendre le sélecteur d'accès très visible */
+.menu-access-select{
+  min-width:220px !important;
+  font-weight:700;
+  border-width:2px !important;
+}
+.menu-admin-table td:nth-child(5){
+  min-width:240px;
+}
