@@ -50,3 +50,23 @@ L'Owner peut maintenant choisir par onglet entre `Utilisateurs autorisés` et `O
 
 ## V15
 Filtres Dashboard par domaine et fournisseur, combinables et sans modification de données Grist.
+
+
+## V16
+Ajout d'un gestionnaire ACL/Sécurité Owner avec audit, sauvegarde JSON et réconciliation des ACL FinOps via `grist.docApi.applyUserActions()`.
+
+
+## V17
+Création de domaines depuis l'interface Owner et filtre Dashboard multi-domaines.
+
+
+## V18
+CRUD complet sur Droits utilisateurs : création, modification, suppression et multi-domaines.
+
+
+## V19
+Synchronisation immédiate des noms de scénarios dans le filtre global après enregistrement.
+
+
+## V20
+Séparation Offre de service en lecture et Paramétrage offre de service en CRUD Owner, indépendants du scénario.

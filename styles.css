@@ -326,3 +326,116 @@
 .dashboard-filters select{
   min-width:190px;
 }
+
+
+/* V16 — ACL / Sécurité */
+.acl-warning{
+  margin:0 0 16px;
+  padding:12px 14px;
+  border:1px solid #f0d49a;
+  background:#fff8e8;
+  border-radius:12px;
+  font-size:13px;
+}
+.acl-result{
+  margin:14px 0 18px;
+  padding:14px;
+  border:1px solid #dbe3ef;
+  border-radius:12px;
+  background:#f8fafc;
+}
+.acl-audit-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(160px,1fr));
+  gap:12px;
+}
+.acl-audit-grid>div{
+  padding:12px;
+  background:#fff;
+  border:1px solid #e3e8f0;
+  border-radius:10px;
+}
+.acl-audit-grid b{display:block;margin-bottom:6px}
+.acl-matrix{margin-top:18px}
+@media(max-width:1000px){
+  .acl-audit-grid{grid-template-columns:repeat(2,minmax(160px,1fr))}
+}
+
+
+/* V17 — filtre multi-domaines Dashboard */
+.dash-domain-field{min-width:230px}
+.field-label{
+  display:block;
+  font-size:11px;
+  font-weight:700;
+  margin-bottom:5px;
+}
+.dash-domain-picker{position:relative}
+.dash-domain-btn{
+  min-width:230px;
+  justify-content:space-between;
+}
+.dash-domain-menu{
+  position:absolute;
+  z-index:50;
+  top:calc(100% + 6px);
+  left:0;
+  min-width:260px;
+  max-height:320px;
+  overflow:auto;
+  background:#fff;
+  border:1px solid #dbe3ef;
+  border-radius:12px;
+  box-shadow:0 14px 35px rgba(25,40,70,.16);
+  padding:8px;
+}
+.dash-domain-menu.hidden{display:none}
+.dash-domain-actions{
+  display:flex;
+  gap:6px;
+  padding:4px 4px 8px;
+  border-bottom:1px solid #eef2f6;
+  margin-bottom:4px;
+}
+.mini-btn{
+  border:1px solid #dbe3ef;
+  background:#f8fafc;
+  border-radius:8px;
+  padding:5px 8px;
+  font-size:11px;
+  cursor:pointer;
+}
+.dash-domain-option{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  padding:7px 8px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.dash-domain-option:hover{background:#f5f7fb}
+.input-error{
+  border-color:#d92d20 !important;
+  box-shadow:0 0 0 2px rgba(217,45,32,.08) !important;
+}
+
+/* V18 — CRUD droits utilisateurs */
+#rightsBody td:last-child{
+  width:110px;
+  text-align:right;
+}
+
+
+/* V20 — offre de service lecture / paramétrage */
+.service-offers-table table{min-width:1900px}
+.service-offers-admin table{min-width:3600px}
+.service-offers-admin .admin-input{min-width:120px}
+.service-offers-admin .compact{min-width:85px}
+.admin-textarea{
+  min-width:180px;
+  min-height:58px;
+  resize:vertical;
+}
+.service-offers-admin td{
+  vertical-align:top;
+}

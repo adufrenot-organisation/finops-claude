@@ -1,6 +1,6 @@
 const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",rights:"Droits_Utilisateurs",menu:"Configuration_Menu"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
-let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainId:0,providerId:0};
+let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 grist.ready({requiredAccess:"full"}); document.addEventListener("DOMContentLoaded",boot);
 function rows(t){if(!t||!Array.isArray(t.id))return[];return t.id.map((id,i)=>{const r={id};for(const[k,v]of Object.entries(t))if(k!=="id"&&Array.isArray(v))r[k]=v[i];return r})}
 function money(v,c="USD"){return new Intl.NumberFormat("fr-FR",{style:"currency",currency:c,maximumFractionDigits:0}).format(Number(v||0))} function num(v){return new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Number(v||0))} function pct(v){return new Intl.NumberFormat("fr-FR",{style:"percent",maximumFractionDigits:1}).format(Number(v||0))} function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
@@ -16,10 +16,12 @@ function menuConfigRows(){
     {Cle:'compare',Libelle:'Comparaison',Ordre:30,Actif:true,Owner_Seulement:false},
     {Cle:'roi',Libelle:'ROI / Économies',Ordre:40,Actif:true,Owner_Seulement:false},
     {Cle:'scenarios',Libelle:'Scénarios',Ordre:50,Actif:true,Owner_Seulement:false},
-    {Cle:'offers',Libelle:'Fournisseurs & offres',Ordre:60,Actif:true,Owner_Seulement:true},
+    {Cle:'offers',Libelle:'Offre de service',Ordre:60,Actif:true,Owner_Seulement:false},
+    {Cle:'offersadmin',Libelle:'Paramétrage offre de service',Ordre:65,Actif:true,Owner_Seulement:true},
     {Cle:'domains',Libelle:'Domaines',Ordre:70,Actif:true,Owner_Seulement:true},
     {Cle:'rights',Libelle:'Droits utilisateurs',Ordre:80,Actif:true,Owner_Seulement:true},
-    {Cle:'menuadmin',Libelle:'Configuration du menu',Ordre:90,Actif:true,Owner_Seulement:true}
+    {Cle:'menuadmin',Libelle:'Configuration du menu',Ordre:90,Actif:true,Owner_Seulement:true},
+    {Cle:'acladmin',Libelle:'ACL / Sécurité',Ordre:100,Actif:true,Owner_Seulement:true}
   ];
   const known=new Set(fallback.map(x=>x.Cle));
   const source=(D?.[T.menu]||[]).filter(r=>known.has(String(r.Cle||'')));
@@ -33,7 +35,7 @@ function menuLabel(view){
   return r?.Libelle||DEFAULT_MENU_LABELS[view]||view;
 }
 function navIcon(view){
-  return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',scenarios:'▤',offers:'¤',domains:'◎',rights:'♙',menuadmin:'☷'}[view]||'•';
+  return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',scenarios:'▤',offers:'¤',offersadmin:'⚙',domains:'◎',rights:'♙',menuadmin:'☷',acladmin:'🔐'}[view]||'•';
 }
 function buildNavHtml(admin){
   return menuConfigRows()
@@ -48,7 +50,7 @@ function renderShell(){
   }
   const admin=ACCESS.role==="OWNER";
   const navHtml=buildNavHtml(admin);
-  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-scenarios" class="view"></section>${admin?'<section id="v-offers" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
+  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${admin?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-acladmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
   document.getElementById('refresh').onclick=boot;
   const toggle=document.getElementById('sidebarToggle');
@@ -85,21 +87,32 @@ const DEFAULT_MENU_LABELS={
   compare:'Comparaison',
   roi:'ROI / Économies',
   scenarios:'Scénarios',
-  offers:'Fournisseurs & offres',
+  offers:'Offre de service',
+  offersadmin:'Paramétrage offre de service',
   domains:'Domaines',
   rights:'Droits utilisateurs',
-  menuadmin:'Configuration du menu'
+  menuadmin:'Configuration du menu',
+  acladmin:'ACL / Sécurité'
 };
 
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
-function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v)}
+function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['offers','offersadmin','domains','rights','menuadmin','acladmin'].includes(v)?'none':''}
 function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))} function scopedAlloc(sid){return D[T.alloc].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))} function scopedBaseline(sid){return D[T.baseline].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))}
-function populateScenario(){const s=document.getElementById('scenarioSelect');s.innerHTML=D[T.scenarios].map(x=>`<option value="${x.id}">${esc(x.Nom)}</option>`).join('');s.onchange=renderAll}
+function populateScenario(preferredId=0){
+  const sel=document.getElementById('scenarioSelect');
+  if(!sel)return;
+  const currentId=+(preferredId||sel.value||0);
+  const scenarios=(D[T.scenarios]||[]).slice().sort((a,b)=>(+a.Annee||0)-(+b.Annee||0)||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));
+  sel.innerHTML=scenarios.map(s=>`<option value="${s.id}">${esc(s.Nom||('Scénario '+s.id))}</option>`).join('');
+  const valid=scenarios.some(s=>+s.id===currentId);
+  if(valid)sel.value=String(currentId);
+  else if(scenarios.length)sel.value=String(scenarios[0].id);
+}
 function selectedScenario(){return D.scenarioById[+document.getElementById('scenarioSelect').value]}
 function model(sid,filter=null){
 const s=D.scenarioById[+sid];
-const domainId=+(filter?.domainId||0),providerId=+(filter?.providerId||0);
-const domains=scopedDomains().filter(d=>!domainId||+d.id===domainId);
+const domainIds=new Set((filter?.domainIds||[]).map(Number).filter(Boolean)),providerId=+(filter?.providerId||0);
+const domains=scopedDomains().filter(d=>!domainIds.size||domainIds.has(+d.id));
 const allowedDomainIds=new Set(domains.map(d=>+d.id));
 const alloc=scopedAlloc(sid).filter(a=>{
   if(!allowedDomainIds.has(+a.Domaine))return false;
@@ -119,11 +132,12 @@ for(const d of Object.values(bd)){d.budgetAnnualized=d.eur*12/months;d.baselineP
 const savingPct=baselineAnnual?savingAnnual/baselineAnnual:0;
 return{s,alloc,baseline,bd,bo,bp,fixed,included,over,total,licenses,unresolved,rate,months,baselineAnnual,budgetPeriodEUR,budgetAnnualizedEUR,baselinePeriod,savingPeriod,savingAnnual,savingPct}
 }
-function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderScenarios();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin()}enforceReadOnlyForNonOwner()}
+function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderScenarios();renderOffersReadOnly();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderAclAdmin()}enforceReadOnlyForNonOwner()}
 function dashboardFilterOptions(){
   const domains=scopedDomains().sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
   const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
-  if(DASH_FILTER.domainId&&!domains.some(d=>+d.id===+DASH_FILTER.domainId))DASH_FILTER.domainId=0;
+  const valid=new Set(domains.map(d=>+d.id));
+  DASH_FILTER.domainIds=(DASH_FILTER.domainIds||[]).map(Number).filter(id=>valid.has(id));
   if(DASH_FILTER.providerId&&!providers.some(p=>+p.id===+DASH_FILTER.providerId))DASH_FILTER.providerId=0;
   return{domains,providers};
 }
@@ -133,14 +147,31 @@ function renderDashboard(){
   const el=document.getElementById('v-dashboard');
   const offers=Object.values(m.bo),domains=Object.values(m.bd).sort((a,b)=>b.total-a.total);
   const unresolved=m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:'<span class="badge ok">Tous les tarifs chiffrés</span>';
-  const activeDomain=opts.domains.find(d=>+d.id===+DASH_FILTER.domainId);
+  const selectedDomainSet=new Set((DASH_FILTER.domainIds||[]).map(Number));
+  const activeDomains=opts.domains.filter(d=>selectedDomainSet.has(+d.id));
   const activeProvider=opts.providers.find(p=>+p.id===+DASH_FILTER.providerId);
-  const filterSummary=[activeDomain?`Domaine : ${esc(activeDomain.Nom)}`:'Tous les domaines',activeProvider?`Fournisseur : ${esc(activeProvider.Nom)}`:'Tous les fournisseurs'].join(' · ');
-  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><label class="field">Domaine<select id="dashDomainFilter"><option value="0">Tous les domaines</option>${opts.domains.map(d=>`<option value="${d.id}" ${+DASH_FILTER.domainId===+d.id?'selected':''}>${esc(d.Nom)}</option>`).join('')}</select></label><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':'<span class="badge ok">Chiffré</span>'}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;
-  const df=document.getElementById('dashDomainFilter'),pf=document.getElementById('dashProviderFilter'),reset=document.getElementById('dashResetFilters');
-  df.onchange=()=>{DASH_FILTER.domainId=+df.value||0;renderDashboard()};
+  const domainSummary=activeDomains.length?activeDomains.map(d=>d.Nom).join(', '):'Tous les domaines';
+  const filterSummary=[`Domaines : ${esc(domainSummary)}`,activeProvider?`Fournisseur : ${esc(activeProvider.Nom)}`:'Tous les fournisseurs'].join(' · ');
+  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><div class="field dash-domain-field"><span class="field-label">Domaines</span><div class="dash-domain-picker"><button id="dashDomainPickerBtn" class="btn secondary dash-domain-btn">${activeDomains.length?`${activeDomains.length} domaine(s) sélectionné(s)`:'Tous les domaines'} ▾</button><div id="dashDomainMenu" class="dash-domain-menu hidden"><div class="dash-domain-actions"><button id="dashAllDomains" class="mini-btn">Tous</button><button id="dashNoDomains" class="mini-btn">Aucun</button></div>${opts.domains.map(d=>`<label class="dash-domain-option"><input type="checkbox" data-dash-domain="${d.id}" ${selectedDomainSet.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></div></div><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':'<span class="badge ok">Chiffré</span>'}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;
+  const pf=document.getElementById('dashProviderFilter'),reset=document.getElementById('dashResetFilters');
+  const pickerBtn=document.getElementById('dashDomainPickerBtn'),menu=document.getElementById('dashDomainMenu');
+  pickerBtn.onclick=e=>{e.stopPropagation();menu.classList.toggle('hidden')};
+  menu.onclick=e=>e.stopPropagation();
+  document.addEventListener('click',()=>menu.classList.add('hidden'),{once:true});
+  menu.querySelectorAll('input[data-dash-domain]').forEach(cb=>cb.onchange=()=>{
+    DASH_FILTER.domainIds=[...menu.querySelectorAll('input[data-dash-domain]:checked')].map(x=>+x.dataset.dashDomain);
+    renderDashboard();
+  });
+  document.getElementById('dashAllDomains').onclick=()=>{
+    DASH_FILTER.domainIds=opts.domains.map(d=>+d.id);
+    renderDashboard();
+  };
+  document.getElementById('dashNoDomains').onclick=()=>{
+    DASH_FILTER.domainIds=[];
+    renderDashboard();
+  };
   pf.onchange=()=>{DASH_FILTER.providerId=+pf.value||0;renderDashboard()};
-  reset.onclick=()=>{DASH_FILTER={domainId:0,providerId:0};renderDashboard()};
+  reset.onclick=()=>{DASH_FILTER={domainIds:[],providerId:0};renderDashboard()};
   renderCharts(m);
 }
 function renderCharts(m){
@@ -158,7 +189,13 @@ async function saveAllAllocations(){const actions=[...document.querySelectorAll(
 function readFields(tr,selector='[data-f]'){const f={};tr.querySelectorAll(selector).forEach(i=>{let v=i.type==='checkbox'?i.checked:i.value;if(i.type==='number')v=+v||0;else if(i.tagName==='SELECT'&&i.dataset.f==='Domaine'&&/^\d+$/.test(v))v=+v;f[i.dataset.f]=v});return f}
 async function saveAllGeneric(viewId,table,rowSelector,idAttr,label){const root=document.getElementById(viewId);const actions=[...root.querySelectorAll(rowSelector)].map(tr=>["UpdateRecord",table,+tr.getAttribute(idAttr),readFields(tr)]);if(!actions.length){toast('Aucune ligne à enregistrer.');return}await apply(actions);toast(`${actions.length} ${label} enregistrée(s).`);await reload()}
 async function delRecord(table,id){if(!confirm('Supprimer cette ligne ?'))return;await apply([["RemoveRecord",table,id]]);toast('Ligne supprimée.');await reload()}
-async function apply(actions){try{return await grist.docApi.applyUserActions(actions)}catch(e){toast(e.message,true);throw e}} async function reload(){D=await fetchAll();deriveAccess();renderAll()}
+async function apply(actions){try{return await grist.docApi.applyUserActions(actions)}catch(e){toast(e.message,true);throw e}} async function reload(){
+  const previousScenarioId=+(document.getElementById('scenarioSelect')?.value||selectedScenario()?.id||0);
+  await fetchAll();
+  deriveAccess();
+  populateScenario(previousScenarioId);
+  renderAll();
+}
 function renderCompare(){const el=document.getElementById('v-compare');el.innerHTML=`<article class="card"><h3>Comparer les scénarios</h3><p>Sélectionne jusqu’à 6 scénarios. Les montants « devis à confirmer » ne sont pas artificiellement valorisés à zéro : le budget affiché est le budget connu.</p><div class="checklist">${D[T.scenarios].map((s,i)=>`<label class="checkpill"><input type="checkbox" class="cmp" value="${s.id}" ${i<Math.min(3,D[T.scenarios].length)?'checked':''}>${esc(s.Nom)}</label>`).join('')}</div><div id="cmpOut" style="margin-top:14px"></div></article>`;document.querySelectorAll('.cmp').forEach(x=>x.onchange=drawCompare);drawCompare()}
 function drawCompare(){const ids=[...document.querySelectorAll('.cmp:checked')].slice(0,6).map(x=>+x.value),ms=ids.map(model);document.getElementById('cmpOut').innerHTML=`<div class="comparegrid">${ms.map(m=>`<div class="comparecard"><h4>${esc(m.s.Nom)}</h4><div class="big">${money(m.total)}</div><div class="muted">${money(m.total*m.rate,'EUR')} · ${num(m.licenses)} licences</div><div class="roi-line">Économie annuelle : <b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b> · ${pct(m.savingPct)}</div><div style="margin-top:8px">${m.unresolved?`<span class="badge warn">${m.unresolved} devis à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div></div>`).join('')}</div><div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Scénario</th><th>Fixe</th><th>Overage</th><th>Budget connu USD</th><th>Budget connu EUR</th><th>Économie annuelle</th><th>Économie %</th><th>Tarifs à confirmer</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td><td class="num ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</td><td class="num">${m.unresolved}</td></tr>`).join('')}</tbody></table></div>`}
 function renderROI(){const el=document.getElementById('v-roi'),m=CURRENT,bmap=Object.fromEntries(m.baseline.map(b=>[b.Domaine,b]));const rowsHtml=Object.values(m.bd).map(x=>{const b=bmap[x.d.id];return `<tr data-bid="${b?.id||''}" data-domain="${x.d.id}"><td><b>${esc(x.d.Nom)}</b></td><td><input class="admin-input roi-edit" data-f="Nb_Collaborateurs_N_1" type="number" min="0" step="0.1" value="${+b?.Nb_Collaborateurs_N_1||0}"></td><td><input class="admin-input roi-edit" data-f="TJM_EUR" type="number" min="0" step="1" value="${+b?.TJM_EUR||0}"></td><td><input class="admin-input roi-edit" data-f="Jours_Ouvres_Override" type="number" min="0" value="${+b?.Jours_Ouvres_Override||0}" title="0 = utiliser le nombre de jours du scénario"></td><td class="num">${num(x.days)}</td><td class="num">${money(x.baselineAnnual,'EUR')}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${money(x.budgetAnnualized,'EUR')}</td><td class="num ${x.savingPeriod<0?'negative':''}">${money(x.savingPeriod,'EUR')}</td><td class="num ${x.savingAnnual<0?'negative':''}"><b>${money(x.savingAnnual,'EUR')}</b></td><td class="num ${x.savingPct<0?'negative':''}">${pct(x.savingPct)}</td><td class="num">${num(x.daysEquivalent)}</td><td class="num">${x.fteEquivalent.toFixed(2).replace('.',',')}</td></tr>`}).join('');
@@ -167,8 +204,188 @@ async function saveAllBaseline(){const actions=[];document.querySelectorAll('#v-
 function renderScenarios(){const el=document.getElementById('v-scenarios');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Scénarios</h3><p>Modifie plusieurs scénarios puis enregistre-les en une seule fois.</p></div><div class="table-actions"><button id="saveAllScenarios" class="btn primary">Enregistrer les modifications</button><button id="newScenario" class="btn secondary">+ Nouveau</button></div></div><div class="tablewrap"><table><thead><tr><th>Nom</th><th>Année</th><th>Mois</th><th>USD/EUR</th><th>Utilisation</th><th>Jours ouvrés/an</th><th>Statut</th></tr></thead><tbody>${D[T.scenarios].map(s=>`<tr data-s="${s.id}"><td><input class="admin-input" data-f="Nom" value="${esc(s.Nom)}"></td><td><input class="admin-input" data-f="Annee" type="number" value="${+s.Annee||0}"></td><td><input class="admin-input" data-f="Nb_Mois" type="number" value="${+s.Nb_Mois||0}"></td><td><input class="admin-input" data-f="Taux_USD_EUR" type="number" step="0.001" value="${+s.Taux_USD_EUR||0}"></td><td><input class="admin-input" data-f="Taux_Utilisation" type="number" step="0.05" value="${+s.Taux_Utilisation||0}"></td><td><input class="admin-input" data-f="Nb_Jours_Ouvres_Annuels" type="number" min="1" value="${+s.Nb_Jours_Ouvres_Annuels||218}"></td><td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td></tr>`).join('')}</tbody></table></div></article>`;document.getElementById('saveAllScenarios').onclick=()=>saveAllGeneric('v-scenarios',T.scenarios,'tr[data-s]','data-s','ligne(s) scénario');document.getElementById('newScenario').onclick=async()=>{await apply([["AddRecord",T.scenarios,null,{Nom:'Nouveau scénario',Annee:2027,Nb_Mois:12,Taux_USD_EUR:.86,Taux_Utilisation:1,Nb_Jours_Ouvres_Annuels:218,Statut:'Travail',Commentaire:''}]]);await reload()}}
 async function saveGenericRow(sel,table,id){const tr=document.querySelector(sel);if(!tr)return;await apply([["UpdateRecord",table,id,readFields(tr)]]);toast('Enregistré.');await reload()}
 function ynBadge(v){return `<span class="badge ${v==='Oui'?'ok':v==='Non'?'no':'warn'}">${esc(v||'A confirmer')}</span>`}
-function renderOffersAdmin(){const el=document.getElementById('v-offers');const rows=D[T.offers].map(o=>{const p=D.providerById[o.Fournisseur];return`<tr data-o="${o.id}" class="${o.Statut_Tarif==='Devis à confirmer'?'unresolved':''}"><td class="provider">${esc(p?.Nom)}</td><td><b>${esc(o.Nom)}</b><br><span class="muted">${esc(o.Code)}</span></td><td>${esc(o.Periodicite_Prix)}</td><td class="num">${o.Tarif_Catalogue_Mensuel?money(o.Tarif_Catalogue_Mensuel):'—'}</td><td class="num">${o.Tarif_Catalogue_Annuel?money(o.Tarif_Catalogue_Annuel):'—'}</td><td><input class="admin-input" data-f="Tarif_Negocie_Mensuel" type="number" step="0.01" value="${+o.Tarif_Negocie_Mensuel||0}"></td><td><input class="admin-input" data-f="Tarif_Negocie_Annuel" type="number" step="0.01" value="${+o.Tarif_Negocie_Annuel||0}"></td><td>${o.Statut_Tarif==='Devis à confirmer'?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(o.Statut_Tarif)}</span>`}</td><td><div class="proc-grid"><div class="proc">Devis<br>${ynBadge(o.Compatible_Devis)}</div><div class="proc">PO<br>${ynBadge(o.Compatible_PO)}</div><div class="proc">Facture<br>${ynBadge(o.Compatible_Facture)}</div><div class="proc">Virement<br>${ynBadge(o.Compatible_Virement)}</div><div class="proc">Prépayé<br>${ynBadge(o.Compatible_Prepaiement)}</div></div></td><td class="price-source">${esc(o.Source_Tarif||'')}</td></tr>`}).join('');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Fournisseurs & offres</h3><p>Les tarifs Claude « Référence interne » sont conservés. Pour Mistral/Cursor Enterprise, saisis le prix négocié reçu au devis.</p></div><button id="saveAllOffers" class="btn primary">Enregistrer les modifications</button></div><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Période</th><th>Catalogue /mois</th><th>Catalogue /an</th><th>Négocié /mois</th><th>Négocié /an</th><th>Statut</th><th>Procurement</th><th>Source</th></tr></thead><tbody>${rows}</tbody></table></div></article>`;document.getElementById('saveAllOffers').onclick=()=>saveAllGeneric('v-offers',T.offers,'tr[data-o]','data-o','offre(s)')}
-function renderDomainsAdmin(){const el=document.getElementById('v-domains');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Domaines</h3><p>Les modifications de toutes les lignes sont enregistrées ensemble.</p></div><button id="saveAllDomains" class="btn primary">Enregistrer les modifications</button></div><div class="tablewrap"><table><thead><tr><th>Nom</th><th>Actif</th><th>Responsable</th></tr></thead><tbody>${D[T.domains].map(d=>`<tr data-d="${d.id}"><td><input class="admin-input" data-f="Nom" value="${esc(d.Nom)}"></td><td><input data-f="Actif" type="checkbox" ${d.Actif!==false?'checked':''}></td><td><input class="admin-input" data-f="Responsable" value="${esc(d.Responsable||'')}"></td></tr>`).join('')}</tbody></table></div></article>`;document.getElementById('saveAllDomains').onclick=()=>saveAllGeneric('v-domains',T.domains,'tr[data-d]','data-d','domaine(s)')}
+
+function serviceOfferRowsHtml(edit=false){
+  const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));
+  return D[T.offers].slice().sort((a,b)=>{
+    const pa=D.providerById[a.Fournisseur]?.Nom||'',pb=D.providerById[b.Fournisseur]?.Nom||'';
+    return pa.localeCompare(pb,'fr')||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr');
+  }).map(o=>edit?offerAdminRow(o,providers):offerReadOnlyRow(o)).join('');
+}
+function offerReadOnlyRow(o){
+  const p=D.providerById[o.Fournisseur];
+  return `<tr class="${o.Statut_Tarif==='Devis à confirmer'?'unresolved':''}">
+    <td class="provider">${esc(p?.Nom||'')}</td>
+    <td><b>${esc(o.Nom||'')}</b><br><span class="muted">${esc(o.Code||'')}</span></td>
+    <td>${esc(o.Famille||'')}</td>
+    <td>${esc(o.Periodicite_Prix||'')}</td>
+    <td>${esc(o.Devise||'USD')}</td>
+    <td class="num">${+o.Tarif_Catalogue_Mensuel?money(o.Tarif_Catalogue_Mensuel):'—'}</td>
+    <td class="num">${+o.Tarif_Catalogue_Annuel?money(o.Tarif_Catalogue_Annuel):'—'}</td>
+    <td class="num">${+o.Tarif_Negocie_Mensuel?money(o.Tarif_Negocie_Mensuel):'—'}</td>
+    <td class="num">${+o.Tarif_Negocie_Annuel?money(o.Tarif_Negocie_Annuel):'—'}</td>
+    <td class="num">${+o.Enveloppe_Usage_Incluse_Mois_Licence?money(o.Enveloppe_Usage_Incluse_Mois_Licence):'—'}</td>
+    <td>${esc(o.Usage_Inclus_Description||'')}</td>
+    <td>${ynBadge(o.Overage_Disponible)}</td>
+    <td class="num">${num(o.Engagement_Defaut_Mois||0)}</td>
+    <td>${o.Statut_Tarif==='Devis à confirmer'?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(o.Statut_Tarif||'')}</span>`}</td>
+    <td><div class="proc-grid"><div class="proc">Devis<br>${ynBadge(o.Compatible_Devis)}</div><div class="proc">PO<br>${ynBadge(o.Compatible_PO)}</div><div class="proc">Facture<br>${ynBadge(o.Compatible_Facture)}</div><div class="proc">Virement<br>${ynBadge(o.Compatible_Virement)}</div><div class="proc">Prépayé<br>${ynBadge(o.Compatible_Prepaiement)}</div></div></td>
+    <td class="price-source">${esc(o.Source_Tarif||'')}</td>
+    <td>${o.Actif!==false?'<span class="badge ok">Actif</span>':'<span class="badge">Inactif</span>'}</td>
+  </tr>`;
+}
+function renderOffersReadOnly(){
+  const el=document.getElementById('v-offers');if(!el)return;
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Offre de service</h3><p>Catalogue de référence indépendant des scénarios. Cette vue est en lecture seule.</p></div></div><div class="tablewrap service-offers-table"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Famille</th><th>Période</th><th>Devise</th><th>Catalogue /mois</th><th>Catalogue /an</th><th>Négocié /mois</th><th>Négocié /an</th><th>Usage inclus /mois/lic.</th><th>Description usage</th><th>Overage</th><th>Engagement défaut</th><th>Statut</th><th>Procurement</th><th>Source</th><th>Actif</th></tr></thead><tbody>${serviceOfferRowsHtml(false)}</tbody></table></div></article>`;
+}
+function offerAdminRow(o={},providers=[]){
+  const isNew=!o.id,id=o.id||'';
+  const providerOptions=providers.map(p=>`<option value="${p.id}" ${+o.Fournisseur===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('');
+  const yn=(field)=>`<input data-f="${field}" type="checkbox" ${o[field]!==false?'checked':''}>`;
+  return `<tr data-o="${id}" data-new="${isNew?'1':'0'}">
+    <td><select class="admin-input" data-f="Fournisseur"><option value="">—</option>${providerOptions}</select></td>
+    <td><input class="admin-input" data-f="Nom" value="${esc(o.Nom||'')}" placeholder="Nom de l'offre"><input class="admin-input compact" data-f="Code" value="${esc(o.Code||'')}" placeholder="Code"></td>
+    <td><input class="admin-input" data-f="Famille" value="${esc(o.Famille||'')}"></td>
+    <td><select class="admin-input" data-f="Periodicite_Prix"><option ${o.Periodicite_Prix==='Mensuel'?'selected':''}>Mensuel</option><option ${o.Periodicite_Prix==='Annuel'?'selected':''}>Annuel</option><option ${o.Periodicite_Prix==='Devis'?'selected':''}>Devis</option></select></td>
+    <td><input class="admin-input compact" data-f="Devise" value="${esc(o.Devise||'USD')}"></td>
+    <td><input class="admin-input" data-f="Tarif_Catalogue_Mensuel" type="number" step="0.01" value="${+o.Tarif_Catalogue_Mensuel||0}"></td>
+    <td><input class="admin-input" data-f="Tarif_Catalogue_Annuel" type="number" step="0.01" value="${+o.Tarif_Catalogue_Annuel||0}"></td>
+    <td><input class="admin-input" data-f="Tarif_Reference_Mensuel" type="number" step="0.01" value="${+o.Tarif_Reference_Mensuel||0}"></td>
+    <td><input class="admin-input" data-f="Tarif_Reference_Annuel" type="number" step="0.01" value="${+o.Tarif_Reference_Annuel||0}"></td>
+    <td><input class="admin-input" data-f="Tarif_Negocie_Mensuel" type="number" step="0.01" value="${+o.Tarif_Negocie_Mensuel||0}"></td>
+    <td><input class="admin-input" data-f="Tarif_Negocie_Annuel" type="number" step="0.01" value="${+o.Tarif_Negocie_Annuel||0}"></td>
+    <td><input class="admin-input" data-f="Enveloppe_Usage_Incluse_Mois_Licence" type="number" step="0.01" value="${+o.Enveloppe_Usage_Incluse_Mois_Licence||0}"></td>
+    <td><textarea class="admin-input admin-textarea" data-f="Usage_Inclus_Description">${esc(o.Usage_Inclus_Description||'')}</textarea></td>
+    <td>${yn('Overage_Disponible')}</td>
+    <td>${yn('Facturer_Engagement_Minimum')}</td>
+    <td><input class="admin-input" data-f="Engagement_Defaut_Mois" type="number" min="0" value="${+o.Engagement_Defaut_Mois||0}"></td>
+    <td><input class="admin-input" data-f="Mois_Factures_Defaut" type="number" min="0" value="${+o.Mois_Factures_Defaut||0}"></td>
+    <td>${yn('Compatible_Devis')}</td>
+    <td>${yn('Compatible_PO')}</td>
+    <td>${yn('Compatible_Facture')}</td>
+    <td>${yn('Compatible_Virement')}</td>
+    <td>${yn('Compatible_Prepaiement')}</td>
+    <td><input class="admin-input" data-f="Statut_Tarif" value="${esc(o.Statut_Tarif||'')}"></td>
+    <td><textarea class="admin-input admin-textarea" data-f="Source_Tarif">${esc(o.Source_Tarif||'')}</textarea></td>
+    <td><textarea class="admin-input admin-textarea" data-f="Note_Procurement">${esc(o.Note_Procurement||'')}</textarea></td>
+    <td>${yn('Actif')}</td>
+    <td><button class="btn danger small offer-delete">${isNew?'Annuler':'Supprimer'}</button></td>
+  </tr>`;
+}
+function renderOffersAdmin(){
+  const el=document.getElementById('v-offersadmin');if(!el)return;
+  const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Paramétrage offre de service</h3><p>Vue d'administration indépendante des scénarios. L'Owner peut créer, modifier et supprimer les lignes du catalogue.</p></div><div class="table-actions"><button id="newOffer" class="btn secondary">+ Nouvelle offre</button><button id="saveAllOffers" class="btn primary">Enregistrer les modifications</button></div></div><div class="tablewrap service-offers-admin"><table><thead><tr><th>Fournisseur</th><th>Offre / Code</th><th>Famille</th><th>Période</th><th>Devise</th><th>Catalogue /mois</th><th>Catalogue /an</th><th>Réf. /mois</th><th>Réf. /an</th><th>Négocié /mois</th><th>Négocié /an</th><th>Usage inclus</th><th>Description usage</th><th>Overage</th><th>Facturer engagement min.</th><th>Engagement défaut</th><th>Mois défaut</th><th>Devis</th><th>PO</th><th>Facture</th><th>Virement</th><th>Prépayé</th><th>Statut tarif</th><th>Source</th><th>Note procurement</th><th>Actif</th><th></th></tr></thead><tbody id="offersAdminBody">${D[T.offers].map(o=>offerAdminRow(o,providers)).join('')}</tbody></table></div></article>`;
+  document.getElementById('newOffer').onclick=()=>{
+    document.getElementById('offersAdminBody').insertAdjacentHTML('beforeend',offerAdminRow({Actif:true,Devise:'USD',Periodicite_Prix:'Mensuel',Overage_Disponible:false,Facturer_Engagement_Minimum:false,Compatible_Devis:false,Compatible_PO:false,Compatible_Facture:false,Compatible_Virement:false,Compatible_Prepaiement:false},providers));
+    bindOfferDeleteButtons();
+  };
+  document.getElementById('saveAllOffers').onclick=saveAllOffersV20;
+  bindOfferDeleteButtons();
+}
+function bindOfferDeleteButtons(){
+  document.querySelectorAll('#offersAdminBody .offer-delete').forEach(btn=>btn.onclick=async()=>{
+    const tr=btn.closest('tr');
+    if(tr.dataset.new==='1'){tr.remove();return}
+    const id=+tr.dataset.o;
+    const offer=D[T.offers].find(o=>+o.id===id);
+    if(!confirm(`Supprimer l'offre "${offer?.Nom||id}" ?\n\nLa suppression échouera si cette offre est encore référencée dans des allocations.`))return;
+    try{
+      await apply([["RemoveRecord",T.offers,id]]);
+      toast("Offre supprimée.");
+      await reload();
+    }catch(e){toast("Suppression impossible : "+(e.message||String(e)),true)}
+  });
+}
+async function saveAllOffersV20(){
+  const actions=[];
+  let invalid=false;
+  const codes=[];
+  document.querySelectorAll('#offersAdminBody tr').forEach(tr=>{
+    const id=+tr.dataset.o||0;
+    const fields=readFields(tr,'[data-f]');
+    fields.Fournisseur=+fields.Fournisseur||0;
+    fields.Nom=String(fields.Nom||'').trim();
+    fields.Code=String(fields.Code||'').trim();
+    fields.Famille=String(fields.Famille||'').trim();
+    fields.Devise=String(fields.Devise||'USD').trim()||'USD';
+    fields.Statut_Tarif=String(fields.Statut_Tarif||'').trim();
+    fields.Source_Tarif=String(fields.Source_Tarif||'').trim();
+    fields.Note_Procurement=String(fields.Note_Procurement||'').trim();
+    fields.Usage_Inclus_Description=String(fields.Usage_Inclus_Description||'').trim();
+    if(!fields.Fournisseur||!fields.Nom||!fields.Code){
+      invalid=true;
+      if(!fields.Nom)tr.querySelector('[data-f="Nom"]')?.classList.add('input-error');
+      if(!fields.Code)tr.querySelector('[data-f="Code"]')?.classList.add('input-error');
+      if(!fields.Fournisseur)tr.querySelector('[data-f="Fournisseur"]')?.classList.add('input-error');
+      return;
+    }
+    codes.push(fields.Code.toLocaleLowerCase());
+    actions.push(id?["UpdateRecord",T.offers,id,fields]:["AddRecord",T.offers,null,fields]);
+  });
+  if(invalid){toast("Fournisseur, nom et code sont obligatoires pour chaque offre.",true);return}
+  if(new Set(codes).size!==codes.length){toast("Deux offres utilisent le même code.",true);return}
+  if(!actions.length){toast("Aucune modification à enregistrer.");return}
+  try{
+    await apply(actions);
+    toast("Offre de service enregistrée.");
+    await reload();
+  }catch(e){toast(e.message||String(e),true)}
+}
+
+function renderDomainsAdmin(){
+  const el=document.getElementById('v-domains');
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Domaines</h3><p>Créer, activer/désactiver et maintenir les domaines de référence.</p></div><div class="table-actions"><button id="newDomain" class="btn secondary">+ Nouveau domaine</button><button id="saveAllDomains" class="btn primary">Enregistrer les modifications</button></div></div><div class="tablewrap"><table><thead><tr><th>Nom</th><th>Responsable</th><th>Actif</th><th></th></tr></thead><tbody id="domainsBody">${D[T.domains].map(r=>domainAdminRow(r)).join('')}</tbody></table></div></article>`;
+  document.getElementById('newDomain').onclick=addDomainDraft;
+  document.getElementById('saveAllDomains').onclick=saveAllDomainsV17;
+  bindDomainDeleteButtons();
+}
+function domainAdminRow(r={}){
+  const id=r.id||'',isNew=!r.id;
+  return `<tr data-r="${id}" data-new="${isNew?'1':'0'}"><td><input class="admin-input" data-f="Nom" value="${esc(r.Nom||'')}" placeholder="Nom du domaine"></td><td><input class="admin-input" data-f="Responsable" value="${esc(r.Responsable||'')}" placeholder="Responsable"></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><button class="btn danger small domain-delete" title="${isNew?'Annuler':'Supprimer'}">${isNew?'Annuler':'Supprimer'}</button></td></tr>`;
+}
+function addDomainDraft(){
+  const tbody=document.getElementById('domainsBody');
+  tbody.insertAdjacentHTML('beforeend',domainAdminRow({Actif:true}));
+  bindDomainDeleteButtons();
+  const rows=tbody.querySelectorAll('tr');
+  rows[rows.length-1]?.querySelector('[data-f="Nom"]')?.focus();
+}
+function bindDomainDeleteButtons(){
+  document.querySelectorAll('#domainsBody .domain-delete').forEach(btn=>btn.onclick=async()=>{
+    const tr=btn.closest('tr');
+    if(tr.dataset.new==='1'){tr.remove();return}
+    const id=+tr.dataset.r;
+    const domain=D[T.domains].find(d=>+d.id===id);
+    if(!confirm(`Supprimer le domaine "${domain?.Nom||id}" ?\n\nLa suppression échouera si des références existent encore dans Grist.`))return;
+    try{
+      await apply([["RemoveRecord",T.domains,id]]);
+      toast("Domaine supprimé.");
+      await boot();
+    }catch(e){toast("Suppression impossible : "+(e.message||String(e)),true)}
+  });
+}
+async function saveAllDomainsV17(){
+  const actions=[];
+  let invalid=false;
+  document.querySelectorAll('#domainsBody tr').forEach(tr=>{
+    const id=+tr.dataset.r||0;
+    const fields=readFields(tr,'[data-f]');
+    fields.Nom=String(fields.Nom||'').trim();
+    fields.Responsable=String(fields.Responsable||'').trim();
+    if(!fields.Nom){invalid=true;tr.querySelector('[data-f="Nom"]')?.classList.add('input-error');return}
+    actions.push(id?["UpdateRecord",T.domains,id,fields]:["AddRecord",T.domains,null,fields]);
+  });
+  if(invalid){toast("Chaque domaine doit avoir un nom.",true);return}
+  const names=[...document.querySelectorAll('#domainsBody [data-f="Nom"]')].map(x=>x.value.trim().toLocaleLowerCase('fr'));
+  if(new Set(names).size!==names.length){toast("Deux domaines portent le même nom.",true);return}
+  if(!actions.length){toast("Aucune modification à enregistrer.");return}
+  try{
+    await apply(actions);
+    toast("Domaines enregistrés.");
+    await boot();
+  }catch(e){toast(e.message||String(e),true)}
+}
 
 function renderMenuAdmin(){
   const el=document.getElementById('v-menuadmin');if(!el)return;
@@ -207,29 +424,232 @@ async function saveMenuConfig(){
 function resetMenuConfigDraft(){
   const defaults=[
     ['dashboard','Dashboard'],['simulation','Simulation'],['compare','Comparaison'],['roi','ROI / Économies'],
-    ['scenarios','Scénarios'],['offers','Fournisseurs & offres'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu']
+    ['scenarios','Scénarios'],['offers','Offre de service'],['offersadmin','Paramétrage offre de service'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu'],['acladmin','ACL / Sécurité']
   ];
   const tbody=document.getElementById('menuAdminBody');if(!tbody)return;
   const byKey=Object.fromEntries([...tbody.querySelectorAll('tr[data-menu-key]')].map(tr=>[tr.dataset.menuKey,tr]));
-  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;const access=tr.querySelector('[data-f="Owner_Seulement"]');if(access)access.value=['offers','domains','rights','menuadmin'].includes(key)?'true':'false';tbody.appendChild(tr)});
+  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;const access=tr.querySelector('[data-f="Owner_Seulement"]');if(access)access.value=['offersadmin','domains','rights','menuadmin','acladmin'].includes(key)?'true':'false';tbody.appendChild(tr)});
   toast("Valeurs par défaut chargées. Clique sur Enregistrer pour les appliquer.");
+}
+
+
+const FINOPS_ACL_TAG="FINOPS_V16";
+const FINOPS_ACL_RESOURCES=[
+  {tableId:"Scenarios",colIds:"*",kind:"global",perm:"+RU"},
+  {tableId:"Configuration_Menu",colIds:"*",kind:"global",perm:"+R"},
+  {tableId:"Fournisseurs",colIds:"*",kind:"global",perm:"+R"},
+  {tableId:"Offres",colIds:"*",kind:"global",perm:"+R"},
+  {tableId:"Allocations",colIds:"*",kind:"domain",perm:"+R"},
+  {tableId:"Baseline_N_1",colIds:"*",kind:"domain",perm:"+R"},
+  {tableId:"Enterprise",colIds:"*",kind:"domain",perm:"+R"},
+  {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",perm:"+R"},
+  {tableId:"Domaines",colIds:"*",kind:"domains",perm:"+R"},
+  {tableId:"Droits_Utilisateurs",colIds:"*",kind:"self",perm:"+R"},
+];
+function internalRows(t){return rows(t)}
+async function readAclMeta(){
+  const [resources,rules]=await Promise.all([
+    grist.docApi.fetchTable("_grist_ACLResources"),
+    grist.docApi.fetchTable("_grist_ACLRules")
+  ]);
+  return{resources:internalRows(resources),rules:internalRows(rules)};
+}
+function finopsUserAttribute(){
+  return JSON.stringify({name:"Droits",tableId:"Droits_Utilisateurs",lookupColId:"Email",charId:"Email"});
+}
+function aclFormulaFor(kind){
+  if(kind==="global")return "user.Droits is not None and user.Droits.Actif";
+  if(kind==="domain")return "user.Droits is not None and user.Droits.Actif and rec.Domaine in user.Droits.Domaines_Autorises";
+  if(kind==="domains")return "user.Droits is not None and user.Droits.Actif and rec.id in user.Droits.Domaines_Autorises";
+  if(kind==="self")return "user.Droits is not None and user.Droits.Actif and rec.Email == user.Email";
+  return "False";
+}
+function aclPlan(meta){
+  const resources=meta.resources||[],rules=meta.rules||[];
+  const defaultRes=resources.find(r=>r.tableId==="*"&&r.colIds==="*");
+  const byKey=Object.fromEntries(resources.map(r=>[`${r.tableId}|${r.colIds}`,r]));
+  const existingUserAttr=rules.find(r=>String(r.userAttributes||"").includes('"name":"Droits"')||String(r.userAttributes||"").includes('"name": "Droits"'));
+  const existingTagged=rules.filter(r=>String(r.memo||"").startsWith(FINOPS_ACL_TAG));
+  const missingResources=FINOPS_ACL_RESOURCES.filter(x=>!byKey[`${x.tableId}|${x.colIds}`]);
+  return{defaultRes,byKey,existingUserAttr,existingTagged,missingResources};
+}
+function aclAuditHtml(meta){
+  const p=aclPlan(meta);
+  const ua=p.existingUserAttr?'<span class="badge ok">Droits trouvé</span>':'<span class="badge warn">Droits absent</span>';
+  const defaultR=p.defaultRes?'<span class="badge ok">Ressource *:* trouvée</span>':'<span class="badge warn">Ressource *:* absente</span>';
+  const mr=p.missingResources.length?p.missingResources.map(x=>`<code>${esc(x.tableId)}</code>`).join(', '):'<span class="badge ok">Aucune</span>';
+  return `<div class="acl-audit-grid"><div><b>Attribut utilisateur</b><div>${ua}</div></div><div><b>Ressource globale</b><div>${defaultR}</div></div><div><b>Règles FinOps existantes</b><div>${p.existingTagged.length}</div></div><div><b>Ressources à créer</b><div>${mr}</div></div></div>`;
+}
+function renderAclAdmin(){
+  const el=document.getElementById('v-acladmin');if(!el)return;
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>ACL / Sécurité <span class="badge warn">Owner uniquement</span></h3><p>Audit et réconciliation des règles d'accès FinOps dans les métadonnées ACL Grist. L'application ne modifie rien tant que tu ne cliques pas sur Appliquer.</p></div></div><div class="acl-warning"><b>Important.</b> Les ACL sont des métadonnées internes Grist. Une sauvegarde JSON est proposée avant application. Une modification d'ACL peut provoquer le rechargement immédiat du document.</div><div class="table-actions"><button id="aclAudit" class="btn secondary">Auditer les ACL</button><button id="aclExport" class="btn secondary">Exporter la sauvegarde JSON</button><button id="aclApply" class="btn primary">Appliquer / réconcilier FinOps</button></div><div id="aclAuditResult" class="acl-result">Clique sur <b>Auditer les ACL</b> pour commencer.</div><article class="acl-matrix"><h4>Matrice cible</h4><table><thead><tr><th>Table</th><th>Utilisateur autorisé</th><th>Périmètre</th></tr></thead><tbody>${FINOPS_ACL_RESOURCES.map(x=>`<tr><td><code>${x.tableId}</code></td><td>${esc(x.perm)}</td><td>${x.kind==="domain"?"Ses domaines":x.kind==="domains"?"Domaines autorisés":x.kind==="self"?"Sa ligne":x.kind==="global"?"Global":"-"}</td></tr>`).join('')}</tbody></table></article></article>`;
+  document.getElementById('aclAudit').onclick=auditFinopsAcl;
+  document.getElementById('aclExport').onclick=exportFinopsAcl;
+  document.getElementById('aclApply').onclick=applyFinopsAcl;
+}
+async function auditFinopsAcl(){
+  const box=document.getElementById('aclAuditResult');
+  try{
+    box.innerHTML='Lecture des métadonnées ACL…';
+    const meta=await readAclMeta();
+    box.innerHTML=aclAuditHtml(meta);
+    window.__finopsAclLastMeta=meta;
+  }catch(e){
+    box.innerHTML=`<span class="badge warn">Lecture impossible</span><p>${esc(e.message||String(e))}</p>`;
+    toast("Impossible de lire les ACL. Vérifie que tu es Owner.",true);
+  }
+}
+async function exportFinopsAcl(){
+  try{
+    const meta=window.__finopsAclLastMeta||await readAclMeta();
+    const payload={exportedAt:new Date().toISOString(),tag:FINOPS_ACL_TAG,resources:meta.resources,rules:meta.rules};
+    const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`finops-acl-backup-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast("Sauvegarde ACL exportée.");
+  }catch(e){toast(e.message||String(e),true)}
+}
+async function applyFinopsAcl(){
+  if(ACCESS.role!=="OWNER"){toast("Action réservée à l’Owner.",true);return}
+  const ok=confirm("Appliquer les ACL FinOps ?\n\nCette opération modifie les règles d’accès Grist et peut recharger immédiatement le document. Fais une sauvegarde JSON avant de continuer.");
+  if(!ok)return;
+  const box=document.getElementById('aclAuditResult');
+  try{
+    const meta=await readAclMeta(),plan=aclPlan(meta);
+    window.__finopsAclLastMeta=meta;
+    if(!plan.defaultRes){
+      await grist.docApi.applyUserActions([["AddRecord","_grist_ACLResources",null,{tableId:"*",colIds:"*"}]]);
+    }
+    // Create missing resources first so we can obtain their row IDs reliably.
+    const resourceActions=plan.missingResources.map(x=>["AddRecord","_grist_ACLResources",null,{tableId:x.tableId,colIds:x.colIds}]);
+    if(resourceActions.length)await grist.docApi.applyUserActions(resourceActions);
+
+    const meta2=await readAclMeta(),p2=aclPlan(meta2);
+    const defaultRes=p2.defaultRes;
+    if(!defaultRes)throw new Error("Impossible de créer ou retrouver la ressource ACL globale *:*.");
+
+    // Remove only FinOps-tagged rules; unrelated ACLs are preserved.
+    const remove=p2.existingTagged.map(r=>["RemoveRecord","_grist_ACLRules",r.id]);
+    if(remove.length)await grist.docApi.applyUserActions(remove);
+
+    const meta3=await readAclMeta(),p3=aclPlan(meta3);
+    const actions=[];
+    if(!p3.existingUserAttr){
+      actions.push(["AddRecord","_grist_ACLRules",null,{
+        resource:p3.defaultRes.id,
+        userAttributes:finopsUserAttribute(),
+        memo:`${FINOPS_ACL_TAG}:USERATTR`
+      }]);
+    }
+
+    for(const spec of FINOPS_ACL_RESOURCES){
+      const res=p3.byKey[`${spec.tableId}|${spec.colIds}`];
+      if(!res)throw new Error(`Ressource ACL manquante: ${spec.tableId}`);
+      actions.push(["AddRecord","_grist_ACLRules",null,{
+        resource:res.id,
+        aclFormula:"user.Access in [OWNER]",
+        permissionsText:"all",
+        memo:`${FINOPS_ACL_TAG}:${spec.tableId}:OWNER`
+      }]);
+      actions.push(["AddRecord","_grist_ACLRules",null,{
+        resource:res.id,
+        aclFormula:aclFormulaFor(spec.kind),
+        permissionsText:spec.perm,
+        memo:`${FINOPS_ACL_TAG}:${spec.tableId}:AUTHORIZED`
+      }]);
+      actions.push(["AddRecord","_grist_ACLRules",null,{
+        resource:res.id,
+        aclFormula:"",
+        permissionsText:"none",
+        memo:`${FINOPS_ACL_TAG}:${spec.tableId}:DEFAULT`
+      }]);
+    }
+
+    // Special restriction: non-owners must not edit schema.
+    const special=meta3.resources.find(r=>r.tableId==="*SPECIAL"&&r.colIds==="SchemaEdit");
+    if(special){
+      actions.push(["AddRecord","_grist_ACLRules",null,{
+        resource:special.id,
+        aclFormula:"user.Access in [OWNER]",
+        permissionsText:"+S",
+        memo:`${FINOPS_ACL_TAG}:SPECIAL:SCHEMA_OWNER`
+      }]);
+      actions.push(["AddRecord","_grist_ACLRules",null,{
+        resource:special.id,
+        aclFormula:"",
+        permissionsText:"-S",
+        memo:`${FINOPS_ACL_TAG}:SPECIAL:SCHEMA_DEFAULT`
+      }]);
+    }
+    box.innerHTML=`Application de ${actions.length} règle(s)…`;
+    await grist.docApi.applyUserActions(actions);
+    box.innerHTML='<span class="badge ok">Réconciliation appliquée</span><p>Le document peut se recharger automatiquement. Relance ensuite un audit.</p>';
+    toast("ACL FinOps appliquées.");
+  }catch(e){
+    box.innerHTML=`<span class="badge warn">Échec de la réconciliation</span><p>${esc(e.message||String(e))}</p>`;
+    toast(e.message||String(e),true);
+  }
 }
 
 function renderRightsAdmin(){
   const el=document.getElementById('v-rights');
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>Un utilisateur peut être rattaché à plusieurs domaines. Coche tous les domaines auxquels il doit avoir accès.</p></div><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div><div class="tablewrap"><table><thead><tr><th>Email</th><th>Domaines autorisés</th><th>Rôle</th><th>Actif</th><th>Commentaire</th></tr></thead><tbody>${D[T.rights].map(r=>{const multi=refListIds(r.Domaines_Autorises),selected=new Set(multi.length?multi:(+r.Domaine?[+r.Domaine]:[]));return`<tr data-r="${r.id}"><td><input class="admin-input" data-f="Email" value="${esc(r.Email||'')}"></td><td><div class="domain-multiselect">${D[T.domains].filter(d=>d.Actif!==false).map(d=>`<label class="domain-chip"><input type="checkbox" data-domain-id="${d.id}" ${selected.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></td><td><select class="admin-input" data-f="Role_App"><option ${r.Role_App==='Domaine'?'selected':''}>Domaine</option><option ${r.Role_App==='Admin'?'selected':''}>Admin</option></select></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td></tr>`}).join('')}</tbody></table></div></article>`;
-  document.getElementById('saveAllRights').onclick=saveAllRightsMultiDomain;
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>Créer, modifier et supprimer les utilisateurs autorisés. Un utilisateur peut être rattaché à plusieurs domaines.</p></div><div class="table-actions"><button id="newRightUser" class="btn secondary">+ Nouvel utilisateur</button><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div></div><div class="tablewrap"><table><thead><tr><th>Email</th><th>Domaines autorisés</th><th>Rôle</th><th>Actif</th><th>Commentaire</th><th></th></tr></thead><tbody id="rightsBody">${D[T.rights].map(r=>rightsAdminRow(r)).join('')}</tbody></table></div></article>`;
+  document.getElementById('newRightUser').onclick=addRightsDraft;
+  document.getElementById('saveAllRights').onclick=saveAllRightsV18;
+  bindRightsDeleteButtons();
 }
-async function saveAllRightsMultiDomain(){
-  const actions=[];
-  document.querySelectorAll('#v-rights tr[data-r]').forEach(tr=>{
+function rightsAdminRow(r={}){
+  const multi=refListIds(r.Domaines_Autorises);
+  const selected=new Set(multi.length?multi:(+r.Domaine?[+r.Domaine]:[]));
+  const id=r.id||'',isNew=!r.id;
+  return `<tr data-r="${id}" data-new="${isNew?'1':'0'}"><td><input class="admin-input" data-f="Email" value="${esc(r.Email||'')}" placeholder="prenom.nom@domaine.fr"></td><td><div class="domain-multiselect">${D[T.domains].filter(d=>d.Actif!==false).map(d=>`<label class="domain-chip"><input type="checkbox" data-domain-id="${d.id}" ${selected.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></td><td><select class="admin-input" data-f="Role_App"><option ${(!r.Role_App||r.Role_App==='Domaine')?'selected':''}>Domaine</option><option ${r.Role_App==='Admin'?'selected':''}>Admin</option></select></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}" placeholder="Commentaire"></td><td><button class="btn danger small rights-delete" title="${isNew?'Annuler':'Supprimer'}">${isNew?'Annuler':'Supprimer'}</button></td></tr>`;
+}
+function addRightsDraft(){
+  const tbody=document.getElementById('rightsBody');
+  tbody.insertAdjacentHTML('beforeend',rightsAdminRow({Actif:true,Role_App:'Domaine'}));
+  bindRightsDeleteButtons();
+  const rows=tbody.querySelectorAll('tr');
+  rows[rows.length-1]?.querySelector('[data-f="Email"]')?.focus();
+}
+function bindRightsDeleteButtons(){
+  document.querySelectorAll('#rightsBody .rights-delete').forEach(btn=>btn.onclick=async()=>{
+    const tr=btn.closest('tr');
+    if(tr.dataset.new==='1'){tr.remove();return}
     const id=+tr.dataset.r;
+    const user=D[T.rights].find(r=>+r.id===id);
+    if(!confirm(`Supprimer les droits de "${user?.Email||id}" ?`))return;
+    try{
+      await apply([["RemoveRecord",T.rights,id]]);
+      toast("Utilisateur supprimé des droits.");
+      await boot();
+    }catch(e){toast("Suppression impossible : "+(e.message||String(e)),true)}
+  });
+}
+async function saveAllRightsV18(){
+  const actions=[];
+  let invalid=false;
+  const emails=[];
+  document.querySelectorAll('#rightsBody tr').forEach(tr=>{
+    const id=+tr.dataset.r||0;
     const fields=readFields(tr,'[data-f]');
+    fields.Email=String(fields.Email||'').trim();
+    fields.Commentaire=String(fields.Commentaire||'').trim();
+    if(!fields.Email || !fields.Email.includes('@')){
+      invalid=true;
+      tr.querySelector('[data-f="Email"]')?.classList.add('input-error');
+      return;
+    }
+    emails.push(fields.Email.toLocaleLowerCase());
     const ids=[...tr.querySelectorAll('input[data-domain-id]:checked')].map(x=>+x.dataset.domainId).filter(Boolean);
     fields.Domaines_Autorises=['L',...ids];
-    fields.Domaine=ids[0]||0;
-    actions.push(["UpdateRecord",T.rights,id,fields]);
+    fields.Domaine=ids[0]||0; // compatibilité historique
+    actions.push(id?["UpdateRecord",T.rights,id,fields]:["AddRecord",T.rights,null,fields]);
   });
-  if(!actions.length){toast('Aucun droit utilisateur à enregistrer.');return}
-  try{await apply(actions);toast(`${actions.length} droit(s) utilisateur enregistrés.`);await reload()}catch(e){toast(e.message,true)}
+  if(invalid){toast("Chaque utilisateur doit avoir une adresse email valide.",true);return}
+  if(new Set(emails).size!==emails.length){toast("Deux lignes utilisent la même adresse email.",true);return}
+  if(!actions.length){toast("Aucune modification à enregistrer.");return}
+  try{
+    await apply(actions);
+    toast("Droits utilisateurs enregistrés.");
+    await boot();
+  }catch(e){toast(e.message||String(e),true)}
 }
