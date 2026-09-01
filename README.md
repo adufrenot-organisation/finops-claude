@@ -46,3 +46,7 @@ Support des utilisateurs multi-domaines via `Domaines_Autorises` (`RefList:Domai
 
 ## V13
 L'Owner peut maintenant choisir par onglet entre `Utilisateurs autorisés` et `Owner uniquement` depuis l'écran Configuration du menu.
+
+
+## V15
+Filtres Dashboard par domaine et fournisseur, combinables et sans modification de données Grist.
