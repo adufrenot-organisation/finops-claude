@@ -1,16 +1,28 @@
-# FinOps Claude — Widget Grist V3
+# FinOps IA — V5 multi-fournisseurs + ROI N-1
 
-Interface unique avec 3 profils :
-- Owner/Admin : dashboard, simulation, scénarios, tarifs, domaines, droits utilisateurs.
-- Domain User : dashboard + simulation limités au domaine visible par les ACL Grist.
-- Denied : page « Accès non autorisé ».
+Cette version reprend la V4 et ajoute le calcul d'économies par rapport à une baseline N-1 de collaborateurs facturés au TJM.
 
-## Déploiement GitHub Pages
-1. Mettre `index.html`, `styles.css`, `app.js` à la racine du dépôt.
-2. GitHub > Settings > Pages > Deploy from a branch > `main` > `/root`.
-3. Utiliser l'URL GitHub Pages comme URL du widget personnalisé Grist.
-4. Donner au widget l'accès complet au document.
+## Si la V4 est déjà installée
 
-## Sécurité
-Le front masque les écrans selon le rôle, mais la sécurité réelle doit être faite dans les Access Rules Grist.
-Tables attendues : Domaines, Scenarios, Tarifs, Enterprise, Forfaits_Individuels, Droits_Utilisateurs.
+1. Faire une copie de sauvegarde du document Grist.
+2. Renseigner la clé API dans `migrate_roi_v5.py`.
+3. Lancer `py migrate_roi_v5.py`.
+4. Ajouter les ACL de `Baseline_N_1` décrites dans `SECURITE_GRIST.md`.
+5. Remplacer les fichiers du widget GitHub Pages par `index.html`, `styles.css`, `app.js`.
+
+## Si la V4 n'est pas installée
+
+Exécuter d'abord `migrate_multifournisseurs.py`, puis `migrate_roi_v5.py`.
+
+## Nouveau dans l'interface
+
+- Menu `ROI / Économies`.
+- Saisie par domaine : nombre de collaborateurs N-1, TJM, surcharge éventuelle du nombre de jours ouvrés.
+- Baseline annuelle N-1.
+- Budget licences de la période et budget annualisé.
+- Économie période et économie annuelle.
+- Taux d'économie.
+- Jours externes équivalents et ETP externes équivalents.
+- Comparaison de scénarios enrichie avec les économies annuelles.
+
+Le paramètre `Nb_Jours_Ouvres_Annuels` est ajouté aux scénarios. La migration l'initialise à 218 uniquement comme valeur de départ modifiable.
