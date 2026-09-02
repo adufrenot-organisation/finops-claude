@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 grist.ready({requiredAccess:"full"}); document.addEventListener("DOMContentLoaded",boot);
@@ -15,6 +15,7 @@ function menuConfigAllRows(){
     {Cle:'simulation',Libelle:'Simulation',Ordre:20,Actif:true,Owner_Seulement:false},
     {Cle:'compare',Libelle:'Comparaison',Ordre:30,Actif:true,Owner_Seulement:false},
     {Cle:'roi',Libelle:'ROI / Économies',Ordre:40,Actif:true,Owner_Seulement:false},
+    {Cle:'presim',Libelle:'Pré-simulation nominative',Ordre:45,Actif:true,Owner_Seulement:false},
     {Cle:'scenarios',Libelle:'Scénarios',Ordre:50,Actif:true,Owner_Seulement:false},
     {Cle:'offers',Libelle:'Offre de service',Ordre:60,Actif:true,Owner_Seulement:false},
     {Cle:'offersadmin',Libelle:'Paramétrage offre de service',Ordre:65,Actif:true,Owner_Seulement:true},
@@ -38,7 +39,7 @@ function menuLabel(view){
   return r?.Libelle||DEFAULT_MENU_LABELS[view]||view;
 }
 function navIcon(view){
-  return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',scenarios:'▤',offers:'¤',offersadmin:'⚙',domains:'◎',rights:'♙',menuadmin:'☷',labelsadmin:'✎',acladmin:'🔐'}[view]||'•';
+  return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',presim:'♙',scenarios:'▤',offers:'¤',offersadmin:'⚙',domains:'◎',rights:'♙',menuadmin:'☷',labelsadmin:'✎',acladmin:'🔐'}[view]||'•';
 }
 function buildNavHtml(admin){
   return menuConfigRows()
@@ -53,7 +54,7 @@ function renderShell(){
   }
   const admin=ACCESS.role==="OWNER";
   const navHtml=buildNavHtml(admin);
-  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${admin?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-acladmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
+  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-presim" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${admin?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-acladmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
   document.getElementById('refresh').onclick=boot;
   const toggle=document.getElementById('sidebarToggle');
@@ -64,12 +65,12 @@ function renderShell(){
 
 const AUTHORIZED_CAN_EDIT_SCENARIOS=true;
 function isOwner(){return ACCESS.role==='OWNER'}
-function canEditView(view){return isOwner() || (AUTHORIZED_CAN_EDIT_SCENARIOS && view==='scenarios')}
+function canEditView(view){return isOwner() || (AUTHORIZED_CAN_EDIT_SCENARIOS && view==='scenarios') || view==='presim'}
 function enforceReadOnlyForNonOwner(){
   if(isOwner())return;
   document.querySelectorAll('.view').forEach(view=>{
     const key=(view.id||'').replace(/^v-/,'');
-    if(key==='scenarios')return;
+    if(key==='scenarios'||key==='presim')return;
     view.querySelectorAll('input,select,textarea,button').forEach(el=>{
       // Keep harmless navigation/refresh controls outside views untouched.
       if(el.closest('.read-only-exempt'))return;
@@ -89,6 +90,7 @@ const DEFAULT_MENU_LABELS={
   simulation:'Simulation',
   compare:'Comparaison',
   roi:'ROI / Économies',
+  presim:'Pré-simulation nominative',
   scenarios:'Scénarios',
   offers:'Offre de service',
   offersadmin:'Paramétrage offre de service',
@@ -100,7 +102,7 @@ const DEFAULT_MENU_LABELS={
 };
 
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
-function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v)?'none':''}
+function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['presim','offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v)?'none':''}
 function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))} function scopedAlloc(sid){return D[T.alloc].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))} function scopedBaseline(sid){return D[T.baseline].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))} function scopedBaselineDetails(sid){return (D[T.baselineDetails]||[]).filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))}
 function populateScenario(preferredId=0){
   const sel=document.getElementById('scenarioSelect');
@@ -156,7 +158,7 @@ for(const d of Object.values(bd)){d.budgetAnnualized=d.eur*12/months;d.baselineP
 const savingPct=baselineAnnual?savingAnnual/baselineAnnual:0;
 return{s,alloc,baseline,baselineDetails,bd,bo,bp,fixed,included,over,total,licenses,unresolved,rate,months,baselineAnnual,budgetPeriodEUR,budgetAnnualizedEUR,baselinePeriod,savingPeriod,savingAnnual,savingPct}
 }
-function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderScenarios();renderOffersReadOnly();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAclAdmin()}applyUILabels();enforceReadOnlyForNonOwner()}
+function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderPreSimulation();renderScenarios();renderOffersReadOnly();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAclAdmin()}applyUILabels();enforceReadOnlyForNonOwner()}
 function dashboardFilterOptions(){
   const domains=scopedDomains().sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
   const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
@@ -303,6 +305,287 @@ async function saveAllBaselineV24(){
   }catch(e){toast(e.message||String(e),true)}
 }
 
+
+
+let PRESIM_SELECTED_ID=0;
+let PRESIM_DRAFT=null;
+let PRESIM_DRAFT_RESOURCES=[];
+let PRESIM_REMOVED_RESOURCE_IDS=[];
+
+function preSimulationRows(){ return D[T.preSim]||[]; }
+function preResourceRows(){ return D[T.preRes]||[]; }
+
+function scopedPreSimulations(){
+  return preSimulationRows().filter(r=>ACCESS.role==='OWNER'||ACCESS.domainIds.includes(+r.Domaine));
+}
+
+function selectedPreSimulation(){
+  if(PRESIM_DRAFT) return PRESIM_DRAFT;
+  const rows=scopedPreSimulations();
+  let r=rows.find(x=>+x.id===+PRESIM_SELECTED_ID);
+  if(!r && rows.length){
+    r=rows[0];
+    PRESIM_SELECTED_ID=+r.id;
+  }
+  return r||null;
+}
+
+function newPreSimulationDraft(){
+  const domain=scopedDomains()[0];
+  return {
+    __draft:true,
+    Nom:'Nouvelle pré-simulation',
+    Domaine:+domain?.id||0,
+    Scenario_Reference:0,
+    Statut:'Travail',
+    Responsable:'',
+    Commentaire:''
+  };
+}
+
+function newPreResourceDraft(){
+  return {
+    __draft:true,
+    __key:`pres-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    Nom_Ressource:'',
+    Profil:'',
+    Offre:0,
+    Commentaire:'',
+    Actif:true
+  };
+}
+
+function preSimOfferOptions(selected=0){
+  const offers=(D[T.offers]||[])
+    .filter(o=>o.Actif!==false)
+    .slice()
+    .sort((a,b)=>{
+      const pa=D.providerById[+a.Fournisseur]?.Nom||'';
+      const pb=D.providerById[+b.Fournisseur]?.Nom||'';
+      return pa.localeCompare(pb,'fr') || String(a.Nom||'').localeCompare(String(b.Nom||''),'fr');
+    });
+  return `<option value="">— Choisir une offre —</option>`+
+    offers.map(o=>{
+      const provider=D.providerById[+o.Fournisseur];
+      return `<option value="${o.id}" ${+selected===+o.id?'selected':''}>${esc(provider?.Nom||'')} — ${esc(o.Nom||'')}</option>`;
+    }).join('');
+}
+
+function preSimCurrentResources(fiche){
+  if(!fiche) return [];
+  const existing=fiche.__draft ? [] : preResourceRows()
+    .filter(r=>+r.Pre_Simulation===+fiche.id && !PRESIM_REMOVED_RESOURCE_IDS.includes(+r.id));
+  return [...existing,...PRESIM_DRAFT_RESOURCES];
+}
+
+function preSimSummary(resources){
+  const map=new Map();
+  resources.filter(r=>r.Actif!==false && +r.Offre).forEach(r=>{
+    const offer=D.offerById[+r.Offre];
+    if(!offer) return;
+    const provider=D.providerById[+offer.Fournisseur];
+    const key=String(offer.id);
+    const item=map.get(key)||{provider:provider?.Nom||'',offer:offer.Nom||'',count:0};
+    item.count++;
+    map.set(key,item);
+  });
+  return [...map.values()].sort((a,b)=>a.provider.localeCompare(b.provider,'fr')||a.offer.localeCompare(b.offer,'fr'));
+}
+
+function renderPreSimulation(){
+  const el=document.getElementById('v-presim');
+  if(!el) return;
+
+  const fiches=scopedPreSimulations();
+  const fiche=selectedPreSimulation();
+
+  if(!fiche){
+    el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Pré-simulation nominative</h3>
+      <p>Crée une fiche rattachée à un domaine, puis affecte une offre IA à chaque ressource nominative, une personne à la fois.</p>
+      </div><button id="newPreSim" class="btn primary">+ Nouvelle pré-simulation</button></div></article>`;
+    document.getElementById('newPreSim').onclick=()=>{
+      PRESIM_DRAFT=newPreSimulationDraft();
+      PRESIM_DRAFT_RESOURCES=[];
+      PRESIM_REMOVED_RESOURCE_IDS=[];
+      renderPreSimulation();
+    };
+    return;
+  }
+
+  const resources=preSimCurrentResources(fiche);
+  const summary=preSimSummary(resources);
+
+  const ficheOptions=fiches.map(x=>
+    `<option value="${x.id}" ${!PRESIM_DRAFT&&+x.id===+fiche.id?'selected':''}>${esc(x.Nom||'Sans nom')} — ${esc(D.domainById[+x.Domaine]?.Nom||'')}</option>`
+  ).join('');
+
+  const domainOptions=scopedDomains().map(d=>
+    `<option value="${d.id}" ${+fiche.Domaine===+d.id?'selected':''}>${esc(d.Nom||'')}</option>`
+  ).join('');
+
+  const scenarioOptions=`<option value="">— Aucun / information facultative —</option>`+
+    (D[T.scenarios]||[]).slice().sort((a,b)=>(+a.Annee||0)-(+b.Annee||0)||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'))
+      .map(s=>`<option value="${s.id}" ${+fiche.Scenario_Reference===+s.id?'selected':''}>${esc(s.Nom||'')}</option>`).join('');
+
+  const resourceRows=resources.map(r=>{
+    const rowKey=r.__draft ? `data-pr-key="${esc(r.__key)}"` : `data-pr-id="${r.id}"`;
+    return `<tr ${rowKey}>
+      <td><input class="admin-input" data-f="Nom_Ressource" value="${esc(r.Nom_Ressource||'')}" placeholder="Nom ou identifiant"></td>
+      <td><input class="admin-input" data-f="Profil" value="${esc(r.Profil||'')}" placeholder="Dev, PO, métier…"></td>
+      <td><select class="admin-input" data-f="Offre">${preSimOfferOptions(r.Offre)}</select></td>
+      <td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td>
+      <td><input type="checkbox" data-f="Actif" ${r.Actif===false?'':'checked'}></td>
+      <td><button class="btn ghost removePreResource">Supprimer</button></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`
+  <article class="card">
+    <div class="cardhead">
+      <div><h3>Pré-simulation nominative</h3>
+      <p>Le domaine est obligatoire. Le scénario de référence est uniquement informatif : il ne crée ni ne modifie aucune allocation.</p></div>
+      <div class="table-actions">
+        <select id="preSimSelect" class="admin-input">
+          <option value="">Choisir une fiche</option>${ficheOptions}
+        </select>
+        <button id="newPreSim" class="btn secondary">+ Nouvelle fiche</button>
+        <button id="savePreSim" class="btn primary">Enregistrer la fiche</button>
+      </div>
+    </div>
+    <div class="presim-meta">
+      <label class="field">Nom de la fiche<input id="psNom" class="admin-input" value="${esc(fiche.Nom||'')}"></label>
+      <label class="field">Domaine obligatoire<select id="psDomain" class="admin-input">${domainOptions}</select></label>
+      <label class="field">Scénario de référence <small>informatif</small><select id="psScenario" class="admin-input">${scenarioOptions}</select></label>
+      <label class="field">Statut<input id="psStatus" class="admin-input" value="${esc(fiche.Statut||'Travail')}"></label>
+      <label class="field">Responsable<input id="psOwner" class="admin-input" value="${esc(fiche.Responsable||'')}"></label>
+    </div>
+    <label class="field presim-comment">Commentaire<textarea id="psComment" class="admin-input" rows="2">${esc(fiche.Commentaire||'')}</textarea></label>
+  </article>
+
+  <article class="card">
+    <div class="cardhead">
+      <div><h3>Ressources nominatives</h3><p>Une ligne = une personne = une décision d'affectation d'offre IA.</p></div>
+      <button id="addPreResource" class="btn secondary">+ Ajouter une ressource</button>
+    </div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Ressource</th><th>Profil</th><th>Offre IA</th><th>Commentaire</th><th>Actif</th><th></th></tr></thead>
+      <tbody>${resourceRows||'<tr><td colspan="6">Aucune ressource pour le moment.</td></tr>'}</tbody>
+    </table></div>
+    <div class="table-actions presim-save"><button id="savePreResources" class="btn primary">Enregistrer les ressources</button></div>
+  </article>
+
+  <article class="card">
+    <div class="cardhead"><div><h3>Synthèse des licences nominatives</h3>
+      <p>Comptage automatique des ressources actives par fournisseur et offre pour cette fiche.</p></div></div>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Licences nominatives</th></tr></thead>
+      <tbody>${summary.length?summary.map(x=>`<tr>
+        <td>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td>
+      </tr>`).join(''):'<tr><td colspan="4">Aucune offre affectée pour le moment.</td></tr>'}</tbody>
+    </table></div>
+  </article>`;
+
+  document.getElementById('preSimSelect').onchange=e=>{
+    PRESIM_DRAFT=null;
+    PRESIM_DRAFT_RESOURCES=[];
+    PRESIM_REMOVED_RESOURCE_IDS=[];
+    PRESIM_SELECTED_ID=+e.target.value||0;
+    renderPreSimulation();
+  };
+  document.getElementById('newPreSim').onclick=()=>{
+    PRESIM_DRAFT=newPreSimulationDraft();
+    PRESIM_DRAFT_RESOURCES=[];
+    PRESIM_REMOVED_RESOURCE_IDS=[];
+    renderPreSimulation();
+  };
+  document.getElementById('addPreResource').onclick=()=>{
+    if(fiche.__draft){
+      toast("Enregistre d'abord la fiche avant d'ajouter les ressources.",true);
+      return;
+    }
+    PRESIM_DRAFT_RESOURCES.push(newPreResourceDraft());
+    renderPreSimulation();
+    const last=el.querySelector('tr[data-pr-key]:last-of-type input[data-f="Nom_Ressource"]');
+    last?.focus();
+  };
+  document.getElementById('savePreSim').onclick=savePreSimulationV28;
+  document.getElementById('savePreResources').onclick=savePreResourcesV28;
+
+  el.querySelectorAll('.removePreResource').forEach(btn=>btn.onclick=()=>{
+    const tr=btn.closest('tr');
+    const id=+tr.dataset.prId||0;
+    const key=tr.dataset.prKey||'';
+    if(key) PRESIM_DRAFT_RESOURCES=PRESIM_DRAFT_RESOURCES.filter(r=>r.__key!==key);
+    if(id) PRESIM_REMOVED_RESOURCE_IDS.push(id);
+    renderPreSimulation();
+  });
+}
+
+function readPreSimulationFields(){
+  return {
+    Nom:document.getElementById('psNom')?.value.trim()||'',
+    Domaine:+document.getElementById('psDomain')?.value||0,
+    Scenario_Reference:+document.getElementById('psScenario')?.value||0,
+    Statut:document.getElementById('psStatus')?.value.trim()||'Travail',
+    Responsable:document.getElementById('psOwner')?.value.trim()||'',
+    Commentaire:document.getElementById('psComment')?.value.trim()||''
+  };
+}
+
+async function savePreSimulationV28(){
+  const fiche=selectedPreSimulation();
+  const fields=readPreSimulationFields();
+  if(!fields.Nom){toast('Le nom de la pré-simulation est obligatoire.',true);return}
+  if(!fields.Domaine){toast('Le domaine est obligatoire.',true);return}
+  if(!ACCESS.domainIds.includes(fields.Domaine) && ACCESS.role!=='OWNER'){toast("Ce domaine n'est pas autorisé.",true);return}
+  try{
+    if(fiche.__draft){
+      await apply([["AddRecord",T.preSim,null,fields]]);
+      PRESIM_DRAFT=null;
+      await reload();
+      const matches=scopedPreSimulations().filter(x=>x.Nom===fields.Nom&&+x.Domaine===fields.Domaine);
+      PRESIM_SELECTED_ID=+(matches.sort((a,b)=>+b.id-+a.id)[0]?.id||0);
+    }else{
+      await apply([["UpdateRecord",T.preSim,+fiche.id,fields]]);
+      await reload();
+    }
+    toast('Pré-simulation enregistrée.');
+  }catch(e){toast(e.message||String(e),true)}
+}
+
+async function savePreResourcesV28(){
+  const fiche=selectedPreSimulation();
+  if(!fiche || fiche.__draft){toast("Enregistre d'abord la fiche de pré-simulation.",true);return}
+  const root=document.getElementById('v-presim');
+  const actions=[];
+  const seenIds=new Set();
+
+  for(const tr of root.querySelectorAll('tbody tr[data-pr-id],tbody tr[data-pr-key]')){
+    const id=+tr.dataset.prId||0;
+    const fields={
+      Pre_Simulation:+fiche.id,
+      Nom_Ressource:tr.querySelector('[data-f="Nom_Ressource"]')?.value.trim()||'',
+      Profil:tr.querySelector('[data-f="Profil"]')?.value.trim()||'',
+      Offre:+tr.querySelector('[data-f="Offre"]')?.value||0,
+      Commentaire:tr.querySelector('[data-f="Commentaire"]')?.value.trim()||'',
+      Actif:!!tr.querySelector('[data-f="Actif"]')?.checked
+    };
+    if(!fields.Nom_Ressource){toast('Chaque ressource doit avoir un nom ou un identifiant.',true);return}
+    if(!fields.Offre){toast(`Choisis une offre IA pour ${fields.Nom_Ressource}.`,true);return}
+    if(id){actions.push(["UpdateRecord",T.preRes,id,fields]);seenIds.add(id)}
+    else actions.push(["AddRecord",T.preRes,null,fields]);
+  }
+
+  for(const id of [...new Set(PRESIM_REMOVED_RESOURCE_IDS)]) actions.push(["RemoveRecord",T.preRes,id]);
+
+  try{
+    if(actions.length) await apply(actions);
+    PRESIM_DRAFT_RESOURCES=[];
+    PRESIM_REMOVED_RESOURCE_IDS=[];
+    await reload();
+    toast(`${actions.length} modification(s) de ressources enregistrée(s).`);
+  }catch(e){toast(e.message||String(e),true)}
+}
 
 let NEW_SCENARIOS=[];
 function scenarioDefaults(){
@@ -685,6 +968,8 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Allocations",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Baseline_N_1",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Baseline_N_1_Details",colIds:"*",kind:"domain",perm:"+R"},
+  {tableId:"Pre_Simulations",colIds:"*",kind:"domain",perm:"+CRUD"},
+  {tableId:"Pre_Simulation_Ressources",colIds:"*",kind:"presimdomain",perm:"+CRUD"},
   {tableId:"Enterprise",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Domaines",colIds:"*",kind:"domains",perm:"+R"},
@@ -704,6 +989,7 @@ function finopsUserAttribute(){
 function aclFormulaFor(kind){
   if(kind==="global")return "user.Droits is not None and user.Droits.Actif";
   if(kind==="domain")return "user.Droits is not None and user.Droits.Actif and rec.Domaine in user.Droits.Domaines_Autorises";
+  if(kind==="presimdomain")return "user.Droits is not None and user.Droits.Actif and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises";
   if(kind==="domains")return "user.Droits is not None and user.Droits.Actif and rec.id in user.Droits.Domaines_Autorises";
   if(kind==="self")return "user.Droits is not None and user.Droits.Actif and rec.Email == user.Email";
   return "False";
@@ -726,7 +1012,7 @@ function aclAuditHtml(meta){
 }
 function renderAclAdmin(){
   const el=document.getElementById('v-acladmin');if(!el)return;
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>ACL / Sécurité <span class="badge warn">Owner uniquement</span></h3><p>Audit et réconciliation des règles d'accès FinOps dans les métadonnées ACL Grist. L'application ne modifie rien tant que tu ne cliques pas sur Appliquer.</p></div></div><div class="acl-warning"><b>Important.</b> Les ACL sont des métadonnées internes Grist. Une sauvegarde JSON est proposée avant application. Une modification d'ACL peut provoquer le rechargement immédiat du document.</div><div class="table-actions"><button id="aclAudit" class="btn secondary">Auditer les ACL</button><button id="aclExport" class="btn secondary">Exporter la sauvegarde JSON</button><button id="aclApply" class="btn primary">Appliquer / réconcilier FinOps</button></div><div id="aclAuditResult" class="acl-result">Clique sur <b>Auditer les ACL</b> pour commencer.</div><article class="acl-matrix"><h4>Matrice cible</h4><table><thead><tr><th>Table</th><th>Utilisateur autorisé</th><th>Périmètre</th></tr></thead><tbody>${FINOPS_ACL_RESOURCES.map(x=>`<tr><td><code>${x.tableId}</code></td><td>${esc(x.perm)}</td><td>${x.kind==="domain"?"Ses domaines":x.kind==="domains"?"Domaines autorisés":x.kind==="self"?"Sa ligne":x.kind==="global"?"Global":"-"}</td></tr>`).join('')}</tbody></table></article></article>`;
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>ACL / Sécurité <span class="badge warn">Owner uniquement</span></h3><p>Audit et réconciliation des règles d'accès FinOps dans les métadonnées ACL Grist. L'application ne modifie rien tant que tu ne cliques pas sur Appliquer.</p></div></div><div class="acl-warning"><b>Important.</b> Les ACL sont des métadonnées internes Grist. Une sauvegarde JSON est proposée avant application. Une modification d'ACL peut provoquer le rechargement immédiat du document.</div><div class="table-actions"><button id="aclAudit" class="btn secondary">Auditer les ACL</button><button id="aclExport" class="btn secondary">Exporter la sauvegarde JSON</button><button id="aclApply" class="btn primary">Appliquer / réconcilier FinOps</button></div><div id="aclAuditResult" class="acl-result">Clique sur <b>Auditer les ACL</b> pour commencer.</div><article class="acl-matrix"><h4>Matrice cible</h4><table><thead><tr><th>Table</th><th>Utilisateur autorisé</th><th>Périmètre</th></tr></thead><tbody>${FINOPS_ACL_RESOURCES.map(x=>`<tr><td><code>${x.tableId}</code></td><td>${esc(x.perm)}</td><td>${x.kind==="domain"?"Ses domaines":x.kind==="presimdomain"?"Domaine de la pré-simulation":x.kind==="domains"?"Domaines autorisés":x.kind==="self"?"Sa ligne":x.kind==="global"?"Global":"-"}</td></tr>`).join('')}</tbody></table></article></article>`;
   document.getElementById('aclAudit').onclick=auditFinopsAcl;
   document.getElementById('aclExport').onclick=exportFinopsAcl;
   document.getElementById('aclApply').onclick=applyFinopsAcl;

@@ -476,3 +476,21 @@
 .labels-menu-table td:nth-child(3){min-width:360px}
 .labels-admin-table td:nth-child(4){min-width:360px}
 .labels-tabs .badge{margin-left:6px}
+
+/* V28 — Pré-simulation nominative */
+.presim-meta{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+  gap:14px;
+  padding-top:12px;
+}
+.presim-meta .field,.presim-comment{
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.presim-comment{margin-top:14px}
+.presim-save{justify-content:flex-end;padding:14px 0 2px}
+#v-presim td:nth-child(1){min-width:210px}
+#v-presim td:nth-child(3){min-width:280px}
+#v-presim textarea{resize:vertical}
