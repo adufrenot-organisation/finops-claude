@@ -707,14 +707,14 @@ function openScenarioDetailV36(sid){
   const m=model(sid),host=document.getElementById('scenarioDetailModal');if(!m?.s||!host)return;
   host.innerHTML=`<div class="modal-backdrop scenario-detail-backdrop">
     <div class="scenario-detail-modal" role="dialog" aria-modal="true" aria-label="Détail du scénario">
-      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue imprimable</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="openScenarioHtml" class="btn secondary">🌐 Ouvrir en HTML</button><button id="printScenarioDetail" class="btn primary">🖨 Imprimer le détail</button></div></div>
+      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue imprimable</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="openScenarioHtml" class="btn secondary">🌐 Ouvrir en HTML</button></div></div>
       <div class="scenario-detail-scroll">${scenarioDetailHtmlV36(m)}</div>
     </div>
   </div>`;
   document.getElementById('closeScenarioDetail').onclick=()=>host.innerHTML='';
   host.querySelector('.scenario-detail-backdrop').onclick=e=>{if(e.target===e.currentTarget)host.innerHTML=''};
   document.getElementById('openScenarioHtml').onclick=()=>openScenarioHtmlV41(sid);
-  document.getElementById('printScenarioDetail').onclick=()=>printScenarioDetailV36(sid);
+  
 }
 function safeFilenameV41(value){
   return String(value||'scenario')
