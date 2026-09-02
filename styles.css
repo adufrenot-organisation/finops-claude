@@ -613,3 +613,58 @@
   font-size:.75rem;
   color:var(--muted,#667085);
 }
+
+/* V34 — présence multi-utilisateur dans FinOps */
+.presence-widget{position:relative}
+.presence-toggle{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  min-height:34px;
+  padding:6px 9px;
+  border:1px solid var(--line,#dbe3ef);
+  border-radius:9px;
+  background:#fff;
+  color:inherit;
+  cursor:pointer;
+}
+.presence-toggle:hover{background:var(--panel,#f8fafc)}
+.presence-menu{
+  position:absolute;
+  right:0;
+  top:calc(100% + 7px);
+  width:min(390px,calc(100vw - 40px));
+  max-height:360px;
+  overflow:auto;
+  z-index:40;
+  padding:8px;
+  border:1px solid var(--line,#dbe3ef);
+  border-radius:12px;
+  background:#fff;
+  box-shadow:0 14px 36px rgba(15,23,42,.14);
+}
+.presence-menu.hidden{display:none}
+.presence-person{
+  display:flex;
+  gap:10px;
+  align-items:flex-start;
+  padding:9px 8px;
+  border-radius:9px;
+}
+.presence-person+.presence-person{border-top:1px solid var(--line,#eef2f6)}
+.presence-person.mine{background:var(--panel,#f8fafc)}
+.presence-person-dot{
+  width:9px;height:9px;border-radius:50%;
+  background:#22c55e;
+  margin-top:6px;
+  flex:0 0 auto;
+  box-shadow:0 0 0 3px rgba(34,197,94,.12);
+}
+.presence-person-main{min-width:0;flex:1}
+.presence-person-name{font-weight:750;overflow-wrap:anywhere}
+.presence-person-meta{font-size:.82rem;margin-top:2px}
+.presence-person-domain{font-size:.75rem;color:var(--muted,#667085);margin-top:2px}
+.presence-empty{padding:12px;color:var(--muted,#667085);font-size:.84rem}
+@media(max-width:900px){
+  .presence-menu{left:0;right:auto}
+}

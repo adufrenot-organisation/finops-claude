@@ -1,12 +1,32 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
+let PRESENCE_INTERVAL=null;
+let PRESENCE_RECORD_ID=0;
+let PRESENCE_CURRENT_VIEW='dashboard';
+let PRESENCE_ROWS=[];
+const PRESENCE_HEARTBEAT_MS=20000;
+const PRESENCE_TTL_MS=75000;
+function presenceSessionId(){
+  try{
+    let id=sessionStorage.getItem('finopsPresenceSessionId');
+    if(!id){
+      id=(globalThis.crypto?.randomUUID?.()||`finops-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+      sessionStorage.setItem('finopsPresenceSessionId',id);
+    }
+    return id;
+  }catch(_){
+    if(!window.__finopsPresenceSessionId)window.__finopsPresenceSessionId=`finops-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    return window.__finopsPresenceSessionId;
+  }
+}
+
 grist.ready({requiredAccess:"full"}); document.addEventListener("DOMContentLoaded",boot);
 function rows(t){if(!t||!Array.isArray(t.id))return[];return t.id.map((id,i)=>{const r={id};for(const[k,v]of Object.entries(t))if(k!=="id"&&Array.isArray(v))r[k]=v[i];return r})}
 function money(v,c="USD"){return new Intl.NumberFormat("fr-FR",{style:"currency",currency:c,maximumFractionDigits:0}).format(Number(v||0))} function num(v){return new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Number(v||0))} function pct(v){return new Intl.NumberFormat("fr-FR",{style:"percent",maximumFractionDigits:1}).format(Number(v||0))} function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
 function toast(m,e=false){const x=document.getElementById("toast");if(!x)return;x.textContent=m;x.className="toast show"+(e?" error":"");setTimeout(()=>x.className="toast",2400)}
 async function fetchAll(){const names=Object.values(T),raw=await Promise.all(names.map(n=>grist.docApi.fetchTable(n).catch(()=>({id:[]}))));const o={};names.forEach((n,i)=>o[n]=rows(raw[i]));o.domainById=Object.fromEntries(o[T.domains].map(r=>[r.id,r]));o.scenarioById=Object.fromEntries(o[T.scenarios].map(r=>[r.id,r]));o.providerById=Object.fromEntries(o[T.providers].map(r=>[r.id,r]));o.offerById=Object.fromEntries(o[T.offers].map(r=>[r.id,r]));return o}
-async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
+async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe();startPresence()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
 function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
 
 const APP_ROLES={
@@ -126,6 +146,124 @@ function buildNavHtml(){
 }
 
 
+
+async function fetchPresenceRows(){
+  try{
+    return rows(await grist.docApi.fetchTable(T.presence));
+  }catch(_){
+    return [];
+  }
+}
+function presenceIdentity(){
+  if(isOwner())return 'Owner Grist';
+  return currentRightRow()?.Email||currentUserLabel();
+}
+function presenceDomainText(){
+  if(isOwner())return 'Tous les domaines';
+  return scopedDomains().map(d=>d.Nom).join(', ')||'Aucun domaine';
+}
+function presencePageLabel(v){
+  return menuLabel(v||'dashboard');
+}
+function presenceAgeLabel(ms){
+  const age=Math.max(0,Date.now()-(+ms||0));
+  if(age<30000)return "à l’instant";
+  if(age<60000)return "il y a moins d’une minute";
+  return `il y a ${Math.max(1,Math.round(age/60000))} min`;
+}
+function activePresenceRows(list=PRESENCE_ROWS){
+  const now=Date.now();
+  return (list||[])
+    .filter(r=>r.Actif!==false && +r.Dernier_Heartbeat_MS>0 && now-(+r.Dernier_Heartbeat_MS)<=PRESENCE_TTL_MS)
+    .sort((a,b)=>{
+      const mineA=String(a.Session_Id)===presenceSessionId()?0:1;
+      const mineB=String(b.Session_Id)===presenceSessionId()?0:1;
+      return mineA-mineB || String(a.Email||'').localeCompare(String(b.Email||''),'fr');
+    });
+}
+function renderPresenceUI(list=PRESENCE_ROWS){
+  const wrap=document.getElementById('presenceWidget');
+  if(!wrap)return;
+  const active=activePresenceRows(list);
+  const count=document.getElementById('presenceCount');
+  if(count)count.textContent=String(active.length);
+
+  const menu=document.getElementById('presenceMenu');
+  if(!menu)return;
+  menu.innerHTML=active.length?active.map(r=>{
+    const mine=String(r.Session_Id)===presenceSessionId();
+    return `<div class="presence-person ${mine?'mine':''}">
+      <span class="presence-person-dot"></span>
+      <div class="presence-person-main">
+        <div class="presence-person-name">${esc(r.Email||'Utilisateur')}${mine?' <span class="badge ok">vous</span>':''}</div>
+        <div class="presence-person-meta">${esc(r.Role_App||'')} · <b>${esc(presencePageLabel(r.Page))}</b></div>
+        <div class="presence-person-domain">${esc(r.Domaine_Texte||'')} · ${esc(presenceAgeLabel(r.Dernier_Heartbeat_MS))}</div>
+      </div>
+    </div>`;
+  }).join(''):'<div class="presence-empty">Aucune autre session FinOps détectée.</div>';
+}
+async function refreshPresenceUI(){
+  PRESENCE_ROWS=await fetchPresenceRows();
+  renderPresenceUI(PRESENCE_ROWS);
+}
+async function cleanupOldPresence(){
+  if(!(isOwner()||ACCESS.role===APP_ROLES.ADMINISTRATEUR))return;
+  try{
+    const all=await fetchPresenceRows();
+    const cutoff=Date.now()-24*60*60*1000;
+    const stale=all.filter(r=>(+r.Dernier_Heartbeat_MS||0)<cutoff).slice(0,100);
+    if(stale.length)await grist.docApi.applyUserActions(stale.map(r=>["RemoveRecord",T.presence,r.id]));
+  }catch(_){}
+}
+async function heartbeatPresence(force=false){
+  if(ACCESS.role===APP_ROLES.DENIED)return;
+  if(document.hidden&&!force)return;
+  const sessionId=presenceSessionId();
+  const now=Date.now();
+  const fields={
+    Session_Id:sessionId,
+    Email:presenceIdentity(),
+    Role_App:roleLabel(),
+    Page:PRESENCE_CURRENT_VIEW||'dashboard',
+    Domaine_Texte:presenceDomainText(),
+    Dernier_Heartbeat_MS:now,
+    Actif:true
+  };
+  try{
+    if(!PRESENCE_RECORD_ID){
+      const all=await fetchPresenceRows();
+      const existing=all.find(r=>String(r.Session_Id)===sessionId);
+      PRESENCE_RECORD_ID=+existing?.id||0;
+    }
+    if(PRESENCE_RECORD_ID){
+      try{
+        await grist.docApi.applyUserActions([["UpdateRecord",T.presence,PRESENCE_RECORD_ID,fields]]);
+      }catch(_){
+        PRESENCE_RECORD_ID=0;
+      }
+    }
+    if(!PRESENCE_RECORD_ID){
+      await grist.docApi.applyUserActions([["AddRecord",T.presence,null,fields]]);
+      const all=await fetchPresenceRows();
+      PRESENCE_RECORD_ID=+(all.find(r=>String(r.Session_Id)===sessionId)?.id||0);
+    }
+    await refreshPresenceUI();
+  }catch(e){
+    console.warn('Presence heartbeat failed',e);
+  }
+}
+function startPresence(){
+  if(PRESENCE_INTERVAL)clearInterval(PRESENCE_INTERVAL);
+  heartbeatPresence(true);
+  PRESENCE_INTERVAL=setInterval(()=>heartbeatPresence(false),PRESENCE_HEARTBEAT_MS);
+  if(!window.__finopsPresenceVisibilityBound){
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden)heartbeatPresence(true)});
+    window.addEventListener('focus',()=>heartbeatPresence(true));
+    window.__finopsPresenceVisibilityBound=true;
+  }
+  cleanupOldPresence();
+}
+
 function renderShell(){
   if(ACCESS.role===APP_ROLES.DENIED){
     document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">🔒</div><h1>Accès non autorisé</h1><p>Votre compte n’est pas inscrit comme utilisateur actif dans la table <b>Droits_Utilisateurs</b>.</p><div class="deniednote">Aucun menu FinOps n’est disponible. Demandez à un administrateur de vous ajouter dans la gestion des droits.</div></div></div>`;
@@ -147,10 +285,15 @@ function renderShell(){
         <div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div>
         <div class="head-right">
           <div class="session-strip" aria-label="Session FinOps">
-            <div class="session-dot" title="Session widget active"></div>
-            <div class="session-ident"><span class="session-label">Connecté</span><b id="sessionUser">${esc(currentUserLabel())}</b></div>
+            <div class="session-ident"><span class="session-label">Moi</span><b id="sessionUser">${esc(currentUserLabel())}</b></div>
             <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}</b></div>
             <div class="session-ident"><span class="session-label">Page</span><b id="sessionPage">${esc(menuLabel('dashboard'))}</b></div>
+            <div id="presenceWidget" class="presence-widget">
+              <button id="presenceToggle" type="button" class="presence-toggle" aria-expanded="false">
+                <span class="session-dot"></span><b><span id="presenceCount">1</span> en ligne</b><span aria-hidden="true">▾</span>
+              </button>
+              <div id="presenceMenu" class="presence-menu hidden"><div class="presence-empty">Chargement de la présence…</div></div>
+            </div>
           </div>
           <div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div>
         </div>
@@ -166,6 +309,21 @@ function renderShell(){
     CURRENT=model(+selectedScenario()?.id||0);
     renderAll();
   };
+
+  const presenceToggle=document.getElementById('presenceToggle');
+  const presenceMenu=document.getElementById('presenceMenu');
+  presenceToggle?.addEventListener('click',()=>{
+    const hidden=presenceMenu?.classList.toggle('hidden');
+    presenceToggle.setAttribute('aria-expanded',hidden?'false':'true');
+    if(!hidden)refreshPresenceUI();
+  });
+  document.addEventListener('click',e=>{
+    const widget=document.getElementById('presenceWidget');
+    if(widget&&!widget.contains(e.target)){
+      document.getElementById('presenceMenu')?.classList.add('hidden');
+      document.getElementById('presenceToggle')?.setAttribute('aria-expanded','false');
+    }
+  },{once:true});
 
   const toggle=document.getElementById('sidebarToggle');
   toggle.onclick=()=>setSidebarCollapsed(!document.querySelector('.shell').classList.contains('sidebar-collapsed'));
@@ -245,7 +403,9 @@ function switchView(v){
   const hideTop=['presim','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v);
   if(scenarioField)scenarioField.style.display=hideTop?'none':'';
   if(refresh)refresh.style.display=hideTop?'none':'';
+  PRESENCE_CURRENT_VIEW=v;
   enforceRolePermissions();
+  heartbeatPresence(true);
 }
 function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))}
 function scopedAlloc(sid){
@@ -1401,7 +1561,8 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Enterprise",colIds:"*",kind:"domain",mode:"read"},
   {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",mode:"read"},
   {tableId:"Domaines",colIds:"*",kind:"domains",mode:"domains"},
-  {tableId:"Droits_Utilisateurs",colIds:"*",kind:"rights",mode:"rights"}
+  {tableId:"Droits_Utilisateurs",colIds:"*",kind:"rights",mode:"rights"},
+  {tableId:"Presence_Utilisateurs",colIds:"*",kind:"presence",mode:"presence"}
 ];
 function internalRows(t){return rows(t)}
 async function readAclMeta(){
@@ -1421,7 +1582,7 @@ function aclRoleFormula(roles){
 }
 function aclFormulaFor(kind,roles){
   const base=aclRoleFormula(roles);
-  if(kind==="global"||kind==="scenario")return base;
+  if(kind==="global"||kind==="scenario"||kind==="presence")return base;
   if(kind==="domain")return `${base} and rec.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="presimdomain")return `${base} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="domains")return `${base} and rec.id in user.Droits.Domaines_Autorises`;
@@ -1454,6 +1615,12 @@ function aclRulesForSpec(spec){
       {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"ADMIN_WRITE_ALL",formula:aclRoleFormula(["ADMINISTRATEUR"])},
       {roles:["OBSERVATEUR","CONTRIBUTEUR_AVANCE"],perm:"+R",tag:"ADV_READ_ALL",formula:aclRoleFormula(["OBSERVATEUR","CONTRIBUTEUR_AVANCE"])},
       {roles:["LECTEUR","CONTRIBUTEUR"],perm:"+R",tag:"SELF_READ",formula:`${aclRoleFormula(["LECTEUR","CONTRIBUTEUR"])} and rec.Email == user.Email`}
+    ];
+  }
+  if(spec.mode==="presence"){
+    return [
+      {roles:reader,perm:"+CRUD",tag:"SELF_WRITE",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`},
+      {roles:reader,perm:"+R",tag:"READ_ALL",formula:aclRoleFormula(reader)}
     ];
   }
   return [{roles:reader,perm:"+R",tag:"READ"}];
