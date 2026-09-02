@@ -78,3 +78,7 @@ Le paramétrage de l'offre de service est strictement adossé aux colonnes persi
 
 ## V22
 Même dictionnaire de colonnes Offres pour lecture/admin et visibilité persistée par vue.
+
+
+## V23
+Paramétrage global et persistant des libellés UI, menu et colonnes Offre.

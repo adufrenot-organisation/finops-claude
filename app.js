@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 grist.ready({requiredAccess:"full"}); document.addEventListener("DOMContentLoaded",boot);
@@ -21,6 +21,7 @@ function menuConfigRows(){
     {Cle:'domains',Libelle:'Domaines',Ordre:70,Actif:true,Owner_Seulement:true},
     {Cle:'rights',Libelle:'Droits utilisateurs',Ordre:80,Actif:true,Owner_Seulement:true},
     {Cle:'menuadmin',Libelle:'Configuration du menu',Ordre:90,Actif:true,Owner_Seulement:true},
+    {Cle:'labelsadmin',Libelle:'Paramétrage des libellés',Ordre:95,Actif:true,Owner_Seulement:true},
     {Cle:'acladmin',Libelle:'ACL / Sécurité',Ordre:100,Actif:true,Owner_Seulement:true}
   ];
   const known=new Set(fallback.map(x=>x.Cle));
@@ -35,7 +36,7 @@ function menuLabel(view){
   return r?.Libelle||DEFAULT_MENU_LABELS[view]||view;
 }
 function navIcon(view){
-  return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',scenarios:'▤',offers:'¤',offersadmin:'⚙',domains:'◎',rights:'♙',menuadmin:'☷',acladmin:'🔐'}[view]||'•';
+  return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',scenarios:'▤',offers:'¤',offersadmin:'⚙',domains:'◎',rights:'♙',menuadmin:'☷',labelsadmin:'✎',acladmin:'🔐'}[view]||'•';
 }
 function buildNavHtml(admin){
   return menuConfigRows()
@@ -50,7 +51,7 @@ function renderShell(){
   }
   const admin=ACCESS.role==="OWNER";
   const navHtml=buildNavHtml(admin);
-  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${admin?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-acladmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
+  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${admin?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-acladmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
   document.getElementById('refresh').onclick=boot;
   const toggle=document.getElementById('sidebarToggle');
@@ -92,11 +93,12 @@ const DEFAULT_MENU_LABELS={
   domains:'Domaines',
   rights:'Droits utilisateurs',
   menuadmin:'Configuration du menu',
+  labelsadmin:'Paramétrage des libellés',
   acladmin:'ACL / Sécurité'
 };
 
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
-function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['offers','offersadmin','domains','rights','menuadmin','acladmin'].includes(v)?'none':''}
+function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v)?'none':''}
 function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))} function scopedAlloc(sid){return D[T.alloc].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))} function scopedBaseline(sid){return D[T.baseline].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))}
 function populateScenario(preferredId=0){
   const sel=document.getElementById('scenarioSelect');
@@ -132,7 +134,7 @@ for(const d of Object.values(bd)){d.budgetAnnualized=d.eur*12/months;d.baselineP
 const savingPct=baselineAnnual?savingAnnual/baselineAnnual:0;
 return{s,alloc,baseline,bd,bo,bp,fixed,included,over,total,licenses,unresolved,rate,months,baselineAnnual,budgetPeriodEUR,budgetAnnualizedEUR,baselinePeriod,savingPeriod,savingAnnual,savingPct}
 }
-function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderScenarios();renderOffersReadOnly();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderAclAdmin()}enforceReadOnlyForNonOwner()}
+function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderScenarios();renderOffersReadOnly();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAclAdmin()}applyUILabels();enforceReadOnlyForNonOwner()}
 function dashboardFilterOptions(){
   const domains=scopedDomains().sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
   const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
@@ -223,7 +225,7 @@ const OFFER_COLUMNS=[
 ];
 function offerColumnConfig(view){
   const rows=D[T.offerCols]||[],byKey=new Map(rows.map(r=>[r.Cle_Colonne,r]));
-  return OFFER_COLUMNS.map((c,i)=>{const r=byKey.get(c.key);return {...c,order:r&&Number.isFinite(+r.Ordre)?+r.Ordre:i*10,visible:view==='read'?(r?r.Visible_Lecture!==false:true):(r?r.Visible_Admin!==false:true)}}).sort((a,b)=>a.order-b.order)
+  return OFFER_COLUMNS.map((c,i)=>{const r=byKey.get(c.key);return {...c,label:(r?.Libelle||c.label),order:r&&Number.isFinite(+r.Ordre)?+r.Ordre:i*10,visible:view==='read'?(r?r.Visible_Lecture!==false:true):(r?r.Visible_Admin!==false:true)}}).sort((a,b)=>a.order-b.order)
 }
 function offerVisibleColumns(view){return offerColumnConfig(view).filter(c=>c.visible)}
 function offerCellRead(o,c){const v=o[c.key];if(c.kind==='ref-provider')return esc(D.providerById[v]?.Nom||'');if(c.kind==='money')return +v?money(v):'—';if(c.kind==='bool')return ynBadge(v);if(c.kind==='int')return num(+v||0);if(c.key==='Statut_Tarif')return v==='Devis à confirmer'?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(v||'')}</span>`;return esc(v??'')}
@@ -231,7 +233,7 @@ function offerCellAdmin(o,c,providers){const v=o[c.key];if(c.kind==='ref-provide
 function columnPickerHtml(view){const cols=offerColumnConfig(view);return `<details class="column-picker read-only-exempt"><summary class="btn secondary">Colonnes</summary><div class="column-picker-panel">${cols.map(c=>`<label><input type="checkbox" data-col-view="${view}" data-col-key="${c.key}" ${c.visible?'checked':''}> ${esc(c.label)}</label>`).join('')}<div class="column-picker-actions"><button class="btn small secondary" data-col-all="${view}">Tout afficher</button><button class="btn small secondary" data-col-none="${view}">Tout masquer</button>${ACCESS.role==='OWNER'?`<button class="btn small primary" data-col-save="${view}">Enregistrer la vue</button>`:''}</div></div></details>`}
 function bindColumnPicker(view){document.querySelectorAll(`[data-col-view="${view}"]`).forEach(cb=>cb.onchange=()=>applyColumnVisibilityLocally(view));document.querySelector(`[data-col-all="${view}"]`)?.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=true);applyColumnVisibilityLocally(view)});document.querySelector(`[data-col-none="${view}"]`)?.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=false);applyColumnVisibilityLocally(view)});document.querySelector(`[data-col-save="${view}"]`)?.addEventListener('click',async e=>{e.preventDefault();await saveOfferColumnView(view)})}
 function applyColumnVisibilityLocally(view){const checked=new Set([...document.querySelectorAll(`[data-col-view="${view}"]:checked`)].map(x=>x.dataset.colKey));const root=document.getElementById(view==='read'?'v-offers':'v-offersadmin');root?.querySelectorAll('[data-col]').forEach(el=>el.style.display=checked.has(el.dataset.col)?'':'none')}
-async function saveOfferColumnView(view){if(ACCESS.role!=='OWNER')return;const state=new Map([...document.querySelectorAll(`[data-col-view="${view}"]`)].map(x=>[x.dataset.colKey,x.checked])),existing=new Map((D[T.offerCols]||[]).map(r=>[r.Cle_Colonne,r])),actions=[];OFFER_COLUMNS.forEach((c,i)=>{const r=existing.get(c.key),fields={Libelle:c.label,Ordre:r?.Ordre??i*10,[view==='read'?'Visible_Lecture':'Visible_Admin']:!!state.get(c.key)};if(r)actions.push(['UpdateRecord',T.offerCols,r.id,fields]);else actions.push(['AddRecord',T.offerCols,null,{Cle_Colonne:c.key,Libelle:c.label,Ordre:i*10,Visible_Lecture:view==='read'?!!state.get(c.key):true,Visible_Admin:view==='admin'?!!state.get(c.key):true}])});try{await apply(actions);toast('Configuration des colonnes enregistrée.');await reload()}catch(e){toast(e.message||String(e),true)}}
+async function saveOfferColumnView(view){if(ACCESS.role!=='OWNER')return;const state=new Map([...document.querySelectorAll(`[data-col-view="${view}"]`)].map(x=>[x.dataset.colKey,x.checked])),existing=new Map((D[T.offerCols]||[]).map(r=>[r.Cle_Colonne,r])),actions=[];OFFER_COLUMNS.forEach((c,i)=>{const r=existing.get(c.key),fields={Libelle:r?.Libelle||c.label,Ordre:r?.Ordre??i*10,[view==='read'?'Visible_Lecture':'Visible_Admin']:!!state.get(c.key)};if(r)actions.push(['UpdateRecord',T.offerCols,r.id,fields]);else actions.push(['AddRecord',T.offerCols,null,{Cle_Colonne:c.key,Libelle:c.label,Ordre:i*10,Visible_Lecture:view==='read'?!!state.get(c.key):true,Visible_Admin:view==='admin'?!!state.get(c.key):true}])});try{await apply(actions);toast('Configuration des colonnes enregistrée.');await reload()}catch(e){toast(e.message||String(e),true)}}
 function serviceOfferRowsHtml(edit=false){const view=edit?'admin':'read',cols=offerVisibleColumns(view),providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));return D[T.offers].slice().sort((a,b)=>{const pa=D.providerById[a.Fournisseur]?.Nom||'',pb=D.providerById[b.Fournisseur]?.Nom||'';return pa.localeCompare(pb,'fr')||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr')}).map(o=>edit?offerAdminRow(o,providers,cols):offerReadOnlyRow(o,cols)).join('')}
 function offerReadOnlyRow(o,cols=offerVisibleColumns('read')){return `<tr>${cols.map(c=>`<td data-col="${c.key}">${offerCellRead(o,c)}</td>`).join('')}</tr>`}
 function renderOffersReadOnly(){const el=document.getElementById('v-offers');if(!el)return;const cols=offerVisibleColumns('read');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Offre de service</h3><p>Lecture seule de la table Grist <b>Offres</b>. Même jeu de colonnes que l'écran de paramétrage.</p></div><div>${columnPickerHtml('read')}</div></div><div class="tablewrap service-offers-table"><table><thead><tr>${cols.map(c=>`<th data-col="${c.key}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${serviceOfferRowsHtml(false)}</tbody></table></div></article>`;bindColumnPicker('read')}
@@ -331,19 +333,103 @@ async function saveMenuConfig(){
 function resetMenuConfigDraft(){
   const defaults=[
     ['dashboard','Dashboard'],['simulation','Simulation'],['compare','Comparaison'],['roi','ROI / Économies'],
-    ['scenarios','Scénarios'],['offers','Offre de service'],['offersadmin','Paramétrage offre de service'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu'],['acladmin','ACL / Sécurité']
+    ['scenarios','Scénarios'],['offers','Offre de service'],['offersadmin','Paramétrage offre de service'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu'],['labelsadmin','Paramétrage des libellés'],['acladmin','ACL / Sécurité']
   ];
   const tbody=document.getElementById('menuAdminBody');if(!tbody)return;
   const byKey=Object.fromEntries([...tbody.querySelectorAll('tr[data-menu-key]')].map(tr=>[tr.dataset.menuKey,tr]));
-  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;const access=tr.querySelector('[data-f="Owner_Seulement"]');if(access)access.value=['offersadmin','domains','rights','menuadmin','acladmin'].includes(key)?'true':'false';tbody.appendChild(tr)});
+  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;const access=tr.querySelector('[data-f="Owner_Seulement"]');if(access)access.value=['offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(key)?'true':'false';tbody.appendChild(tr)});
   toast("Valeurs par défaut chargées. Clique sur Enregistrer pour les appliquer.");
 }
 
+
+
+function uiLabelRows(){return D?.[T.uiLabels]||[]}
+function uiLabelMap(){
+  const m=new Map();
+  uiLabelRows().filter(r=>r.Actif!==false).forEach(r=>{
+    const screen=String(r.Ecran||'*'),def=String(r.Libelle_Defaut||'').trim();
+    if(def)m.set(`${screen}||${def}`,String(r.Libelle||def));
+  });
+  return m;
+}
+function uiTextScreen(el){
+  const view=el.closest?.('.view');
+  return view?.id?view.id.replace(/^v-/,''):'global';
+}
+function uiTextNodes(){
+  const selector='h1,h2,h3,p,th,button,label.field,summary,small,.status,.menu-admin-note,.offer-schema-note,.deniednote';
+  const out=[];
+  document.querySelectorAll(selector).forEach(el=>{
+    if(el.closest('#v-labelsadmin'))return;
+    const screen=uiTextScreen(el);
+    [...el.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).forEach(n=>{
+      const def=String(n.nodeValue||'').trim();
+      if(def.length<2 || /^[-+]?\d+(?:[.,]\d+)?$/.test(def))return;
+      out.push({screen,def,node:n});
+    });
+  });
+  return out;
+}
+function applyUILabels(){
+  const map=uiLabelMap();
+  uiTextNodes().forEach(x=>{
+    const val=map.get(`${x.screen}||${x.def}`)??map.get(`*||${x.def}`);
+    if(val && val!==x.def){
+      const raw=x.node.nodeValue||'',lead=raw.match(/^\s*/)?.[0]||'',trail=raw.match(/\s*$/)?.[0]||'';
+      x.node.nodeValue=lead+val+trail;
+    }
+  });
+}
+function slugLabel(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,70)}
+function collectUILabelCandidates(){
+  const uniq=new Map();
+  uiTextNodes().forEach(x=>{const k=`${x.screen}||${x.def}`;if(!uniq.has(k))uniq.set(k,{Ecran:x.screen,Libelle_Defaut:x.def,Cle:`${x.screen}.${slugLabel(x.def)}`})});
+  uiLabelRows().forEach(r=>{const k=`${r.Ecran||'*'}||${r.Libelle_Defaut||''}`;if(!uniq.has(k))uniq.set(k,{Ecran:r.Ecran||'*',Libelle_Defaut:r.Libelle_Defaut||'',Cle:r.Cle||`${r.Ecran}.${slugLabel(r.Libelle_Defaut)}`})});
+  return [...uniq.values()].sort((a,b)=>String(a.Ecran).localeCompare(String(b.Ecran),'fr')||String(a.Libelle_Defaut).localeCompare(String(b.Libelle_Defaut),'fr'));
+}
+function renderLabelsAdmin(){
+  const el=document.getElementById('v-labelsadmin');if(!el)return;
+  const rows=uiLabelRows(),byPair=new Map(rows.map(r=>[`${r.Ecran||'*'}||${r.Libelle_Defaut||''}`,r]));
+  const candidates=collectUILabelCandidates();
+  const menuRows=menuConfigRows();
+  const colRows=offerColumnConfig('read');
+  el.innerHTML=`
+  <article class="card"><div class="cardhead"><div><h3>Paramétrage des libellés</h3><p>Personnalise et persiste les textes visibles de l'application. Les valeurs par défaut restent disponibles comme fallback.</p></div><div class="table-actions"><input id="labelSearch" class="admin-input" placeholder="Rechercher un écran ou un libellé"><button id="saveUILabels" class="btn primary">Enregistrer les textes</button></div></div>
+    <div class="tablewrap labels-admin-wrap"><table class="labels-admin-table"><thead><tr><th>Écran</th><th>Clé</th><th>Libellé par défaut</th><th>Libellé affiché</th><th>Actif</th></tr></thead><tbody id="uiLabelsBody">${candidates.map(c=>{const r=byPair.get(`${c.Ecran}||${c.Libelle_Defaut}`);return `<tr data-label-id="${r?.id||''}" data-screen="${esc(c.Ecran)}" data-default="${esc(c.Libelle_Defaut)}"><td><code>${esc(c.Ecran)}</code></td><td><code>${esc(r?.Cle||c.Cle)}</code></td><td>${esc(c.Libelle_Defaut)}</td><td><input class="admin-input wide" data-f="Libelle" value="${esc(r?.Libelle||c.Libelle_Defaut)}"></td><td><input type="checkbox" data-f="Actif" ${r?.Actif===false?'':'checked'}></td></tr>`}).join('')}</tbody></table></div>
+  </article>
+  <article class="card"><div class="cardhead"><div><h3>Libellés du menu</h3><p>Les noms des onglets restent stockés dans Configuration_Menu et sont éditables ici également.</p></div><button id="saveMenuLabelsFromLabels" class="btn primary">Enregistrer le menu</button></div><div class="tablewrap"><table><thead><tr><th>Clé</th><th>Libellé</th></tr></thead><tbody>${menuRows.map(r=>`<tr data-menu-label-id="${r.id||''}" data-menu-label-key="${esc(r.Cle)}"><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input wide" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}"></td></tr>`).join('')}</tbody></table></div></article>
+  <article class="card"><div class="cardhead"><div><h3>Colonnes Offre de service</h3><p>Ces libellés sont communs aux vues lecture et paramétrage et restent stockés dans Configuration_Colonnes_Offres.</p></div><button id="saveOfferColLabels" class="btn primary">Enregistrer les colonnes</button></div><div class="tablewrap"><table><thead><tr><th>Clé colonne</th><th>Libellé</th></tr></thead><tbody>${colRows.map(c=>`<tr data-offer-col-key="${esc(c.key)}"><td><code>${esc(c.key)}</code></td><td><input class="admin-input wide" value="${esc(c.label)}"></td></tr>`).join('')}</tbody></table></div></article>`;
+  document.getElementById('saveUILabels').onclick=saveUILabelsV23;
+  document.getElementById('saveMenuLabelsFromLabels').onclick=saveMenuLabelsV23;
+  document.getElementById('saveOfferColLabels').onclick=saveOfferColumnLabelsV23;
+  document.getElementById('labelSearch').oninput=e=>{const q=String(e.target.value||'').toLowerCase();document.querySelectorAll('#uiLabelsBody tr').forEach(tr=>tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none')};
+}
+async function saveUILabelsV23(){
+  if(ACCESS.role!=='OWNER'){toast('Action réservée à l’Owner.',true);return}
+  const actions=[];
+  document.querySelectorAll('#uiLabelsBody tr').forEach((tr,i)=>{
+    const id=+tr.dataset.labelId||0,screen=tr.dataset.screen||'*',def=tr.dataset.default||'',lib=tr.querySelector('[data-f="Libelle"]')?.value.trim()||def,active=!!tr.querySelector('[data-f="Actif"]')?.checked;
+    const fields={Cle:`${screen}.${slugLabel(def)}`,Ecran:screen,Libelle_Defaut:def,Libelle:lib,Actif:active,Ordre:(i+1)*10};
+    actions.push(id?["UpdateRecord",T.uiLabels,id,fields]:["AddRecord",T.uiLabels,null,fields]);
+  });
+  try{await apply(actions);toast('Libellés des écrans enregistrés.');await boot()}catch(e){toast(e.message||String(e),true)}
+}
+async function saveMenuLabelsV23(){
+  const actions=[];
+  document.querySelectorAll('[data-menu-label-key]').forEach(tr=>{const id=+tr.dataset.menuLabelId||0,key=tr.dataset.menuLabelKey,old=menuConfigRows().find(r=>r.Cle===key)||{},lib=tr.querySelector('input')?.value.trim()||DEFAULT_MENU_LABELS[key]||key;const fields={Cle:key,Libelle:lib,Ordre:old.Ordre||999,Actif:old.Actif!==false,Owner_Seulement:!!old.Owner_Seulement};actions.push(id?["UpdateRecord",T.menu,id,fields]:["AddRecord",T.menu,null,fields])});
+  try{await apply(actions);toast('Libellés du menu enregistrés.');await boot()}catch(e){toast(e.message||String(e),true)}
+}
+async function saveOfferColumnLabelsV23(){
+  const existing=new Map((D[T.offerCols]||[]).map(r=>[r.Cle_Colonne,r])),actions=[];
+  document.querySelectorAll('[data-offer-col-key]').forEach((tr,i)=>{const key=tr.dataset.offerColKey,r=existing.get(key),lib=tr.querySelector('input')?.value.trim()||OFFER_COLUMNS.find(c=>c.key===key)?.label||key;const fields={Cle_Colonne:key,Libelle:lib,Ordre:r?.Ordre??i*10,Visible_Lecture:r?.Visible_Lecture!==false,Visible_Admin:r?.Visible_Admin!==false};actions.push(r?["UpdateRecord",T.offerCols,r.id,fields]:["AddRecord",T.offerCols,null,fields])});
+  try{await apply(actions);toast('Libellés des colonnes enregistrés.');await boot()}catch(e){toast(e.message||String(e),true)}
+}
 
 const FINOPS_ACL_TAG="FINOPS_V16";
 const FINOPS_ACL_RESOURCES=[
   {tableId:"Scenarios",colIds:"*",kind:"global",perm:"+RU"},
   {tableId:"Configuration_Menu",colIds:"*",kind:"global",perm:"+R"},
+  {tableId:"Configuration_Libelles_UI",colIds:"*",kind:"global",perm:"+R"},
   {tableId:"Fournisseurs",colIds:"*",kind:"global",perm:"+R"},
   {tableId:"Offres",colIds:"*",kind:"global",perm:"+R"},
   {tableId:"Allocations",colIds:"*",kind:"domain",perm:"+R"},
