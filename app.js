@@ -595,6 +595,7 @@ async function savePreResourcesV28(){
   }catch(e){toast(e.message||String(e),true)}
 }
 
+let SCENARIO_FILTER={q:'',year:'',status:''};
 let NEW_SCENARIOS=[];
 function scenarioDefaults(){
   const now=new Date();
@@ -607,23 +608,123 @@ function scenarioRowHtml(s){
   const attrs=draft?`data-draft="${esc(s.__key)}"`:`data-s="${s.id}"`;
   return `<tr ${attrs}><td><input class="admin-input" data-f="Nom" value="${esc(s.Nom)}"></td><td><input class="admin-input" data-f="Annee" type="number" value="${+s.Annee||0}"></td><td><input class="admin-input" data-f="Nb_Mois" type="number" min="1" max="12" value="${+s.Nb_Mois||0}"></td><td><input class="admin-input" data-f="Taux_USD_EUR" type="number" step="0.001" value="${+s.Taux_USD_EUR||0}"></td><td><input class="admin-input" data-f="Taux_Utilisation" type="number" step="0.05" min="0" value="${+s.Taux_Utilisation||0}"></td><td><input class="admin-input" data-f="Nb_Jours_Ouvres_Annuels" type="number" min="1" value="${+s.Nb_Jours_Ouvres_Annuels||218}"></td><td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td>${draft?`<td><button class="btn ghost cancelScenarioDraft" data-key="${esc(s.__key)}">Annuler</button></td>`:'<td></td>'}</tr>`;
 }
+
 function renderScenarios(){
   const el=document.getElementById('v-scenarios');
-  const all=[...D[T.scenarios],...NEW_SCENARIOS];
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Scénarios</h3><p>Modifie ou ajoute plusieurs scénarios puis enregistre-les en une seule fois.</p></div><div class="table-actions"><button id="saveAllScenarios" class="btn primary">Enregistrer les modifications</button><button id="newScenario" class="btn secondary">+ Nouveau</button></div></div><div class="tablewrap"><table><thead><tr><th>Nom</th><th>Année</th><th>Mois</th><th>USD/EUR</th><th>Utilisation</th><th>Jours ouvrés/an</th><th>Statut</th><th></th></tr></thead><tbody>${all.map(s=>scenarioRowHtml(s)).join('')}</tbody></table></div></article>`;
-  document.getElementById('saveAllScenarios').onclick=saveAllScenariosV26;
-  document.getElementById('newScenario').onclick=()=>{
+  if(!el)return;
+
+  const allExisting=(D[T.scenarios]||[]).slice().sort((a,b)=>
+    (+b.Annee||0)-(+a.Annee||0) || String(a.Nom||'').localeCompare(String(b.Nom||''),'fr')
+  );
+
+  const years=[...new Set(allExisting.map(s=>String(s.Annee||'')).filter(Boolean))].sort((a,b)=>+b-+a);
+  const statuses=[...new Set(allExisting.map(s=>String(s.Statut||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));
+
+  const q=String(SCENARIO_FILTER.q||'').trim().toLowerCase();
+  const filtered=allExisting.filter(s=>{
+    const text=[s.Nom,s.Annee,s.Statut,s.Commentaire].map(v=>String(v||'').toLowerCase()).join(' ');
+    const okQ=!q || text.includes(q);
+    const okYear=!SCENARIO_FILTER.year || String(s.Annee||'')===String(SCENARIO_FILTER.year);
+    const okStatus=!SCENARIO_FILTER.status || String(s.Statut||'')===String(SCENARIO_FILTER.status);
+    return okQ && okYear && okStatus;
+  });
+
+  const rows=[...filtered,...NEW_SCENARIOS];
+
+  el.innerHTML=`<article class="card">
+    <div class="cardhead">
+      <div>
+        <h3>Scénarios</h3>
+        <p>Modifie ou ajoute plusieurs scénarios puis enregistre-les en une seule fois.</p>
+      </div>
+      <div class="table-actions">
+        <button id="saveScenarios" class="btn primary">Enregistrer les modifications</button>
+        <button id="addScenario" class="btn secondary">+ Nouveau</button>
+      </div>
+    </div>
+
+    <div class="scenario-filters read-only-exempt">
+      <label class="scenario-search">
+        <span>Rechercher</span>
+        <input id="scenarioSearch" class="admin-input" type="search"
+          placeholder="Nom, année, statut, commentaire…"
+          value="${esc(SCENARIO_FILTER.q||'')}">
+      </label>
+
+      <label>
+        <span>Année</span>
+        <select id="scenarioYearFilter" class="admin-input">
+          <option value="">Toutes les années</option>
+          ${years.map(y=>`<option value="${esc(y)}" ${String(SCENARIO_FILTER.year)===y?'selected':''}>${esc(y)}</option>`).join('')}
+        </select>
+      </label>
+
+      <label>
+        <span>Statut</span>
+        <select id="scenarioStatusFilter" class="admin-input">
+          <option value="">Tous les statuts</option>
+          ${statuses.map(s=>`<option value="${esc(s)}" ${String(SCENARIO_FILTER.status)===s?'selected':''}>${esc(s)}</option>`).join('')}
+        </select>
+      </label>
+
+      <div class="scenario-filter-actions">
+        <button id="resetScenarioFilters" class="btn ghost" type="button">Réinitialiser</button>
+        <span class="scenario-count">${filtered.length} scénario(s) affiché(s) sur ${allExisting.length}</span>
+      </div>
+    </div>
+
+    <div class="tablewrap"><table>
+      <thead><tr>
+        <th>Nom</th><th>Année</th><th>Mois</th><th>USD/EUR</th><th>Utilisation</th><th>Jours ouvrés/an</th><th>Statut</th><th></th>
+      </tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(s=>scenarioRowHtml(s)).join('') : `
+          <tr><td colspan="8" class="empty-state">Aucun scénario ne correspond aux filtres.</td></tr>
+        `}
+      </tbody>
+    </table></div>
+  </article>`;
+
+  document.getElementById('saveScenarios').onclick=saveAllScenariosV26;
+
+  document.getElementById('addScenario').onclick=()=>{
     NEW_SCENARIOS.push(scenarioDefaults());
     renderScenarios();
-    applyUILabelsSafe?.();
-    const last=el.querySelector('tr[data-draft]:last-of-type input[data-f="Nom"]');
-    last?.focus(); last?.select();
+    const last=el.querySelector('tr[data-new-scenario]:last-of-type input[data-f="Nom"]');
+    last?.focus();
+    last?.select();
   };
-  el.querySelectorAll('.cancelScenarioDraft').forEach(b=>b.onclick=()=>{
-    NEW_SCENARIOS=NEW_SCENARIOS.filter(x=>x.__key!==b.dataset.key);
-    renderScenarios(); applyUILabelsSafe?.();
+
+  const updateFilters=()=>{
+    SCENARIO_FILTER={
+      q:document.getElementById('scenarioSearch')?.value||'',
+      year:document.getElementById('scenarioYearFilter')?.value||'',
+      status:document.getElementById('scenarioStatusFilter')?.value||''
+    };
+    renderScenarios();
+  };
+
+  document.getElementById('scenarioSearch')?.addEventListener('input',()=>{
+    SCENARIO_FILTER.q=document.getElementById('scenarioSearch').value||'';
+    renderScenarios();
+    const search=document.getElementById('scenarioSearch');
+    search?.focus();
+    if(search) search.setSelectionRange(search.value.length,search.value.length);
+  });
+  document.getElementById('scenarioYearFilter')?.addEventListener('change',updateFilters);
+  document.getElementById('scenarioStatusFilter')?.addEventListener('change',updateFilters);
+  document.getElementById('resetScenarioFilters')?.addEventListener('click',()=>{
+    SCENARIO_FILTER={q:'',year:'',status:''};
+    renderScenarios();
+  });
+
+  el.querySelectorAll('[data-cancel-new-scenario]').forEach(btn=>btn.onclick=()=>{
+    const key=btn.dataset.cancelNewScenario;
+    NEW_SCENARIOS=NEW_SCENARIOS.filter(s=>String(s.__key)!==String(key));
+    renderScenarios();
   });
 }
+
 async function saveAllScenariosV26(){
   const root=document.getElementById('v-scenarios'),actions=[];
   for(const tr of root.querySelectorAll('tbody tr')){
