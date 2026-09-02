@@ -549,8 +549,149 @@ async function reload(){
   renderAll();
   applyUILabelsSafe?.();
 }
-function renderCompare(){const el=document.getElementById('v-compare');el.innerHTML=`<article class="card"><h3>Comparer les scénarios</h3><p>Sélectionne jusqu’à 6 scénarios. Les montants « devis à confirmer » ne sont pas artificiellement valorisés à zéro : le budget affiché est le budget connu.</p><div class="checklist">${D[T.scenarios].map((s,i)=>`<label class="checkpill"><input type="checkbox" class="cmp" value="${s.id}" ${i<Math.min(3,D[T.scenarios].length)?'checked':''}>${esc(s.Nom)}</label>`).join('')}</div><div id="cmpOut" style="margin-top:14px"></div></article>`;document.querySelectorAll('.cmp').forEach(x=>x.onchange=drawCompare);drawCompare()}
-function drawCompare(){const ids=[...document.querySelectorAll('.cmp:checked')].slice(0,6).map(x=>+x.value),ms=ids.map(model);document.getElementById('cmpOut').innerHTML=`<div class="comparegrid">${ms.map(m=>`<div class="comparecard"><h4>${esc(m.s.Nom)}</h4><div class="big">${money(m.total)}</div><div class="muted">${money(m.total*m.rate,'EUR')} · ${num(m.licenses)} licences</div><div class="roi-line">Économie annuelle : <b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b> · ${pct(m.savingPct)}</div><div style="margin-top:8px">${m.unresolved?`<span class="badge warn">${m.unresolved} devis à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div></div>`).join('')}</div><div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Scénario</th><th>Fixe</th><th>Overage</th><th>Budget connu USD</th><th>Budget connu EUR</th><th>Économie annuelle</th><th>Économie %</th><th>Tarifs à confirmer</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td><td class="num ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</td><td class="num">${m.unresolved}</td></tr>`).join('')}</tbody></table></div>`}
+
+let COMPARE_SELECTED_IDS=[];
+function compareSelectedIds(){
+  const checked=[...document.querySelectorAll('.cmp:checked')].slice(0,6).map(x=>+x.value);
+  if(checked.length)COMPARE_SELECTED_IDS=checked;
+  return checked;
+}
+function scenarioDetailRows(m){
+  return m.alloc.map(a=>{
+    const d=D.domainById?.[a.Domaine]||D[T.domains].find(x=>+x.id===+a.Domaine)||{};
+    const o=D.offerById[a.Offre]||{};
+    const p=D.providerById[o.Fournisseur]||{};
+    return {
+      domain:d.Nom||'Domaine',
+      provider:p.Nom||'—',
+      offer:o.Nom||'—',
+      licenses:+a.Nb_Licences||0,
+      engagement:+a.Engagement_Mois||(+o.Engagement_Defaut_Mois||0),
+      billed:+a.Mois_Factures||(+o.Mois_Factures_Defaut||m.months||0),
+      fixed:+a.Cout_Abonnement||0,
+      variable:+a.Cout_Overage||0,
+      total:+a.Budget_Total_USD||0,
+      unresolved:!!a.Tarif_A_Confirmer
+    };
+  }).sort((a,b)=>a.domain.localeCompare(b.domain,'fr')||a.provider.localeCompare(b.provider,'fr')||a.offer.localeCompare(b.offer,'fr'));
+}
+function scenarioDomainGroups(m){
+  const groups={};
+  for(const r of scenarioDetailRows(m)){
+    (groups[r.domain]??=[]).push(r);
+  }
+  return Object.entries(groups).map(([domain,rows])=>({
+    domain,rows,
+    licenses:rows.reduce((s,r)=>s+r.licenses,0),
+    fixed:rows.reduce((s,r)=>s+r.fixed,0),
+    variable:rows.reduce((s,r)=>s+r.variable,0),
+    total:rows.reduce((s,r)=>s+r.total,0)
+  }));
+}
+function renderCompare(){
+  const el=document.getElementById('v-compare');
+  const scenarios=D[T.scenarios]||[];
+  if(!COMPARE_SELECTED_IDS.length)COMPARE_SELECTED_IDS=scenarios.slice(0,Math.min(3,scenarios.length)).map(s=>+s.id);
+  const selected=new Set(COMPARE_SELECTED_IDS);
+  el.innerHTML=`<article class="card synthesis-card">
+    <div class="cardhead synthesis-head"><div><h3>Comparer les scénarios</h3><p>Sélectionne jusqu’à 6 scénarios. Clique sur une carte pour ouvrir le détail financier par domaine.</p></div>
+      <button id="printSynthesis" class="btn primary">🖨 Imprimer la synthèse</button>
+    </div>
+    <div class="checklist">${scenarios.map(s=>`<label class="checkpill"><input type="checkbox" class="cmp" value="${s.id}" ${selected.has(+s.id)?'checked':''}>${esc(s.Nom)}</label>`).join('')}</div>
+    <div id="cmpOut" style="margin-top:14px"></div>
+  </article>
+  <div id="scenarioDetailModal"></div>`;
+  document.querySelectorAll('.cmp').forEach(x=>x.onchange=()=>{
+    const ids=[...document.querySelectorAll('.cmp:checked')].map(x=>+x.value);
+    if(ids.length>6){x.checked=false;toast('Maximum 6 scénarios.',true);return}
+    COMPARE_SELECTED_IDS=ids;drawCompare();
+  });
+  document.getElementById('printSynthesis').onclick=printSynthesisV36;
+  drawCompare();
+}
+function drawCompare(){
+  const ids=compareSelectedIds(),ms=ids.map(model).filter(m=>m?.s);
+  const out=document.getElementById('cmpOut');if(!out)return;
+  out.innerHTML=`<div class="comparegrid synthesis-grid">${ms.map(m=>{
+    const fixedPct=m.total?Math.max(0,Math.min(100,m.fixed/m.total*100)):0;
+    const domainCount=Object.values(m.bd).filter(x=>x.total>0).length;
+    const offerCount=Object.keys(m.bo).length;
+    return `<button type="button" class="comparecard synthesis-scenario-card" data-open-scenario="${m.s.id}">
+      <div class="scenario-card-top"><div><span class="scenario-eyebrow">SCÉNARIO</span><h4>${esc(m.s.Nom)}</h4></div>${m.unresolved?`<span class="badge warn">${m.unresolved} à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div>
+      <div class="scenario-budget">${money(m.total)}</div>
+      <div class="scenario-eur">${money(m.total*m.rate,'EUR')}</div>
+      <div class="scenario-metrics"><span><b>${num(m.licenses)}</b> licences</span><span><b>${domainCount}</b> domaines</span><span><b>${offerCount}</b> offres</span></div>
+      <div class="cost-split"><div class="cost-split-bar"><span class="fixed" style="width:${fixedPct}%"></span><span class="variable" style="width:${100-fixedPct}%"></span></div><div class="cost-split-labels"><span>Fixe ${money(m.fixed)}</span><span>Variable ${money(m.over)}</span></div></div>
+      <div class="scenario-card-footer"><span>Économie annuelle <b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></span><strong>Voir le détail →</strong></div>
+    </button>`;
+  }).join('')}</div>
+  <div class="tablewrap synthesis-table" style="margin-top:18px"><table><thead><tr><th>Scénario</th><th>Fixe</th><th>Variable</th><th>Budget USD</th><th>Budget EUR</th><th>Économie annuelle</th><th>Économie %</th><th>Tarifs à confirmer</th></tr></thead><tbody>${ms.map(m=>`<tr class="synthesis-row" data-open-scenario="${m.s.id}"><td><b>${esc(m.s.Nom)}</b></td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num"><b>${money(m.total)}</b></td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td><td class="num ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</td><td class="num">${m.unresolved}</td></tr>`).join('')}</tbody></table></div>`;
+  out.querySelectorAll('[data-open-scenario]').forEach(x=>x.onclick=()=>openScenarioDetailV36(+x.dataset.openScenario));
+}
+function scenarioDetailHtmlV36(m,printMode=false){
+  const groups=scenarioDomainGroups(m);
+  const offerCount=Object.keys(m.bo).length;
+  return `<div class="scenario-detail-document ${printMode?'print-document':''}">
+    <div class="detail-hero">
+      <div><span class="scenario-eyebrow">SYNTHÈSE FINOPS IA</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} licences</span><span>${groups.length} domaines</span><span>${offerCount} offres</span>${m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div></div>
+      <div class="detail-total"><small>Budget total</small><strong>${money(m.total)}</strong><span>${money(m.total*m.rate,'EUR')}</span></div>
+    </div>
+    <div class="detail-kpis">
+      <div><span>Coûts fixes</span><b>${money(m.fixed)}</b></div>
+      <div><span>Coûts variables</span><b>${money(m.over)}</b></div>
+      <div><span>Budget EUR</span><b>${money(m.total*m.rate,'EUR')}</b></div>
+      <div><span>Économie annuelle</span><b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></div>
+    </div>
+    <div class="detail-section-title"><span>02</span><div><h3>Détail par domaine</h3><p>Offres, licences, engagements et structure des coûts.</p></div></div>
+    <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
+      <div class="domain-detail-head"><div><span class="domain-label">DOMAINE</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} licences</span><b>${money(g.total)}</b></div></div>
+      <div class="tablewrap"><table class="detail-table"><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Engagement</th><th>Mois facturés</th><th>Fixe</th><th>Variable</th><th>Total</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?' <span class="badge warn">À confirmer</span>':''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.engagement?num(r.engagement)+' mois':'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${money(r.fixed)}</td><td class="num">${money(r.variable)}</td><td class="num"><b>${money(r.total)}</b></td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5">Sous-total ${esc(g.domain)}</td><td class="num">${money(g.fixed)}</td><td class="num">${money(g.variable)}</td><td class="num"><b>${money(g.total)}</b></td></tr></tfoot></table></div>
+    </section>`).join(''):'<div class="empty-state">Aucune allocation sur ce scénario.</div>'}</div>
+    <div class="detail-grand-total"><div><span>Total scénario</span><small>${num(m.licenses)} licences · ${groups.length} domaines</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
+  </div>`;
+}
+function openScenarioDetailV36(sid){
+  const m=model(sid),host=document.getElementById('scenarioDetailModal');if(!m?.s||!host)return;
+  host.innerHTML=`<div class="modal-backdrop scenario-detail-backdrop">
+    <div class="scenario-detail-modal" role="dialog" aria-modal="true" aria-label="Détail du scénario">
+      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue imprimable</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="printScenarioDetail" class="btn primary">🖨 Imprimer le détail</button></div></div>
+      <div class="scenario-detail-scroll">${scenarioDetailHtmlV36(m)}</div>
+    </div>
+  </div>`;
+  document.getElementById('closeScenarioDetail').onclick=()=>host.innerHTML='';
+  host.querySelector('.scenario-detail-backdrop').onclick=e=>{if(e.target===e.currentTarget)host.innerHTML=''};
+  document.getElementById('printScenarioDetail').onclick=()=>printScenarioDetailV36(sid);
+}
+function printWindowV36(title,body){
+  const w=window.open('','_blank','width=1280,height=900');
+  if(!w){toast("Le navigateur a bloqué la fenêtre d'impression.",true);return}
+  w.document.open();
+  w.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${esc(title)}</title><style>${PRINT_CSS_V36}</style></head><body>${body}<script>window.onload=()=>setTimeout(()=>window.print(),180)<\/script></body></html>`);
+  w.document.close();
+}
+const PRINT_CSS_V36=`
+@page{size:A4 landscape;margin:12mm}
+*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10213e;margin:0;background:#fff;font-size:10px}
+h1,h2,h3,p{margin-top:0}.print-cover{display:flex;justify-content:space-between;align-items:end;border-bottom:3px solid #5b4df5;padding-bottom:12px;margin-bottom:18px}.print-cover h1{font-size:26px;margin-bottom:4px}.print-cover p{color:#64748b;margin:0}
+.scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}
+.domain-detail-card{border:1px solid #dbe3ef;border-radius:12px;margin:0 0 12px;overflow:hidden;break-inside:avoid}.domain-detail-head{display:flex;justify-content:space-between;padding:10px 12px;background:#f8fafc}.domain-detail-head h3{margin:2px 0 0}.domain-totals{text-align:right}.domain-totals span,.domain-totals b{display:block}
+table{width:100%;border-collapse:collapse}th,td{padding:7px 8px;border-top:1px solid #e7edf5;text-align:left}th{font-size:8px;text-transform:uppercase;color:#64748b;background:#fbfcfe}td.num,th.num{text-align:right}tfoot td{font-weight:700;background:#fbfcfe}.detail-grand-total{display:flex;justify-content:space-between;align-items:center;border-top:3px solid #10213e;padding:12px 4px;margin-top:16px}.detail-grand-total span,.detail-grand-total small{display:block}.detail-grand-total b{font-size:22px}.negative{color:#c62828}.badge{display:inline-block;padding:2px 5px;border-radius:99px;font-size:8px}.badge.ok{background:#eaf8ef;color:#08783d}.badge.warn{background:#fff4dd;color:#955900}
+.summary-table{width:100%;margin-bottom:22px}.summary-table th,.summary-table td{padding:9px}.summary-table tbody tr{break-inside:avoid}.summary-total{font-weight:800;background:#f5f7ff}.page-break{break-before:page}.print-section-title{font-size:18px;margin:18px 0 10px}
+`;
+function printScenarioDetailV36(sid){
+  const m=model(sid);if(!m?.s)return;
+  const body=`<div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>Détail du scénario · ${esc(m.s.Nom)}</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>${scenarioDetailHtmlV36(m,true)}`;
+  printWindowV36(`FinOps - ${m.s.Nom}`,body);
+}
+function printSynthesisV36(){
+  const ids=compareSelectedIds(),ms=ids.map(model).filter(m=>m?.s);
+  if(!ms.length){toast('Sélectionne au moins un scénario.',true);return}
+  const summary=`<div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>${ms.length} scénario(s) sélectionné(s)</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+    <h2 class="print-section-title">01 · Synthèse</h2>
+    <table class="summary-table"><thead><tr><th>Scénario</th><th>Licences</th><th>Fixe</th><th>Variable</th><th>Budget USD</th><th>Budget EUR</th><th>Économie annuelle</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${num(m.licenses)}</td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num"><b>${money(m.total)}</b></td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td></tr>`).join('')}</tbody></table>
+    <div class="page-break"></div><h2 class="print-section-title">02 · Détails des scénarios</h2>${ms.map((m,i)=>`${i?'<div class="page-break"></div>':''}${scenarioDetailHtmlV36(m,true)}`).join('')}`;
+  printWindowV36('Synthèse FinOps IA',summary);
+}
 
 let ROI_TIER_COUNT=0;
 function roiTierCount(m){
