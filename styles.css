@@ -708,3 +708,24 @@
 .domain-detail-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fbfcfe;border-bottom:1px solid #e8edf3}.domain-detail-head h3{margin:2px 0 0}.domain-totals{text-align:right}.domain-totals span,.domain-totals b{display:block}.domain-totals span{font-size:.75rem;color:var(--muted,#667085)}.domain-totals b{font-size:1.05rem;margin-top:2px}
 .detail-table tfoot td{font-weight:800;background:#fbfcfe}.detail-grand-total{display:flex;justify-content:space-between;align-items:center;margin-top:18px;padding:18px 4px;border-top:3px solid #10213e}.detail-grand-total>div:last-child{text-align:right}.detail-grand-total span,.detail-grand-total small{display:block}.detail-grand-total small,.detail-grand-total>div:last-child span{color:var(--muted,#667085)}.detail-grand-total b{font-size:1.6rem}
 @media(max-width:800px){.detail-kpis{grid-template-columns:1fr 1fr}.detail-hero{flex-direction:column}.detail-total{text-align:left}.scenario-detail-backdrop{padding:8px}.scenario-detail-modal{width:100%;height:98vh}}
+
+/* V37 — cartes plus colorées + détail du prix forfait */
+.synthesis-scenario-card{position:relative;overflow:hidden}
+.synthesis-scenario-card::before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:var(--card-accent,#635bdb)}
+.synthesis-scenario-card::after{content:"";position:absolute;width:170px;height:170px;border-radius:50%;right:-70px;top:-85px;background:var(--card-glow,rgba(99,91,219,.09));pointer-events:none}
+.synthesis-scenario-card.tone-0{--card-accent:#635bdb;--card-glow:rgba(99,91,219,.12);background:linear-gradient(145deg,#ffffff 35%,#f3f1ff 100%)}
+.synthesis-scenario-card.tone-1{--card-accent:#0ea5a4;--card-glow:rgba(14,165,164,.12);background:linear-gradient(145deg,#ffffff 35%,#ecfbfa 100%)}
+.synthesis-scenario-card.tone-2{--card-accent:#e59a16;--card-glow:rgba(229,154,22,.13);background:linear-gradient(145deg,#ffffff 35%,#fff7e8 100%)}
+.synthesis-scenario-card.tone-3{--card-accent:#db5b7b;--card-glow:rgba(219,91,123,.12);background:linear-gradient(145deg,#ffffff 35%,#fff0f4 100%)}
+.synthesis-scenario-card.tone-4{--card-accent:#3478d4;--card-glow:rgba(52,120,212,.12);background:linear-gradient(145deg,#ffffff 35%,#edf5ff 100%)}
+.synthesis-scenario-card .scenario-budget{color:var(--card-accent)}
+.synthesis-scenario-card .cost-split-bar span.fixed{background:var(--card-accent)}
+.synthesis-scenario-card .scenario-card-footer strong{color:var(--card-accent)}
+.pricing-explainer{display:flex;gap:12px;align-items:flex-start;margin:0 0 18px;padding:13px 15px;border:1px solid #dedcff;border-radius:13px;background:linear-gradient(135deg,#f7f6ff,#fff)}
+.pricing-explainer .pricing-icon{width:34px;height:34px;border-radius:10px;background:#635bdb;color:white;display:flex;align-items:center;justify-content:center;font-weight:900;flex:0 0 auto}
+.pricing-explainer p{margin:3px 0 0;color:var(--muted,#667085);font-size:.82rem;line-height:1.4}
+.price-period,.price-source{display:block;font-size:.68rem;font-weight:500;color:var(--muted,#667085);margin-top:2px;white-space:nowrap}
+.price-source{color:#635bdb}
+.fixed-basis{font-size:.75rem;line-height:1.35;color:#344054;display:block;min-width:190px}
+.detail-table th:nth-child(4),.detail-table td:nth-child(4){min-width:120px}
+.detail-table th:nth-child(5),.detail-table td:nth-child(5){min-width:220px}

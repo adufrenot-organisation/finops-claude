@@ -556,11 +556,54 @@ function compareSelectedIds(){
   if(checked.length)COMPARE_SELECTED_IDS=checked;
   return checked;
 }
+
+function effectiveOfferPrice(a,o){
+  const monthlyCandidates=[
+    [+a.Tarif_Negocie_Mensuel||0,'Négocié allocation'],
+    [+o.Tarif_Negocie_Mensuel||0,'Négocié offre'],
+    [+o.Tarif_Reference_Mensuel||0,'Référence interne'],
+    [+o.Tarif_Catalogue_Mensuel||0,'Catalogue']
+  ];
+  const annualCandidates=[
+    [+a.Tarif_Negocie_Annuel||0,'Négocié allocation'],
+    [+o.Tarif_Negocie_Annuel||0,'Négocié offre'],
+    [+o.Tarif_Reference_Annuel||0,'Référence interne'],
+    [+o.Tarif_Catalogue_Annuel||0,'Catalogue']
+  ];
+  const monthly=monthlyCandidates.find(([v])=>v>0)||[0,'À confirmer'];
+  const annual=annualCandidates.find(([v])=>v>0)||[0,'À confirmer'];
+  const periodicity=String(o.Periodicite_Prix||'').toLowerCase();
+  if(periodicity.includes('annuel') || (!monthly[0]&&annual[0])){
+    return {amount:annual[0],period:'an',source:annual[1],kind:'annual'};
+  }
+  return {amount:monthly[0],period:'mois',source:monthly[1],kind:'monthly'};
+}
+function fixedCostBasis(a,o){
+  const price=effectiveOfferPrice(a,o);
+  const licenses=+a.Nb_Licences||0;
+  const billed=+a.Mois_Factures||0;
+  const engagement=+a.Engagement_Mois||0;
+  const effectiveMonths=Math.max(billed,(o.Facturer_Engagement_Minimum?engagement:0));
+  if(price.kind==='annual'){
+    return {
+      price,
+      basis:price.amount?`${money(price.amount)} / licence / an × ${num(licenses)} licence(s)`:'Tarif annuel à confirmer',
+      theoretical:price.amount*licenses
+    };
+  }
+  return {
+    price,
+    basis:price.amount?`${money(price.amount)} / licence / mois × ${num(licenses)} licence(s) × ${num(effectiveMonths)} mois`:'Tarif mensuel à confirmer',
+    theoretical:price.amount*licenses*effectiveMonths
+  };
+}
+
 function scenarioDetailRows(m){
   return m.alloc.map(a=>{
     const d=D.domainById?.[a.Domaine]||D[T.domains].find(x=>+x.id===+a.Domaine)||{};
     const o=D.offerById[a.Offre]||{};
     const p=D.providerById[o.Fournisseur]||{};
+    const fixedBasis=fixedCostBasis(a,o);
     return {
       domain:d.Nom||'Domaine',
       provider:p.Nom||'—',
@@ -568,6 +611,11 @@ function scenarioDetailRows(m){
       licenses:+a.Nb_Licences||0,
       engagement:+a.Engagement_Mois||(+o.Engagement_Defaut_Mois||0),
       billed:+a.Mois_Factures||(+o.Mois_Factures_Defaut||m.months||0),
+      unitPrice:fixedBasis.price.amount,
+      unitPeriod:fixedBasis.price.period,
+      priceSource:fixedBasis.price.source,
+      fixedBasis:fixedBasis.basis,
+      fixedTheoretical:fixedBasis.theoretical,
       fixed:+a.Cout_Abonnement||0,
       variable:+a.Cout_Overage||0,
       total:+a.Budget_Total_USD||0,
@@ -575,6 +623,7 @@ function scenarioDetailRows(m){
     };
   }).sort((a,b)=>a.domain.localeCompare(b.domain,'fr')||a.provider.localeCompare(b.provider,'fr')||a.offer.localeCompare(b.offer,'fr'));
 }
+
 function scenarioDomainGroups(m){
   const groups={};
   for(const r of scenarioDetailRows(m)){
@@ -612,11 +661,11 @@ function renderCompare(){
 function drawCompare(){
   const ids=compareSelectedIds(),ms=ids.map(model).filter(m=>m?.s);
   const out=document.getElementById('cmpOut');if(!out)return;
-  out.innerHTML=`<div class="comparegrid synthesis-grid">${ms.map(m=>{
+  out.innerHTML=`<div class="comparegrid synthesis-grid">${ms.map((m,idx)=>{
     const fixedPct=m.total?Math.max(0,Math.min(100,m.fixed/m.total*100)):0;
     const domainCount=Object.values(m.bd).filter(x=>x.total>0).length;
     const offerCount=Object.keys(m.bo).length;
-    return `<button type="button" class="comparecard synthesis-scenario-card" data-open-scenario="${m.s.id}">
+    return `<button type="button" class="comparecard synthesis-scenario-card tone-${idx%5}" data-open-scenario="${m.s.id}">
       <div class="scenario-card-top"><div><span class="scenario-eyebrow">SCÉNARIO</span><h4>${esc(m.s.Nom)}</h4></div>${m.unresolved?`<span class="badge warn">${m.unresolved} à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div>
       <div class="scenario-budget">${money(m.total)}</div>
       <div class="scenario-eur">${money(m.total*m.rate,'EUR')}</div>
@@ -625,7 +674,7 @@ function drawCompare(){
       <div class="scenario-card-footer"><span>Économie annuelle <b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></span><strong>Voir le détail →</strong></div>
     </button>`;
   }).join('')}</div>
-  <div class="tablewrap synthesis-table" style="margin-top:18px"><table><thead><tr><th>Scénario</th><th>Fixe</th><th>Variable</th><th>Budget USD</th><th>Budget EUR</th><th>Économie annuelle</th><th>Économie %</th><th>Tarifs à confirmer</th></tr></thead><tbody>${ms.map(m=>`<tr class="synthesis-row" data-open-scenario="${m.s.id}"><td><b>${esc(m.s.Nom)}</b></td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num"><b>${money(m.total)}</b></td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td><td class="num ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</td><td class="num">${m.unresolved}</td></tr>`).join('')}</tbody></table></div>`;
+  `;
   out.querySelectorAll('[data-open-scenario]').forEach(x=>x.onclick=()=>openScenarioDetailV36(+x.dataset.openScenario));
 }
 function scenarioDetailHtmlV36(m,printMode=false){
@@ -642,10 +691,11 @@ function scenarioDetailHtmlV36(m,printMode=false){
       <div><span>Budget EUR</span><b>${money(m.total*m.rate,'EUR')}</b></div>
       <div><span>Économie annuelle</span><b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></div>
     </div>
-    <div class="detail-section-title"><span>02</span><div><h3>Détail par domaine</h3><p>Offres, licences, engagements et structure des coûts.</p></div></div>
+    <div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>Lecture du coût fixe</b><p>Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.</p></div></div>
+    <div class="detail-section-title"><span>02</span><div><h3>Détail par domaine</h3><p>Offres, licences, prix du forfait, engagements et structure des coûts.</p></div></div>
     <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
       <div class="domain-detail-head"><div><span class="domain-label">DOMAINE</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} licences</span><b>${money(g.total)}</b></div></div>
-      <div class="tablewrap"><table class="detail-table"><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Engagement</th><th>Mois facturés</th><th>Fixe</th><th>Variable</th><th>Total</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?' <span class="badge warn">À confirmer</span>':''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.engagement?num(r.engagement)+' mois':'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${money(r.fixed)}</td><td class="num">${money(r.variable)}</td><td class="num"><b>${money(r.total)}</b></td></tr>`).join('')}</tbody><tfoot><tr><td colspan="5">Sous-total ${esc(g.domain)}</td><td class="num">${money(g.fixed)}</td><td class="num">${money(g.variable)}</td><td class="num"><b>${money(g.total)}</b></td></tr></tfoot></table></div>
+      <div class="tablewrap"><table class="detail-table"><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Prix forfait</th><th>Base calcul fixe</th><th>Engagement</th><th>Mois facturés</th><th>Fixe</th><th>Variable</th><th>Total</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?' <span class="badge warn">À confirmer</span>':''}</td><td class="num">${num(r.licenses)}</td><td class="num"><b>${r.unitPrice?money(r.unitPrice):'—'}</b>${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' mois':'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${money(r.fixed)}</td><td class="num">${money(r.variable)}</td><td class="num"><b>${money(r.total)}</b></td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">Sous-total ${esc(g.domain)}</td><td class="num">${money(g.fixed)}</td><td class="num">${money(g.variable)}</td><td class="num"><b>${money(g.total)}</b></td></tr></tfoot></table></div>
     </section>`).join(''):'<div class="empty-state">Aucune allocation sur ce scénario.</div>'}</div>
     <div class="detail-grand-total"><div><span>Total scénario</span><small>${num(m.licenses)} licences · ${groups.length} domaines</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
   </div>`;
@@ -673,7 +723,7 @@ const PRINT_CSS_V36=`
 @page{size:A4 landscape;margin:12mm}
 *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10213e;margin:0;background:#fff;font-size:10px}
 h1,h2,h3,p{margin-top:0}.print-cover{display:flex;justify-content:space-between;align-items:end;border-bottom:3px solid #5b4df5;padding-bottom:12px;margin-bottom:18px}.print-cover h1{font-size:26px;margin-bottom:4px}.print-cover p{color:#64748b;margin:0}
-.scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}
+.scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}.pricing-explainer{display:flex;gap:8px;padding:9px;border:1px solid #dedcff;border-radius:9px;margin-bottom:12px;background:#f8f7ff}.pricing-icon{width:25px;height:25px;border-radius:7px;background:#635bdb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}.pricing-explainer p{margin:2px 0 0;color:#64748b}.price-period,.price-source{display:block;font-size:7px;color:#64748b}.price-source{color:#635bdb}.fixed-basis{font-size:8px;line-height:1.3}
 .domain-detail-card{border:1px solid #dbe3ef;border-radius:12px;margin:0 0 12px;overflow:hidden;break-inside:avoid}.domain-detail-head{display:flex;justify-content:space-between;padding:10px 12px;background:#f8fafc}.domain-detail-head h3{margin:2px 0 0}.domain-totals{text-align:right}.domain-totals span,.domain-totals b{display:block}
 table{width:100%;border-collapse:collapse}th,td{padding:7px 8px;border-top:1px solid #e7edf5;text-align:left}th{font-size:8px;text-transform:uppercase;color:#64748b;background:#fbfcfe}td.num,th.num{text-align:right}tfoot td{font-weight:700;background:#fbfcfe}.detail-grand-total{display:flex;justify-content:space-between;align-items:center;border-top:3px solid #10213e;padding:12px 4px;margin-top:16px}.detail-grand-total span,.detail-grand-total small{display:block}.detail-grand-total b{font-size:22px}.negative{color:#c62828}.badge{display:inline-block;padding:2px 5px;border-radius:99px;font-size:8px}.badge.ok{background:#eaf8ef;color:#08783d}.badge.warn{background:#fff4dd;color:#955900}
 .summary-table{width:100%;margin-bottom:22px}.summary-table th,.summary-table td{padding:9px}.summary-table tbody tr{break-inside:avoid}.summary-total{font-weight:800;background:#f5f7ff}.page-break{break-before:page}.print-section-title{font-size:18px;margin:18px 0 10px}
