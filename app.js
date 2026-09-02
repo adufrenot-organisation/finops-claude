@@ -301,7 +301,59 @@ async function saveAllBaselineV24(){
   }catch(e){toast(e.message||String(e),true)}
 }
 
-function renderScenarios(){const el=document.getElementById('v-scenarios');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Scénarios</h3><p>Modifie plusieurs scénarios puis enregistre-les en une seule fois.</p></div><div class="table-actions"><button id="saveAllScenarios" class="btn primary">Enregistrer les modifications</button><button id="newScenario" class="btn secondary">+ Nouveau</button></div></div><div class="tablewrap"><table><thead><tr><th>Nom</th><th>Année</th><th>Mois</th><th>USD/EUR</th><th>Utilisation</th><th>Jours ouvrés/an</th><th>Statut</th></tr></thead><tbody>${D[T.scenarios].map(s=>`<tr data-s="${s.id}"><td><input class="admin-input" data-f="Nom" value="${esc(s.Nom)}"></td><td><input class="admin-input" data-f="Annee" type="number" value="${+s.Annee||0}"></td><td><input class="admin-input" data-f="Nb_Mois" type="number" value="${+s.Nb_Mois||0}"></td><td><input class="admin-input" data-f="Taux_USD_EUR" type="number" step="0.001" value="${+s.Taux_USD_EUR||0}"></td><td><input class="admin-input" data-f="Taux_Utilisation" type="number" step="0.05" value="${+s.Taux_Utilisation||0}"></td><td><input class="admin-input" data-f="Nb_Jours_Ouvres_Annuels" type="number" min="1" value="${+s.Nb_Jours_Ouvres_Annuels||218}"></td><td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td></tr>`).join('')}</tbody></table></div></article>`;document.getElementById('saveAllScenarios').onclick=()=>saveAllGeneric('v-scenarios',T.scenarios,'tr[data-s]','data-s','ligne(s) scénario');document.getElementById('newScenario').onclick=async()=>{await apply([["AddRecord",T.scenarios,null,{Nom:'Nouveau scénario',Annee:2027,Nb_Mois:12,Taux_USD_EUR:.86,Taux_Utilisation:1,Nb_Jours_Ouvres_Annuels:218,Statut:'Travail',Commentaire:''}]]);await reload()}}
+
+let NEW_SCENARIOS=[];
+function scenarioDefaults(){
+  const now=new Date();
+  return {__draft:true,__key:`draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    Nom:'Nouveau scénario',Annee:now.getFullYear(),Nb_Mois:12,Taux_USD_EUR:.86,
+    Taux_Utilisation:1,Nb_Jours_Ouvres_Annuels:218,Statut:'Travail',Commentaire:''};
+}
+function scenarioRowHtml(s){
+  const draft=!!s.__draft;
+  const attrs=draft?`data-draft="${esc(s.__key)}"`:`data-s="${s.id}"`;
+  return `<tr ${attrs}><td><input class="admin-input" data-f="Nom" value="${esc(s.Nom)}"></td><td><input class="admin-input" data-f="Annee" type="number" value="${+s.Annee||0}"></td><td><input class="admin-input" data-f="Nb_Mois" type="number" min="1" max="12" value="${+s.Nb_Mois||0}"></td><td><input class="admin-input" data-f="Taux_USD_EUR" type="number" step="0.001" value="${+s.Taux_USD_EUR||0}"></td><td><input class="admin-input" data-f="Taux_Utilisation" type="number" step="0.05" min="0" value="${+s.Taux_Utilisation||0}"></td><td><input class="admin-input" data-f="Nb_Jours_Ouvres_Annuels" type="number" min="1" value="${+s.Nb_Jours_Ouvres_Annuels||218}"></td><td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td>${draft?`<td><button class="btn ghost cancelScenarioDraft" data-key="${esc(s.__key)}">Annuler</button></td>`:'<td></td>'}</tr>`;
+}
+function renderScenarios(){
+  const el=document.getElementById('v-scenarios');
+  const all=[...D[T.scenarios],...NEW_SCENARIOS];
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Scénarios</h3><p>Modifie ou ajoute plusieurs scénarios puis enregistre-les en une seule fois.</p></div><div class="table-actions"><button id="saveAllScenarios" class="btn primary">Enregistrer les modifications</button><button id="newScenario" class="btn secondary">+ Nouveau</button></div></div><div class="tablewrap"><table><thead><tr><th>Nom</th><th>Année</th><th>Mois</th><th>USD/EUR</th><th>Utilisation</th><th>Jours ouvrés/an</th><th>Statut</th><th></th></tr></thead><tbody>${all.map(s=>scenarioRowHtml(s)).join('')}</tbody></table></div></article>`;
+  document.getElementById('saveAllScenarios').onclick=saveAllScenariosV26;
+  document.getElementById('newScenario').onclick=()=>{
+    NEW_SCENARIOS.push(scenarioDefaults());
+    renderScenarios();
+    applyUILabelsSafe?.();
+    const last=el.querySelector('tr[data-draft]:last-of-type input[data-f="Nom"]');
+    last?.focus(); last?.select();
+  };
+  el.querySelectorAll('.cancelScenarioDraft').forEach(b=>b.onclick=()=>{
+    NEW_SCENARIOS=NEW_SCENARIOS.filter(x=>x.__key!==b.dataset.key);
+    renderScenarios(); applyUILabelsSafe?.();
+  });
+}
+async function saveAllScenariosV26(){
+  const root=document.getElementById('v-scenarios'),actions=[];
+  for(const tr of root.querySelectorAll('tbody tr')){
+    const fields=readFields(tr);
+    if(!String(fields.Nom||'').trim()){toast('Le nom du scénario est obligatoire.',true);return}
+    if((+fields.Nb_Mois||0)<1){toast('Le nombre de mois doit être supérieur à 0.',true);return}
+    if(tr.dataset.s) actions.push(["UpdateRecord",T.scenarios,+tr.dataset.s,fields]);
+    else if(tr.dataset.draft) actions.push(["AddRecord",T.scenarios,null,{...fields,Commentaire:''}]);
+  }
+  if(!actions.length){toast('Aucun scénario à enregistrer.');return}
+  try{
+    await apply(actions);
+    NEW_SCENARIOS=[];
+    await reload();
+    toast(`${actions.length} scénario(s) enregistré(s).`);
+  }catch(e){
+    // Keep drafts visible so the user does not lose typed values.
+    if(String(e?.message||e).toLowerCase().includes('permission')){
+      toast("Création refusée par les règles d'accès Grist. Applique la règle Scenarios +CRU de la V26.",true);
+    }
+  }
+}
+
 async function saveGenericRow(sel,table,id){const tr=document.querySelector(sel);if(!tr)return;await apply([["UpdateRecord",table,id,readFields(tr)]]);toast('Enregistré.');await reload()}
 function ynBadge(v){return `<span class="badge ${v==='Oui'?'ok':v==='Non'?'no':'warn'}">${esc(v||'A confirmer')}</span>`}
 
@@ -547,7 +599,7 @@ async function saveOfferColumnLabelsV23(){
 
 const FINOPS_ACL_TAG="FINOPS_V16";
 const FINOPS_ACL_RESOURCES=[
-  {tableId:"Scenarios",colIds:"*",kind:"global",perm:"+RU"},
+  {tableId:"Scenarios",colIds:"*",kind:"global",perm:"+CRU"},
   {tableId:"Configuration_Menu",colIds:"*",kind:"global",perm:"+R"},
   {tableId:"Configuration_Libelles_UI",colIds:"*",kind:"global",perm:"+R"},
   {tableId:"Fournisseurs",colIds:"*",kind:"global",perm:"+R"},
