@@ -929,15 +929,173 @@ const OFFER_COLUMNS=[
 ];
 function offerColumnConfig(view){
   const rows=D[T.offerCols]||[],byKey=new Map(rows.map(r=>[r.Cle_Colonne,r]));
-  return OFFER_COLUMNS.map((c,i)=>{const r=byKey.get(c.key);return {...c,label:(r?.Libelle||c.label),order:r&&Number.isFinite(+r.Ordre)?+r.Ordre:i*10,visible:view==='read'?(r?r.Visible_Lecture!==false:true):(r?r.Visible_Admin!==false:true)}}).sort((a,b)=>a.order-b.order)
+  return OFFER_COLUMNS.map((c,i)=>{
+    const r=byKey.get(c.key);
+    const viewOrder=view==='read'?r?.Ordre_Lecture:r?.Ordre_Admin;
+    const fallbackOrder=r?.Ordre;
+    const order=Number.isFinite(+viewOrder)?+viewOrder:(Number.isFinite(+fallbackOrder)?+fallbackOrder:i*10);
+    return {...c,label:(r?.Libelle||c.label),order,visible:view==='read'?(r?r.Visible_Lecture!==false:true):(r?r.Visible_Admin!==false:true)}
+  }).sort((a,b)=>a.order-b.order||String(a.label).localeCompare(String(b.label),'fr'))
 }
 function offerVisibleColumns(view){return offerColumnConfig(view).filter(c=>c.visible)}
 function offerCellRead(o,c){const v=o[c.key];if(c.kind==='ref-provider')return esc(D.providerById[v]?.Nom||'');if(c.kind==='money')return +v?money(v):'—';if(c.kind==='bool')return ynBadge(v);if(c.kind==='int')return num(+v||0);if(c.key==='Statut_Tarif')return v==='Devis à confirmer'?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(v||'')}</span>`;return esc(v??'')}
 function offerCellAdmin(o,c,providers){const v=o[c.key];if(c.kind==='ref-provider'){const opts=providers.map(p=>`<option value="${p.id}" ${+v===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('');return `<select class="admin-input" data-f="${c.key}"><option value="">—</option>${opts}</select>`}if(c.kind==='bool')return `<input data-f="${c.key}" type="checkbox" ${v!==false?'checked':''}>`;if(c.kind==='money')return `<input class="admin-input" data-f="${c.key}" type="number" step="0.01" value="${+v||0}">`;if(c.kind==='int')return `<input class="admin-input" data-f="${c.key}" type="number" min="0" step="1" value="${+v||0}">`;if(c.kind==='text-long')return `<textarea class="admin-input admin-textarea" data-f="${c.key}">${esc(v||'')}</textarea>`;if(c.key==='Periodicite_Prix')return `<select class="admin-input" data-f="${c.key}"><option ${v==='Mensuel'?'selected':''}>Mensuel</option><option ${v==='Annuel'?'selected':''}>Annuel</option><option ${v==='Devis'?'selected':''}>Devis</option></select>`;return `<input class="admin-input" data-f="${c.key}" value="${esc(v||'')}">`}
-function columnPickerHtml(view){const cols=offerColumnConfig(view);return `<details class="column-picker read-only-exempt"><summary class="btn secondary">Colonnes</summary><div class="column-picker-panel">${cols.map(c=>`<label><input type="checkbox" data-col-view="${view}" data-col-key="${c.key}" ${c.visible?'checked':''}> ${esc(c.label)}</label>`).join('')}<div class="column-picker-actions"><button class="btn small secondary" data-col-all="${view}">Tout afficher</button><button class="btn small secondary" data-col-none="${view}">Tout masquer</button>${ACCESS.role==='OWNER'?`<button class="btn small primary" data-col-save="${view}">Enregistrer la vue</button>`:''}</div></div></details>`}
-function bindColumnPicker(view){document.querySelectorAll(`[data-col-view="${view}"]`).forEach(cb=>cb.onchange=()=>applyColumnVisibilityLocally(view));document.querySelector(`[data-col-all="${view}"]`)?.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=true);applyColumnVisibilityLocally(view)});document.querySelector(`[data-col-none="${view}"]`)?.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=false);applyColumnVisibilityLocally(view)});document.querySelector(`[data-col-save="${view}"]`)?.addEventListener('click',async e=>{e.preventDefault();await saveOfferColumnView(view)})}
-function applyColumnVisibilityLocally(view){const checked=new Set([...document.querySelectorAll(`[data-col-view="${view}"]:checked`)].map(x=>x.dataset.colKey));const root=document.getElementById(view==='read'?'v-offers':'v-offersadmin');root?.querySelectorAll('[data-col]').forEach(el=>el.style.display=checked.has(el.dataset.col)?'':'none')}
-async function saveOfferColumnView(view){if(ACCESS.role!=='OWNER')return;const state=new Map([...document.querySelectorAll(`[data-col-view="${view}"]`)].map(x=>[x.dataset.colKey,x.checked])),existing=new Map((D[T.offerCols]||[]).map(r=>[r.Cle_Colonne,r])),actions=[];OFFER_COLUMNS.forEach((c,i)=>{const r=existing.get(c.key),fields={Libelle:r?.Libelle||c.label,Ordre:r?.Ordre??i*10,[view==='read'?'Visible_Lecture':'Visible_Admin']:!!state.get(c.key)};if(r)actions.push(['UpdateRecord',T.offerCols,r.id,fields]);else actions.push(['AddRecord',T.offerCols,null,{Cle_Colonne:c.key,Libelle:c.label,Ordre:i*10,Visible_Lecture:view==='read'?!!state.get(c.key):true,Visible_Admin:view==='admin'?!!state.get(c.key):true}])});try{await apply(actions);toast('Configuration des colonnes enregistrée.');await reload()}catch(e){toast(e.message||String(e),true)}}
+
+function canSaveOfferColumnView(){
+  return isOwner() || ACCESS.role===APP_ROLES.ADMINISTRATEUR;
+}
+function columnPickerHtml(view){
+  const cols=offerColumnConfig(view);
+  return `<details class="column-picker read-only-exempt">
+    <summary class="btn secondary">Colonnes</summary>
+    <div class="column-picker-panel">
+      <div class="column-picker-help">Sélectionne les colonnes puis utilise ↑ / ↓ pour définir leur ordre dans cette vue.</div>
+      <div class="column-order-list" data-col-order-list="${view}">
+        ${cols.map((c,i)=>`<div class="column-order-row" data-order-key="${c.key}">
+          <label class="column-order-label">
+            <input type="checkbox" data-col-view="${view}" data-col-key="${c.key}" ${c.visible?'checked':''}>
+            <span>${esc(c.label)}</span>
+          </label>
+          <div class="column-order-actions">
+            <button type="button" class="mini-btn" data-col-up="${view}" data-col-key="${c.key}" ${i===0?'disabled':''} title="Monter la colonne">↑</button>
+            <button type="button" class="mini-btn" data-col-down="${view}" data-col-key="${c.key}" ${i===cols.length-1?'disabled':''} title="Descendre la colonne">↓</button>
+          </div>
+        </div>`).join('')}
+      </div>
+      <div class="column-picker-actions">
+        <button class="btn small secondary" data-col-all="${view}">Tout afficher</button>
+        <button class="btn small secondary" data-col-none="${view}">Tout masquer</button>
+        ${canSaveOfferColumnView()?`<button class="btn small primary" data-col-save="${view}">Enregistrer la vue</button>`:
+          `<span class="column-save-note">Personnalisation locale uniquement</span>`}
+      </div>
+    </div>
+  </details>`;
+}
+function currentColumnOrder(view){
+  return [...document.querySelectorAll(`[data-col-order-list="${view}"] .column-order-row`)].map((row,i)=>({
+    key:row.dataset.orderKey,
+    order:i*10
+  }));
+}
+function refreshColumnOrderButtons(view){
+  const rows=[...document.querySelectorAll(`[data-col-order-list="${view}"] .column-order-row`)];
+  rows.forEach((row,i)=>{
+    const up=row.querySelector(`[data-col-up="${view}"]`);
+    const down=row.querySelector(`[data-col-down="${view}"]`);
+    if(up)up.disabled=i===0;
+    if(down)down.disabled=i===rows.length-1;
+  });
+}
+function moveColumnOrder(view,key,delta){
+  const list=document.querySelector(`[data-col-order-list="${view}"]`);
+  const row=list?.querySelector(`.column-order-row[data-order-key="${CSS.escape(key)}"]`);
+  if(!list||!row)return;
+  const rows=[...list.querySelectorAll('.column-order-row')];
+  const idx=rows.indexOf(row),next=idx+delta;
+  if(next<0||next>=rows.length)return;
+  if(delta<0)list.insertBefore(row,rows[next]);
+  else list.insertBefore(rows[next],row);
+  refreshColumnOrderButtons(view);
+  applyColumnOrderLocally(view);
+}
+function bindColumnPicker(view){
+  document.querySelectorAll(`[data-col-view="${view}"]`).forEach(cb=>cb.onchange=()=>applyColumnVisibilityLocally(view));
+  document.querySelector(`[data-col-all="${view}"]`)?.addEventListener('click',e=>{
+    e.preventDefault();
+    document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=true);
+    applyColumnVisibilityLocally(view);
+  });
+  document.querySelector(`[data-col-none="${view}"]`)?.addEventListener('click',e=>{
+    e.preventDefault();
+    document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=false);
+    applyColumnVisibilityLocally(view);
+  });
+  document.querySelectorAll(`[data-col-up="${view}"]`).forEach(b=>b.addEventListener('click',e=>{
+    e.preventDefault();moveColumnOrder(view,b.dataset.colKey,-1);
+  }));
+  document.querySelectorAll(`[data-col-down="${view}"]`).forEach(b=>b.addEventListener('click',e=>{
+    e.preventDefault();moveColumnOrder(view,b.dataset.colKey,1);
+  }));
+  document.querySelector(`[data-col-save="${view}"]`)?.addEventListener('click',async e=>{
+    e.preventDefault();
+    await saveOfferColumnView(view);
+  });
+}
+function applyColumnVisibilityLocally(view){
+  const checked=new Set([...document.querySelectorAll(`[data-col-view="${view}"]:checked`)].map(x=>x.dataset.colKey));
+  const root=document.getElementById(view==='read'?'v-offers':'v-offersadmin');
+  root?.querySelectorAll('[data-col]').forEach(el=>el.style.display=checked.has(el.dataset.col)?'':'none');
+}
+function applyColumnOrderLocally(view){
+  const root=document.getElementById(view==='read'?'v-offers':'v-offersadmin');
+  const table=root?.querySelector('table');
+  if(!table)return;
+  const order=currentColumnOrder(view).map(x=>x.key);
+  const head=table.querySelector('thead tr');
+  const bodyRows=[...table.querySelectorAll('tbody tr')];
+
+  order.forEach(key=>{
+    const th=head?.querySelector(`th[data-col="${CSS.escape(key)}"]`);
+    if(th)head.appendChild(th);
+    bodyRows.forEach(tr=>{
+      const td=tr.querySelector(`td[data-col="${CSS.escape(key)}"]`);
+      if(td)tr.appendChild(td);
+    });
+  });
+
+  // Keep the admin action column at the end.
+  const actionHead=head?.querySelector('th:not([data-col])');
+  if(actionHead)head.appendChild(actionHead);
+  bodyRows.forEach(tr=>{
+    const action=tr.querySelector('td.row-action');
+    if(action)tr.appendChild(action);
+  });
+}
+async function saveOfferColumnView(view){
+  if(!canSaveOfferColumnView()){
+    toast("Votre rôle ne permet pas d'enregistrer une configuration de colonnes partagée.",true);
+    return;
+  }
+
+  const state=new Map([...document.querySelectorAll(`[data-col-view="${view}"]`)].map(x=>[x.dataset.colKey,x.checked]));
+  const order=new Map(currentColumnOrder(view).map(x=>[x.key,x.order]));
+  const existing=new Map((D[T.offerCols]||[]).map(r=>[r.Cle_Colonne,r]));
+  const actions=[];
+
+  OFFER_COLUMNS.forEach((c,i)=>{
+    const r=existing.get(c.key);
+    const orderField=view==='read'?'Ordre_Lecture':'Ordre_Admin';
+    const visibleField=view==='read'?'Visible_Lecture':'Visible_Admin';
+    const fields={
+      Libelle:r?.Libelle||c.label,
+      [orderField]:order.has(c.key)?order.get(c.key):i*10,
+      [visibleField]:!!state.get(c.key)
+    };
+
+    if(r){
+      actions.push(['UpdateRecord',T.offerCols,r.id,fields]);
+    }else{
+      actions.push(['AddRecord',T.offerCols,null,{
+        Cle_Colonne:c.key,
+        Libelle:c.label,
+        Ordre:i*10,
+        Ordre_Lecture:view==='read'?(order.get(c.key)??i*10):i*10,
+        Ordre_Admin:view==='admin'?(order.get(c.key)??i*10):i*10,
+        Visible_Lecture:view==='read'?!!state.get(c.key):true,
+        Visible_Admin:view==='admin'?!!state.get(c.key):true
+      }]);
+    }
+  });
+
+  try{
+    await apply(actions);
+    toast('Vue enregistrée : visibilité et ordre des colonnes sauvegardés.');
+    await reload();
+  }catch(e){
+    toast(e.message||String(e),true);
+  }
+}
+
 function serviceOfferRowsHtml(edit=false){const view=edit?'admin':'read',cols=offerVisibleColumns(view),providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));return D[T.offers].slice().sort((a,b)=>{const pa=D.providerById[a.Fournisseur]?.Nom||'',pb=D.providerById[b.Fournisseur]?.Nom||'';return pa.localeCompare(pb,'fr')||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr')}).map(o=>edit?offerAdminRow(o,providers,cols):offerReadOnlyRow(o,cols)).join('')}
 function offerReadOnlyRow(o,cols=offerVisibleColumns('read')){return `<tr>${cols.map(c=>`<td data-col="${c.key}">${offerCellRead(o,c)}</td>`).join('')}</tr>`}
 function renderOffersReadOnly(){const el=document.getElementById('v-offers');if(!el)return;const cols=offerVisibleColumns('read');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Offre de service</h3><p>Lecture seule de la table Grist <b>Offres</b>. Même jeu de colonnes que l'écran de paramétrage.</p></div><div>${columnPickerHtml('read')}</div></div><div class="tablewrap service-offers-table"><table><thead><tr>${cols.map(c=>`<th data-col="${c.key}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${serviceOfferRowsHtml(false)}</tbody></table></div></article>`;bindColumnPicker('read')}
