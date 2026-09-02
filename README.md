@@ -82,3 +82,7 @@ Même dictionnaire de colonnes Offres pour lecture/admin et visibilité persist�
 
 ## V23
 Paramétrage global et persistant des libellés UI, menu et colonnes Offre.
+
+
+## V24
+Libellés resynchronisés sur tous les rerendus et ROI multi-TJM par domaine sur une seule ligne.

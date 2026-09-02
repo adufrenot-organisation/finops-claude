@@ -460,3 +460,9 @@
 .labels-admin-table thead th{position:sticky;top:0;z-index:2;background:var(--card,#fff)}
 .admin-input.wide{min-width:360px;width:100%}
 #v-labelsadmin .card{margin-bottom:16px}
+
+/* V24 — ROI multi-TJM sur une ligne par domaine */
+.roi-tier-table table{width:max-content;min-width:100%}
+.roi-tier-table th{white-space:nowrap}
+.roi-tier-table .roi-tier{min-width:145px}
+.roi-tier-table .roi-tier input{min-width:120px}

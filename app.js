@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 grist.ready({requiredAccess:"full"}); document.addEventListener("DOMContentLoaded",boot);
@@ -6,7 +6,7 @@ function rows(t){if(!t||!Array.isArray(t.id))return[];return t.id.map((id,i)=>{c
 function money(v,c="USD"){return new Intl.NumberFormat("fr-FR",{style:"currency",currency:c,maximumFractionDigits:0}).format(Number(v||0))} function num(v){return new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Number(v||0))} function pct(v){return new Intl.NumberFormat("fr-FR",{style:"percent",maximumFractionDigits:1}).format(Number(v||0))} function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
 function toast(m,e=false){const x=document.getElementById("toast");if(!x)return;x.textContent=m;x.className="toast show"+(e?" error":"");setTimeout(()=>x.className="toast",2400)}
 async function fetchAll(){const names=Object.values(T),raw=await Promise.all(names.map(n=>grist.docApi.fetchTable(n).catch(()=>({id:[]}))));const o={};names.forEach((n,i)=>o[n]=rows(raw[i]));o.domainById=Object.fromEntries(o[T.domains].map(r=>[r.id,r]));o.scenarioById=Object.fromEntries(o[T.scenarios].map(r=>[r.id,r]));o.providerById=Object.fromEntries(o[T.providers].map(r=>[r.id,r]));o.offerById=Object.fromEntries(o[T.offers].map(r=>[r.id,r]));return o}
-async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
+async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
 function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
 function deriveAccess(){const rr=D[T.rights].filter(r=>r.Actif!==false);if(rr.some(r=>String(r.Role_App).toLowerCase()==="admin")){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:rr};return}if(rr.length){const ids=[];rr.forEach(r=>{const multi=refListIds(r.Domaines_Autorises);if(multi.length)ids.push(...multi);else if(+r.Domaine)ids.push(+r.Domaine)});ACCESS={role:"DOMAIN_USER",domainIds:[...new Set(ids)],rights:rr};return}const visibleDomains=[...new Set(D[T.alloc].map(r=>+r.Domaine).filter(Boolean))];if(D[T.domains].length>1&&visibleDomains.length>1){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:[]};return}ACCESS={role:"DENIED",domainIds:[]}}
 function menuConfigRows(){
@@ -99,7 +99,7 @@ const DEFAULT_MENU_LABELS={
 
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
 function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v)?'none':''}
-function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))} function scopedAlloc(sid){return D[T.alloc].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))} function scopedBaseline(sid){return D[T.baseline].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))}
+function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))} function scopedAlloc(sid){return D[T.alloc].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))} function scopedBaseline(sid){return D[T.baseline].filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))} function scopedBaselineDetails(sid){return (D[T.baselineDetails]||[]).filter(r=>+r.Scenario===+sid&&ACCESS.domainIds.includes(+r.Domaine))}
 function populateScenario(preferredId=0){
   const sel=document.getElementById('scenarioSelect');
   if(!sel)return;
@@ -123,16 +123,36 @@ const alloc=scopedAlloc(sid).filter(a=>{
   return +o?.Fournisseur===providerId;
 });
 const baseline=scopedBaseline(sid).filter(b=>allowedDomainIds.has(+b.Domaine));
+const baselineDetails=scopedBaselineDetails(sid).filter(b=>allowedDomainIds.has(+b.Domaine));
 const bd={},bo={},bp={};
 for(const d of domains)bd[d.id]={d,total:0,eur:0,baselineAnnual:0,tjm:0,collabs:0,days:+s?.Nb_Jours_Ouvres_Annuels||0};
 let fixed=0,included=0,over=0,total=0,unresolved=0,licenses=0;
 for(const a of alloc){const o=D.offerById[a.Offre],p=D.providerById[o?.Fournisseur],d=bd[a.Domaine];if(!o||!p||!d)continue;const f=+a.Cout_Abonnement||0,i=+a.Usage_Inclus_Total||0,ov=+a.Cout_Overage||0,t=+a.Budget_Total_USD||0;fixed+=f;included+=i;over+=ov;total+=t;licenses+=+a.Nb_Licences||0;if(a.Tarif_A_Confirmer)unresolved++;d.total+=t;d.eur+=+a.Budget_Total_EUR||0;const ok=o.id,pk=p.id;bo[ok]??={o,p,licenses:0,fixed:0,included:0,over:0,total:0,unresolved:0};bo[ok].licenses+=+a.Nb_Licences||0;bo[ok].fixed+=f;bo[ok].included+=i;bo[ok].over+=ov;bo[ok].total+=t;if(a.Tarif_A_Confirmer)bo[ok].unresolved++;bp[pk]??={p,total:0,licenses:0};bp[pk].total+=t;bp[pk].licenses+=+a.Nb_Licences||0}
-for(const b of baseline){const d=bd[b.Domaine];if(!d)continue;d.baselineAnnual+=+b.Cout_Reference_N_1_Annuel_EUR||0;d.tjm=+b.TJM_EUR||0;d.collabs=+b.Nb_Collaborateurs_N_1||0;d.days=+b.Jours_Ouvres_Effectifs||(+s?.Nb_Jours_Ouvres_Annuels||0)}
+const detailsByDomain={};
+for(const r of baselineDetails)(detailsByDomain[r.Domaine]??=[]).push(r);
+for(const b of baseline){
+  const d=bd[b.Domaine];if(!d)continue;
+  d.days=+b.Jours_Ouvres_Effectifs||(+b.Jours_Ouvres_Override||0)||(+s?.Nb_Jours_Ouvres_Annuels||0);
+  const tiers=(detailsByDomain[b.Domaine]||[]).filter(r=>(+r.Nb_Collaborateurs_N_1||0)>0 || (+r.TJM_EUR||0)>0);
+  if(tiers.length){
+    let weighted=0,collabs=0;
+    for(const r of tiers){const c=+r.Nb_Collaborateurs_N_1||0,t=+r.TJM_EUR||0;collabs+=c;weighted+=c*t}
+    d.collabs=collabs;
+    d.tjm=collabs?weighted/collabs:0;
+    d.baselineAnnual=weighted*d.days;
+    d.tiers=tiers.slice().sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||(+a.id||0)-(+b.id||0));
+  }else{
+    d.baselineAnnual=+b.Cout_Reference_N_1_Annuel_EUR||0;
+    d.tjm=+b.TJM_EUR||0;
+    d.collabs=+b.Nb_Collaborateurs_N_1||0;
+    d.tiers=[];
+  }
+}
 const months=Math.max(1,+s?.Nb_Mois||12),rate=+s?.Taux_USD_EUR||0;
 let baselineAnnual=0,budgetPeriodEUR=total*rate,budgetAnnualizedEUR=0,baselinePeriod=0,savingPeriod=0,savingAnnual=0;
 for(const d of Object.values(bd)){d.budgetAnnualized=d.eur*12/months;d.baselinePeriod=d.baselineAnnual*months/12;d.savingPeriod=d.baselinePeriod-d.eur;d.savingAnnual=d.baselineAnnual-d.budgetAnnualized;d.savingPct=d.baselineAnnual?d.savingAnnual/d.baselineAnnual:0;d.daysEquivalent=d.tjm>0?d.savingAnnual/d.tjm:0;d.fteEquivalent=(d.tjm>0&&d.days>0)?d.savingAnnual/(d.tjm*d.days):0;baselineAnnual+=d.baselineAnnual;budgetAnnualizedEUR+=d.budgetAnnualized;baselinePeriod+=d.baselinePeriod;savingPeriod+=d.savingPeriod;savingAnnual+=d.savingAnnual}
 const savingPct=baselineAnnual?savingAnnual/baselineAnnual:0;
-return{s,alloc,baseline,bd,bo,bp,fixed,included,over,total,licenses,unresolved,rate,months,baselineAnnual,budgetPeriodEUR,budgetAnnualizedEUR,baselinePeriod,savingPeriod,savingAnnual,savingPct}
+return{s,alloc,baseline,baselineDetails,bd,bo,bp,fixed,included,over,total,licenses,unresolved,rate,months,baselineAnnual,budgetPeriodEUR,budgetAnnualizedEUR,baselinePeriod,savingPeriod,savingAnnual,savingPct}
 }
 function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderScenarios();renderOffersReadOnly();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAclAdmin()}applyUILabels();enforceReadOnlyForNonOwner()}
 function dashboardFilterOptions(){
@@ -174,7 +194,7 @@ function renderDashboard(){
   };
   pf.onchange=()=>{DASH_FILTER.providerId=+pf.value||0;renderDashboard()};
   reset.onclick=()=>{DASH_FILTER={domainIds:[],providerId:0};renderDashboard()};
-  renderCharts(m);
+  renderCharts(m);scheduleUILabelApply();
 }
 function renderCharts(m){
   const ps=Object.values(m.bp),sum=Math.max(1,m.total);let acc=0,st=[];
@@ -200,9 +220,77 @@ async function apply(actions){try{return await grist.docApi.applyUserActions(act
 }
 function renderCompare(){const el=document.getElementById('v-compare');el.innerHTML=`<article class="card"><h3>Comparer les scénarios</h3><p>Sélectionne jusqu’à 6 scénarios. Les montants « devis à confirmer » ne sont pas artificiellement valorisés à zéro : le budget affiché est le budget connu.</p><div class="checklist">${D[T.scenarios].map((s,i)=>`<label class="checkpill"><input type="checkbox" class="cmp" value="${s.id}" ${i<Math.min(3,D[T.scenarios].length)?'checked':''}>${esc(s.Nom)}</label>`).join('')}</div><div id="cmpOut" style="margin-top:14px"></div></article>`;document.querySelectorAll('.cmp').forEach(x=>x.onchange=drawCompare);drawCompare()}
 function drawCompare(){const ids=[...document.querySelectorAll('.cmp:checked')].slice(0,6).map(x=>+x.value),ms=ids.map(model);document.getElementById('cmpOut').innerHTML=`<div class="comparegrid">${ms.map(m=>`<div class="comparecard"><h4>${esc(m.s.Nom)}</h4><div class="big">${money(m.total)}</div><div class="muted">${money(m.total*m.rate,'EUR')} · ${num(m.licenses)} licences</div><div class="roi-line">Économie annuelle : <b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b> · ${pct(m.savingPct)}</div><div style="margin-top:8px">${m.unresolved?`<span class="badge warn">${m.unresolved} devis à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div></div>`).join('')}</div><div class="tablewrap" style="margin-top:14px"><table><thead><tr><th>Scénario</th><th>Fixe</th><th>Overage</th><th>Budget connu USD</th><th>Budget connu EUR</th><th>Économie annuelle</th><th>Économie %</th><th>Tarifs à confirmer</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td><td class="num ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</td><td class="num">${m.unresolved}</td></tr>`).join('')}</tbody></table></div>`}
-function renderROI(){const el=document.getElementById('v-roi'),m=CURRENT,bmap=Object.fromEntries(m.baseline.map(b=>[b.Domaine,b]));const rowsHtml=Object.values(m.bd).map(x=>{const b=bmap[x.d.id];return `<tr data-bid="${b?.id||''}" data-domain="${x.d.id}"><td><b>${esc(x.d.Nom)}</b></td><td><input class="admin-input roi-edit" data-f="Nb_Collaborateurs_N_1" type="number" min="0" step="0.1" value="${+b?.Nb_Collaborateurs_N_1||0}"></td><td><input class="admin-input roi-edit" data-f="TJM_EUR" type="number" min="0" step="1" value="${+b?.TJM_EUR||0}"></td><td><input class="admin-input roi-edit" data-f="Jours_Ouvres_Override" type="number" min="0" value="${+b?.Jours_Ouvres_Override||0}" title="0 = utiliser le nombre de jours du scénario"></td><td class="num">${num(x.days)}</td><td class="num">${money(x.baselineAnnual,'EUR')}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${money(x.budgetAnnualized,'EUR')}</td><td class="num ${x.savingPeriod<0?'negative':''}">${money(x.savingPeriod,'EUR')}</td><td class="num ${x.savingAnnual<0?'negative':''}"><b>${money(x.savingAnnual,'EUR')}</b></td><td class="num ${x.savingPct<0?'negative':''}">${pct(x.savingPct)}</td><td class="num">${num(x.daysEquivalent)}</td><td class="num">${x.fteEquivalent.toFixed(2).replace('.',',')}</td></tr>`}).join('');
-el.innerHTML=`<div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Budget licences annualisé</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><article class="card"><div class="cardhead"><div><h3>Baseline N-1 par domaine</h3><p>Coût annuel de référence = collaborateurs N-1 × TJM × jours ouvrés. Une surcharge de jours à 0 utilise le paramètre du scénario (${num(m.s?.Nb_Jours_Ouvres_Annuels||0)} jours/an).</p></div><button id="saveAllBaseline" class="btn primary">Enregistrer les modifications</button></div><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Collaborateurs N-1</th><th>TJM EUR</th><th>Override jours</th><th>Jours effectifs</th><th>Baseline annuelle</th><th>Licences période</th><th>Licences annualisées</th><th>Économie période</th><th>Économie annuelle</th><th>Économie %</th><th>Jours équiv.</th><th>ETP équiv.</th></tr></thead><tbody>${rowsHtml}<tr class="total"><td colspan="5">TOTAL</td><td class="num">${money(m.baselineAnnual,'EUR')}</td><td class="num">${money(m.budgetPeriodEUR,'EUR')}</td><td class="num">${money(m.budgetAnnualizedEUR,'EUR')}</td><td class="num ${m.savingPeriod<0?'negative':''}">${money(m.savingPeriod,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td><td class="num ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</td><td colspan="2"></td></tr></tbody></table></div></article>`;document.getElementById('saveAllBaseline').onclick=saveAllBaseline}
-async function saveAllBaseline(){const actions=[];document.querySelectorAll('#v-roi tr[data-domain]').forEach(tr=>{const id=+tr.dataset.bid||0,fields={Scenario:CURRENT.s.id,Domaine:+tr.dataset.domain,...readFields(tr,'.roi-edit')};actions.push(id?["UpdateRecord",T.baseline,id,fields]:["AddRecord",T.baseline,null,fields])});if(!actions.length){toast('Aucune baseline à enregistrer.');return}try{await apply(actions);toast(`${actions.length} baseline(s) N-1 enregistrée(s).`);await reload()}catch(e){toast(e.message,true)}}
+
+let ROI_TIER_COUNT=0;
+function roiTierCount(m){
+  const byDomain={};
+  (m.baselineDetails||[]).forEach(r=>(byDomain[r.Domaine]??=[]).push(r));
+  const max=Math.max(1,...Object.values(byDomain).map(a=>a.length));
+  if(!ROI_TIER_COUNT || ROI_TIER_COUNT<max)ROI_TIER_COUNT=max;
+  return ROI_TIER_COUNT;
+}
+function roiDetailsByDomain(m){
+  const out={};
+  (m.baselineDetails||[]).forEach(r=>(out[r.Domaine]??=[]).push(r));
+  Object.values(out).forEach(a=>a.sort((x,y)=>(+x.Ordre||0)-(+y.Ordre||0)||(+x.id||0)-(+y.id||0)));
+  return out;
+}
+function renderROI(){
+  const el=document.getElementById('v-roi'),m=CURRENT;
+  const bmap=Object.fromEntries(m.baseline.map(b=>[b.Domaine,b]));
+  const details=roiDetailsByDomain(m),tierCount=roiTierCount(m);
+  const tierHeads=Array.from({length:tierCount},(_,i)=>`<th>Collaborateurs N-1 #${i+1}</th><th>TJM #${i+1} EUR</th>`).join('');
+  const rowsHtml=Object.values(m.bd).map(x=>{
+    const b=bmap[x.d.id],tiers=details[x.d.id]||[];
+    const tierCells=Array.from({length:tierCount},(_,i)=>{
+      const r=tiers[i]||{};
+      return `<td class="roi-tier" data-tier="${i}" data-detail-id="${r.id||''}"><input class="admin-input roi-tier-edit" data-f="Nb_Collaborateurs_N_1" type="number" min="0" step="0.1" value="${+r.Nb_Collaborateurs_N_1||0}"></td><td class="roi-tier" data-tier="${i}" data-detail-id="${r.id||''}"><input class="admin-input roi-tier-edit" data-f="TJM_EUR" type="number" min="0" step="1" value="${+r.TJM_EUR||0}"></td>`;
+    }).join('');
+    return `<tr data-bid="${b?.id||''}" data-domain="${x.d.id}"><td><b>${esc(x.d.Nom)}</b></td>${tierCells}<td><input class="admin-input roi-root-edit" data-f="Jours_Ouvres_Override" type="number" min="0" value="${+b?.Jours_Ouvres_Override||0}" title="0 = utiliser le nombre de jours du scénario"></td><td class="num">${num(x.days)}</td><td class="num">${money(x.baselineAnnual,'EUR')}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${money(x.budgetAnnualized,'EUR')}</td><td class="num ${x.savingPeriod<0?'negative':''}">${money(x.savingPeriod,'EUR')}</td><td class="num ${x.savingAnnual<0?'negative':''}"><b>${money(x.savingAnnual,'EUR')}</b></td><td class="num ${x.savingPct<0?'negative':''}">${pct(x.savingPct)}</td><td class="num">${num(x.daysEquivalent)}</td><td class="num">${x.fteEquivalent.toFixed(2).replace('.',',')}</td></tr>`;
+  }).join('');
+  el.innerHTML=`<div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Budget licences annualisé</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><article class="card"><div class="cardhead"><div><h3>Baseline N-1 par domaine</h3><p>Chaque domaine peut contenir plusieurs couples Collaborateurs N-1 / TJM sur une seule ligne. Le coût annuel de référence est la somme des collaborateurs × TJM × jours ouvrés.</p></div><div class="table-actions read-only-exempt"><button id="addRoiTier" class="btn secondary">+ Ajouter un TJM</button><button id="removeRoiTier" class="btn secondary">− Retirer le dernier TJM</button><button id="saveAllBaseline" class="btn primary">Enregistrer les modifications</button></div></div><div class="tablewrap roi-tier-table"><table><thead><tr><th>Domaine</th>${tierHeads}<th>Override jours</th><th>Jours effectifs</th><th>Baseline annuelle</th><th>Licences période</th><th>Licences annualisées</th><th>Économie période</th><th>Économie annuelle</th><th>Économie %</th><th>Jours équiv.</th><th>ETP équiv.</th></tr></thead><tbody>${rowsHtml}<tr class="total"><td colspan="${1+tierCount*2+2}">TOTAL</td><td class="num">${money(m.baselineAnnual,'EUR')}</td><td class="num">${money(m.budgetPeriodEUR,'EUR')}</td><td class="num">${money(m.budgetAnnualizedEUR,'EUR')}</td><td class="num ${m.savingPeriod<0?'negative':''}">${money(m.savingPeriod,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td><td class="num ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</td><td colspan="2"></td></tr></tbody></table></div></article>`;
+  document.getElementById('saveAllBaseline').onclick=saveAllBaselineV24;
+  document.getElementById('addRoiTier').onclick=()=>{ROI_TIER_COUNT=tierCount+1;renderROI();applyUILabelsSafe()};
+  document.getElementById('removeRoiTier').onclick=()=>{
+    if(tierCount<=1){toast("Il faut conserver au moins un couple Collaborateurs / TJM.",true);return}
+    const lastHasData=[...document.querySelectorAll(`#v-roi [data-tier="${tierCount-1}"] input`)].some(i=>+i.value>0);
+    if(lastHasData&&!confirm("La dernière tranche contient des valeurs. La masquer sans enregistrer ne supprime pas les données. Continuer ?"))return;
+    ROI_TIER_COUNT=tierCount-1;renderROI();applyUILabelsSafe();
+  };
+}
+async function saveAllBaselineV24(){
+  if(ACCESS.role!=='OWNER'){toast("Modification de la baseline réservée à l'Owner.",true);return}
+  const rootActions=[],detailActions=[];
+  document.querySelectorAll('#v-roi tr[data-domain]').forEach(tr=>{
+    const domain=+tr.dataset.domain,bid=+tr.dataset.bid||0;
+    const override=+tr.querySelector('[data-f="Jours_Ouvres_Override"]')?.value||0;
+    const rootFields={Scenario:CURRENT.s.id,Domaine:domain,Jours_Ouvres_Override:override};
+    rootActions.push(bid?["UpdateRecord",T.baseline,bid,rootFields]:["AddRecord",T.baseline,null,rootFields]);
+    const pairs={};
+    tr.querySelectorAll('.roi-tier').forEach(td=>{
+      const idx=+td.dataset.tier,id=+td.dataset.detailId||0;
+      const input=td.querySelector('input'); if(!input)return;
+      pairs[idx]??={id};
+      if(id)pairs[idx].id=id;
+      pairs[idx][input.dataset.f]=+input.value||0;
+    });
+    Object.entries(pairs).forEach(([idx,p])=>{
+      const fields={Scenario:CURRENT.s.id,Domaine:domain,Ordre:(+idx+1)*10,Nb_Collaborateurs_N_1:+p.Nb_Collaborateurs_N_1||0,TJM_EUR:+p.TJM_EUR||0};
+      if((fields.Nb_Collaborateurs_N_1>0 || fields.TJM_EUR>0)){
+        detailActions.push(p.id?["UpdateRecord",T.baselineDetails,p.id,fields]:["AddRecord",T.baselineDetails,null,fields]);
+      }else if(p.id){
+        detailActions.push(["RemoveRecord",T.baselineDetails,p.id]);
+      }
+    });
+  });
+  try{
+    if(rootActions.length)await apply(rootActions);
+    if(detailActions.length)await apply(detailActions);
+    toast(`Baseline N-1 enregistrée (${detailActions.length} tranche(s) TJM traitée(s)).`);
+    await reload();
+  }catch(e){toast(e.message||String(e),true)}
+}
+
 function renderScenarios(){const el=document.getElementById('v-scenarios');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Scénarios</h3><p>Modifie plusieurs scénarios puis enregistre-les en une seule fois.</p></div><div class="table-actions"><button id="saveAllScenarios" class="btn primary">Enregistrer les modifications</button><button id="newScenario" class="btn secondary">+ Nouveau</button></div></div><div class="tablewrap"><table><thead><tr><th>Nom</th><th>Année</th><th>Mois</th><th>USD/EUR</th><th>Utilisation</th><th>Jours ouvrés/an</th><th>Statut</th></tr></thead><tbody>${D[T.scenarios].map(s=>`<tr data-s="${s.id}"><td><input class="admin-input" data-f="Nom" value="${esc(s.Nom)}"></td><td><input class="admin-input" data-f="Annee" type="number" value="${+s.Annee||0}"></td><td><input class="admin-input" data-f="Nb_Mois" type="number" value="${+s.Nb_Mois||0}"></td><td><input class="admin-input" data-f="Taux_USD_EUR" type="number" step="0.001" value="${+s.Taux_USD_EUR||0}"></td><td><input class="admin-input" data-f="Taux_Utilisation" type="number" step="0.05" value="${+s.Taux_Utilisation||0}"></td><td><input class="admin-input" data-f="Nb_Jours_Ouvres_Annuels" type="number" min="1" value="${+s.Nb_Jours_Ouvres_Annuels||218}"></td><td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td></tr>`).join('')}</tbody></table></div></article>`;document.getElementById('saveAllScenarios').onclick=()=>saveAllGeneric('v-scenarios',T.scenarios,'tr[data-s]','data-s','ligne(s) scénario');document.getElementById('newScenario').onclick=async()=>{await apply([["AddRecord",T.scenarios,null,{Nom:'Nouveau scénario',Annee:2027,Nb_Mois:12,Taux_USD_EUR:.86,Taux_Utilisation:1,Nb_Jours_Ouvres_Annuels:218,Statut:'Travail',Commentaire:''}]]);await reload()}}
 async function saveGenericRow(sel,table,id){const tr=document.querySelector(sel);if(!tr)return;await apply([["UpdateRecord",table,id,readFields(tr)]]);toast('Enregistré.');await reload()}
 function ynBadge(v){return `<span class="badge ${v==='Oui'?'ok':v==='Non'?'no':'warn'}">${esc(v||'A confirmer')}</span>`}
@@ -357,7 +445,7 @@ function uiTextScreen(el){
   return view?.id?view.id.replace(/^v-/,''):'global';
 }
 function uiTextNodes(){
-  const selector='h1,h2,h3,p,th,button,label.field,summary,small,.status,.menu-admin-note,.offer-schema-note,.deniednote';
+  const selector='h1,h2,h3,h4,p,th,button,label.field,summary,small,.status,.menu-admin-note,.offer-schema-note,.deniednote,.kpi .l,.field-label,.filter-title b,.mini-btn,.badge';
   const out=[];
   document.querySelectorAll(selector).forEach(el=>{
     if(el.closest('#v-labelsadmin'))return;
@@ -380,6 +468,28 @@ function applyUILabels(){
     }
   });
 }
+
+let UI_LABEL_OBSERVER=null,UI_LABEL_PENDING=false,UI_LABEL_APPLYING=false;
+function scheduleUILabelApply(){
+  if(UI_LABEL_PENDING||UI_LABEL_APPLYING)return;
+  UI_LABEL_PENDING=true;
+  queueMicrotask(()=>{UI_LABEL_PENDING=false;applyUILabelsSafe()});
+}
+function applyUILabelsSafe(){
+  if(UI_LABEL_APPLYING)return;
+  UI_LABEL_APPLYING=true;
+  try{applyUILabels()}finally{UI_LABEL_APPLYING=false}
+}
+function ensureUILabelObserver(){
+  const root=document.getElementById('root');if(!root)return;
+  if(UI_LABEL_OBSERVER)UI_LABEL_OBSERVER.disconnect();
+  UI_LABEL_OBSERVER=new MutationObserver(muts=>{
+    if(UI_LABEL_APPLYING)return;
+    if(muts.some(m=>m.type==='childList'||m.type==='characterData'))scheduleUILabelApply();
+  });
+  UI_LABEL_OBSERVER.observe(root,{subtree:true,childList:true,characterData:true});
+}
+
 function slugLabel(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,70)}
 function collectUILabelCandidates(){
   const uniq=new Map();
@@ -394,7 +504,7 @@ function renderLabelsAdmin(){
   const menuRows=menuConfigRows();
   const colRows=offerColumnConfig('read');
   el.innerHTML=`
-  <article class="card"><div class="cardhead"><div><h3>Paramétrage des libellés</h3><p>Personnalise et persiste les textes visibles de l'application. Les valeurs par défaut restent disponibles comme fallback.</p></div><div class="table-actions"><input id="labelSearch" class="admin-input" placeholder="Rechercher un écran ou un libellé"><button id="saveUILabels" class="btn primary">Enregistrer les textes</button></div></div>
+  <article class="card"><div class="cardhead"><div><h3>Paramétrage des libellés</h3><p>Personnalise et persiste les textes visibles de toute l'application. Les libellés sont resynchronisés après chaque rerendu partiel, notamment sur le Dashboard.</p></div><div class="table-actions"><input id="labelSearch" class="admin-input" placeholder="Rechercher un écran ou un libellé"><button id="saveUILabels" class="btn primary">Enregistrer les textes</button></div></div>
     <div class="tablewrap labels-admin-wrap"><table class="labels-admin-table"><thead><tr><th>Écran</th><th>Clé</th><th>Libellé par défaut</th><th>Libellé affiché</th><th>Actif</th></tr></thead><tbody id="uiLabelsBody">${candidates.map(c=>{const r=byPair.get(`${c.Ecran}||${c.Libelle_Defaut}`);return `<tr data-label-id="${r?.id||''}" data-screen="${esc(c.Ecran)}" data-default="${esc(c.Libelle_Defaut)}"><td><code>${esc(c.Ecran)}</code></td><td><code>${esc(r?.Cle||c.Cle)}</code></td><td>${esc(c.Libelle_Defaut)}</td><td><input class="admin-input wide" data-f="Libelle" value="${esc(r?.Libelle||c.Libelle_Defaut)}"></td><td><input type="checkbox" data-f="Actif" ${r?.Actif===false?'':'checked'}></td></tr>`}).join('')}</tbody></table></div>
   </article>
   <article class="card"><div class="cardhead"><div><h3>Libellés du menu</h3><p>Les noms des onglets restent stockés dans Configuration_Menu et sont éditables ici également.</p></div><button id="saveMenuLabelsFromLabels" class="btn primary">Enregistrer le menu</button></div><div class="tablewrap"><table><thead><tr><th>Clé</th><th>Libellé</th></tr></thead><tbody>${menuRows.map(r=>`<tr data-menu-label-id="${r.id||''}" data-menu-label-key="${esc(r.Cle)}"><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input wide" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}"></td></tr>`).join('')}</tbody></table></div></article>
@@ -434,6 +544,7 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Offres",colIds:"*",kind:"global",perm:"+R"},
   {tableId:"Allocations",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Baseline_N_1",colIds:"*",kind:"domain",perm:"+R"},
+  {tableId:"Baseline_N_1_Details",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Enterprise",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",perm:"+R"},
   {tableId:"Domaines",colIds:"*",kind:"domains",perm:"+R"},
