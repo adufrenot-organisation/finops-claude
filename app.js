@@ -707,13 +707,62 @@ function openScenarioDetailV36(sid){
   const m=model(sid),host=document.getElementById('scenarioDetailModal');if(!m?.s||!host)return;
   host.innerHTML=`<div class="modal-backdrop scenario-detail-backdrop">
     <div class="scenario-detail-modal" role="dialog" aria-modal="true" aria-label="Détail du scénario">
-      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue imprimable</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="printScenarioDetail" class="btn primary">🖨 Imprimer le détail</button></div></div>
+      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue imprimable</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="openScenarioHtml" class="btn secondary">🌐 Ouvrir en HTML</button><button id="printScenarioDetail" class="btn primary">🖨 Imprimer le détail</button></div></div>
       <div class="scenario-detail-scroll">${scenarioDetailHtmlV36(m)}</div>
     </div>
   </div>`;
   document.getElementById('closeScenarioDetail').onclick=()=>host.innerHTML='';
   host.querySelector('.scenario-detail-backdrop').onclick=e=>{if(e.target===e.currentTarget)host.innerHTML=''};
+  document.getElementById('openScenarioHtml').onclick=()=>openScenarioHtmlV41(sid);
   document.getElementById('printScenarioDetail').onclick=()=>printScenarioDetailV36(sid);
+}
+function safeFilenameV41(value){
+  return String(value||'scenario')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-zA-Z0-9_-]+/g,'-')
+    .replace(/^-+|-+$/g,'')
+    .replace(/-+/g,'-') || 'scenario';
+}
+function scenarioHtmlDocumentV41(m){
+  const reportTitle=`FinOps - ${m.s.Nom}`;
+  const filename=`FinOps_${safeFilenameV41(m.s.Nom)}_${new Date().toISOString().slice(0,10)}.html`;
+  const body=`<div class="html-report-toolbar no-print">
+      <div><b>Synthèse FinOps IA</b><span>Rapport HTML autonome · ${esc(m.s.Nom)}</span></div>
+      <div class="html-report-actions"><button id="htmlPrint">🖨 Imprimer / PDF</button><button id="htmlSave">💾 Enregistrer le fichier HTML</button></div>
+    </div>
+    <main class="html-report-page">
+      <div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>Détail du scénario · ${esc(m.s.Nom)}</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+      ${scenarioDetailHtmlV36(m,true)}
+    </main>`;
+  const screenCss=`
+    body{background:#eef2f7;padding:0 0 36px;font-size:12px}
+    .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
+    .html-report-toolbar>div:first-child{display:flex;flex-direction:column;gap:2px}.html-report-toolbar span{font-size:11px;color:#cbd5e1}
+    .html-report-actions{display:flex;gap:8px;flex-wrap:wrap}.html-report-actions button{border:0;border-radius:9px;padding:9px 13px;font-weight:700;cursor:pointer}.html-report-actions button:first-child{background:#fff;color:#10213e}.html-report-actions button:last-child{background:#635bdb;color:#fff}
+    .html-report-page{width:min(1460px,calc(100% - 32px));margin:24px auto;background:#fff;padding:22px;border-radius:16px;box-shadow:0 12px 34px rgba(15,23,42,.10)}
+    @media(max-width:760px){.html-report-toolbar{align-items:flex-start;flex-direction:column}.html-report-actions{width:100%}.html-report-actions button{flex:1 1 220px}.html-report-page{width:calc(100% - 12px);margin:8px auto;padding:10px}}
+    @media print{.no-print{display:none!important}.html-report-page{width:auto;margin:0;padding:0;box-shadow:none;border-radius:0}body{padding:0;background:#fff}}
+  `;
+  const js=`
+    const REPORT_FILENAME=${JSON.stringify(filename)};
+    document.getElementById('htmlPrint').addEventListener('click',()=>window.print());
+    document.getElementById('htmlSave').addEventListener('click',()=>{
+      const source='<!doctype html>\\n'+document.documentElement.outerHTML;
+      const blob=new Blob([source],{type:'text/html;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=REPORT_FILENAME;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+    });
+  `;
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(reportTitle)}</title><style>${PRINT_CSS_V36}${screenCss}</style></head><body>${body}<script>${js}<\/script></body></html>`;
+}
+function openScenarioHtmlV41(sid){
+  const m=model(sid);if(!m?.s)return;
+  const w=window.open('','_blank');
+  if(!w){toast("Le navigateur a bloqué l’ouverture du rapport HTML.",true);return}
+  w.document.open();
+  w.document.write(scenarioHtmlDocumentV41(m));
+  w.document.close();
 }
 function printWindowV36(title,body){
   const w=window.open('','_blank','width=1280,height=900');
