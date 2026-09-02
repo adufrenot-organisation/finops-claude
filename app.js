@@ -912,10 +912,83 @@ function scenarioDefaults(){
     Nom:'Nouveau scénario',Annee:now.getFullYear(),Nb_Mois:12,Taux_USD_EUR:.86,
     Taux_Utilisation:1,Nb_Jours_Ouvres_Annuels:218,Statut:'Travail',Commentaire:''};
 }
+
+function scenarioUsage(scenarioId){
+  const sid=+scenarioId||0;
+  const allocations=(D[T.alloc]||[]).filter(r=>+r.Scenario===sid).length;
+  const preSimulations=(D[T.preSim]||[]).filter(r=>+r.Scenario_Reference===sid).length;
+  const enterprise=(D.Enterprise||D['Enterprise']||[]).filter(r=>+r.Scenario===sid).length;
+  const individual=(D.Forfaits_Individuels||D['Forfaits_Individuels']||[]).filter(r=>+r.Scenario===sid).length;
+  const baseline=(D[T.baseline]||[]).filter(r=>+r.Scenario===sid).length;
+  const baselineDetails=(D[T.baselineDetails]||[]).filter(r=>+r.Scenario===sid).length;
+  const simulation=allocations+enterprise+individual;
+  const other=baseline+baselineDetails;
+  return {
+    allocations,preSimulations,enterprise,individual,baseline,baselineDetails,
+    simulation,other,total:simulation+preSimulations+other
+  };
+}
+function scenarioUsageReason(scenarioId){
+  const u=scenarioUsage(scenarioId),parts=[];
+  if(u.allocations)parts.push(`${u.allocations} allocation(s)`);
+  if(u.enterprise)parts.push(`${u.enterprise} ligne(s) Enterprise historique`);
+  if(u.individual)parts.push(`${u.individual} forfait(s) individuel(s)`);
+  if(u.preSimulations)parts.push(`${u.preSimulations} pré-simulation(s) nominative(s)`);
+  if(u.baseline||u.baselineDetails)parts.push(`${u.baseline+u.baselineDetails} donnée(s) ROI / baseline`);
+  return parts.join(' · ');
+}
+function canDeleteScenario(scenarioId){
+  return scenarioUsage(scenarioId).total===0;
+}
+async function deleteScenarioV35(scenarioId){
+  const s=(D[T.scenarios]||[]).find(x=>+x.id===+scenarioId);
+  if(!s)return;
+  const usage=scenarioUsage(scenarioId);
+  if(usage.total){
+    toast(`Suppression impossible : ${scenarioUsageReason(scenarioId)}.`,true);
+    return;
+  }
+  if(!canEditView('scenarios')){
+    toast(readOnlyMessage(),true);
+    return;
+  }
+  if(!confirm(`Supprimer définitivement le scénario "${s.Nom||scenarioId}" ?\n\nIl n'est rattaché à aucune simulation, pré-simulation nominative ni donnée ROI.`))return;
+  try{
+    await apply([["RemoveRecord",T.scenarios,+scenarioId]]);
+    if(+selectedScenario()?.id===+scenarioId)PRESIM_SELECTED_ID=0;
+    SCENARIO_FILTER.scenarioId='';
+    await reload();
+    toast('Scénario supprimé.');
+  }catch(e){
+    toast(`Suppression impossible : ${e.message||String(e)}`,true);
+  }
+}
+
+
 function scenarioRowHtml(s){
   const draft=!!s.__draft;
-  const attrs=draft?`data-draft="${esc(s.__key)}"`:`data-s="${s.id}"`;
-  return `<tr ${attrs}><td><input class="admin-input" data-f="Nom" value="${esc(s.Nom)}"></td><td><input class="admin-input" data-f="Annee" type="number" value="${+s.Annee||0}"></td><td><input class="admin-input" data-f="Nb_Mois" type="number" min="1" max="12" value="${+s.Nb_Mois||0}"></td><td><input class="admin-input" data-f="Taux_USD_EUR" type="number" step="0.001" value="${+s.Taux_USD_EUR||0}"></td><td><input class="admin-input" data-f="Taux_Utilisation" type="number" step="0.05" min="0" value="${+s.Taux_Utilisation||0}"></td><td><input class="admin-input" data-f="Nb_Jours_Ouvres_Annuels" type="number" min="1" value="${+s.Nb_Jours_Ouvres_Annuels||218}"></td><td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td>${draft?`<td><button class="btn ghost cancelScenarioDraft" data-key="${esc(s.__key)}">Annuler</button></td>`:'<td></td>'}</tr>`;
+  const attrs=draft?`data-draft="1" data-new-scenario="${esc(s.__key)}"`:`data-s="${s.id}"`;
+  let action='';
+  if(draft){
+    action=`<button class="btn ghost cancelScenarioDraft" data-key="${esc(s.__key)}">Annuler</button>`;
+  }else{
+    const usage=scenarioUsage(s.id);
+    if(usage.total){
+      action=`<button type="button" class="btn ghost small scenario-delete blocked" data-delete-scenario="${s.id}" disabled title="${esc('Suppression impossible : '+scenarioUsageReason(s.id))}">🔒 Utilisé</button>`;
+    }else{
+      action=`<button type="button" class="btn danger small scenario-delete" data-delete-scenario="${s.id}" title="Supprimer ce scénario non utilisé">Supprimer</button>`;
+    }
+  }
+  return `<tr ${attrs}>
+    <td><input class="admin-input" data-f="Nom" value="${esc(s.Nom)}"></td>
+    <td><input class="admin-input" data-f="Annee" type="number" value="${+s.Annee||0}"></td>
+    <td><input class="admin-input" data-f="Nb_Mois" type="number" min="1" max="12" value="${+s.Nb_Mois||0}"></td>
+    <td><input class="admin-input" data-f="Taux_USD_EUR" type="number" step="0.001" value="${+s.Taux_USD_EUR||0}"></td>
+    <td><input class="admin-input" data-f="Taux_Utilisation" type="number" step="0.05" min="0" value="${+s.Taux_Utilisation||0}"></td>
+    <td><input class="admin-input" data-f="Nb_Jours_Ouvres_Annuels" type="number" min="1" value="${+s.Nb_Jours_Ouvres_Annuels||218}"></td>
+    <td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td>
+    <td class="scenario-action">${action}</td>
+  </tr>`;
 }
 
 function renderScenarios(){
@@ -945,7 +1018,7 @@ function renderScenarios(){
     <div class="cardhead">
       <div>
         <h3>Scénarios</h3>
-        <p>Modifie ou ajoute plusieurs scénarios puis enregistre-les en une seule fois.</p>
+        <p>Modifie, ajoute ou supprime les scénarios non utilisés. Un scénario rattaché à une simulation, une pré-simulation nominative ou des données ROI est protégé.</p>
       </div>
       <div class="table-actions">
         <button id="saveScenarios" class="btn primary">Enregistrer les modifications</button>
@@ -1004,6 +1077,10 @@ function renderScenarios(){
   </article>`;
 
   document.getElementById('saveScenarios').onclick=saveAllScenariosV26;
+
+  el.querySelectorAll('.scenario-delete:not(.blocked)').forEach(btn=>{
+    btn.onclick=()=>deleteScenarioV35(+btn.dataset.deleteScenario);
+  });
 
   document.getElementById('addScenario').onclick=()=>{
     NEW_SCENARIOS.push(scenarioDefaults());
@@ -1594,7 +1671,7 @@ function aclRulesForSpec(spec){
   const contributors=["CONTRIBUTEUR","CONTRIBUTEUR_AVANCE","ADMINISTRATEUR"];
   if(spec.mode==="userEdit"){
     return [
-      {roles:contributors,perm:spec.kind==="scenario"?"+CRU":"+CRUD",tag:"WRITE"},
+      {roles:contributors,perm:"+CRUD",tag:"WRITE"},
       {roles:reader,perm:"+R",tag:"READ"}
     ];
   }

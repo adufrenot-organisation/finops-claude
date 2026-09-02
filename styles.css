@@ -668,3 +668,12 @@
 @media(max-width:900px){
   .presence-menu{left:0;right:auto}
 }
+
+/* V35 — suppression sécurisée des scénarios */
+.scenario-action{white-space:nowrap;min-width:110px}
+.scenario-delete.blocked{
+  opacity:.72;
+  cursor:not-allowed;
+  border-color:var(--line,#dbe3ef);
+  color:var(--muted,#667085);
+}
