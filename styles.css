@@ -450,3 +450,6 @@
   line-height:1.45;
   background:rgba(127,127,127,.04);
 }
+
+/* V22 — colonnes communes Offres */
+.column-picker{display:inline-block;position:relative}.column-picker>summary{list-style:none;cursor:pointer}.column-picker>summary::-webkit-details-marker{display:none}.column-picker-panel{position:absolute;right:0;top:calc(100% + 6px);z-index:50;min-width:300px;max-height:430px;overflow:auto;padding:12px;background:#fff;border:1px solid var(--border,#d9dde5);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.12)}.column-picker-panel label{display:block;padding:5px 2px;font-size:13px;white-space:nowrap}.column-picker-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border,#d9dde5)}.service-offers-table table,.service-offers-admin table{width:max-content;min-width:100%}.row-action{position:sticky;right:0;background:#fff}

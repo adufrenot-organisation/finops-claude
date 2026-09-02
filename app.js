@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",rights:"Droits_Utilisateurs",menu:"Configuration_Menu"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 grist.ready({requiredAccess:"full"}); document.addEventListener("DOMContentLoaded",boot);
@@ -205,133 +205,40 @@ function renderScenarios(){const el=document.getElementById('v-scenarios');el.in
 async function saveGenericRow(sel,table,id){const tr=document.querySelector(sel);if(!tr)return;await apply([["UpdateRecord",table,id,readFields(tr)]]);toast('Enregistré.');await reload()}
 function ynBadge(v){return `<span class="badge ${v==='Oui'?'ok':v==='Non'?'no':'warn'}">${esc(v||'A confirmer')}</span>`}
 
-function serviceOfferRowsHtml(edit=false){
-  const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));
-  return D[T.offers].slice().sort((a,b)=>{
-    const pa=D.providerById[a.Fournisseur]?.Nom||'',pb=D.providerById[b.Fournisseur]?.Nom||'';
-    return pa.localeCompare(pb,'fr')||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr');
-  }).map(o=>edit?offerAdminRow(o,providers):offerReadOnlyRow(o)).join('');
+const OFFER_COLUMNS=[
+  {key:'Fournisseur',label:'Fournisseur',kind:'ref-provider'},
+  {key:'Nom',label:'Nom',kind:'text'},{key:'Code',label:'Code',kind:'text'},{key:'Famille',label:'Famille',kind:'text'},
+  {key:'Periodicite_Prix',label:'Périodicité',kind:'text'},{key:'Devise',label:'Devise',kind:'text'},
+  {key:'Tarif_Catalogue_Mensuel',label:'Catalogue / mois',kind:'money'},{key:'Tarif_Catalogue_Annuel',label:'Catalogue / an',kind:'money'},
+  {key:'Tarif_Reference_Mensuel',label:'Référence / mois',kind:'money'},{key:'Tarif_Reference_Annuel',label:'Référence / an',kind:'money'},
+  {key:'Tarif_Negocie_Mensuel',label:'Négocié / mois',kind:'money'},{key:'Tarif_Negocie_Annuel',label:'Négocié / an',kind:'money'},
+  {key:'Enveloppe_Usage_Incluse_Mois_Licence',label:'Usage inclus / mois / licence',kind:'money'},
+  {key:'Usage_Inclus_Description',label:'Description usage inclus',kind:'text-long'},
+  {key:'Overage_Disponible',label:'Overage disponible',kind:'bool'},{key:'Facturer_Engagement_Minimum',label:'Facturer engagement minimum',kind:'bool'},
+  {key:'Engagement_Defaut_Mois',label:'Engagement par défaut (mois)',kind:'int'},{key:'Mois_Factures_Defaut',label:'Mois facturés par défaut',kind:'int'},
+  {key:'Compatible_Devis',label:'Compatible devis',kind:'bool'},{key:'Compatible_PO',label:'Compatible PO',kind:'bool'},
+  {key:'Compatible_Facture',label:'Compatible facture',kind:'bool'},{key:'Compatible_Virement',label:'Compatible virement',kind:'bool'},
+  {key:'Compatible_Prepaiement',label:'Compatible prépaiement',kind:'bool'},{key:'Statut_Tarif',label:'Statut tarif',kind:'text'},
+  {key:'Source_Tarif',label:'Source tarif',kind:'text-long'},{key:'Note_Procurement',label:'Note procurement',kind:'text-long'},{key:'Actif',label:'Actif',kind:'bool'}
+];
+function offerColumnConfig(view){
+  const rows=D[T.offerCols]||[],byKey=new Map(rows.map(r=>[r.Cle_Colonne,r]));
+  return OFFER_COLUMNS.map((c,i)=>{const r=byKey.get(c.key);return {...c,order:r&&Number.isFinite(+r.Ordre)?+r.Ordre:i*10,visible:view==='read'?(r?r.Visible_Lecture!==false:true):(r?r.Visible_Admin!==false:true)}}).sort((a,b)=>a.order-b.order)
 }
-function offerReadOnlyRow(o){
-  const p=D.providerById[o.Fournisseur];
-  return `<tr class="${o.Statut_Tarif==='Devis à confirmer'?'unresolved':''}">
-    <td class="provider">${esc(p?.Nom||'')}</td>
-    <td><b>${esc(o.Nom||'')}</b><br><span class="muted">${esc(o.Code||'')}</span></td>
-    <td>${esc(o.Famille||'')}</td>
-    <td>${esc(o.Periodicite_Prix||'')}</td>
-    <td>${esc(o.Devise||'USD')}</td>
-    <td class="num">${+o.Tarif_Catalogue_Mensuel?money(o.Tarif_Catalogue_Mensuel):'—'}</td>
-    <td class="num">${+o.Tarif_Catalogue_Annuel?money(o.Tarif_Catalogue_Annuel):'—'}</td>
-    <td class="num">${+o.Tarif_Negocie_Mensuel?money(o.Tarif_Negocie_Mensuel):'—'}</td>
-    <td class="num">${+o.Tarif_Negocie_Annuel?money(o.Tarif_Negocie_Annuel):'—'}</td>
-    <td class="num">${+o.Enveloppe_Usage_Incluse_Mois_Licence?money(o.Enveloppe_Usage_Incluse_Mois_Licence):'—'}</td>
-    <td>${esc(o.Usage_Inclus_Description||'')}</td>
-    <td>${ynBadge(o.Overage_Disponible)}</td>
-    <td class="num">${num(o.Engagement_Defaut_Mois||0)}</td>
-    <td>${o.Statut_Tarif==='Devis à confirmer'?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(o.Statut_Tarif||'')}</span>`}</td>
-    <td><div class="proc-grid"><div class="proc">Devis<br>${ynBadge(o.Compatible_Devis)}</div><div class="proc">PO<br>${ynBadge(o.Compatible_PO)}</div><div class="proc">Facture<br>${ynBadge(o.Compatible_Facture)}</div><div class="proc">Virement<br>${ynBadge(o.Compatible_Virement)}</div><div class="proc">Prépayé<br>${ynBadge(o.Compatible_Prepaiement)}</div></div></td>
-    <td class="price-source">${esc(o.Source_Tarif||'')}</td>
-    <td>${o.Actif!==false?'<span class="badge ok">Actif</span>':'<span class="badge">Inactif</span>'}</td>
-  </tr>`;
-}
-function renderOffersReadOnly(){
-  const el=document.getElementById('v-offers');if(!el)return;
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Offre de service</h3><p>Catalogue de référence indépendant des scénarios. Cette vue est en lecture seule.</p></div></div><div class="tablewrap service-offers-table"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Famille</th><th>Période</th><th>Devise</th><th>Catalogue /mois</th><th>Catalogue /an</th><th>Négocié /mois</th><th>Négocié /an</th><th>Usage inclus /mois/lic.</th><th>Description usage</th><th>Overage</th><th>Engagement défaut</th><th>Statut</th><th>Procurement</th><th>Source</th><th>Actif</th></tr></thead><tbody>${serviceOfferRowsHtml(false)}</tbody></table></div></article>`;
-}
-function offerAdminRow(o={},providers=[]){
-  const isNew=!o.id,id=o.id||'';
-  const providerOptions=providers.map(p=>`<option value="${p.id}" ${+o.Fournisseur===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('');
-  const yn=(field)=>`<input data-f="${field}" type="checkbox" ${o[field]!==false?'checked':''}>`;
-  return `<tr data-o="${id}" data-new="${isNew?'1':'0'}">
-    <td><select class="admin-input" data-f="Fournisseur"><option value="">—</option>${providerOptions}</select></td>
-    <td><input class="admin-input" data-f="Nom" value="${esc(o.Nom||'')}" placeholder="Nom de l'offre"><input class="admin-input compact" data-f="Code" value="${esc(o.Code||'')}" placeholder="Code"></td>
-    <td><input class="admin-input" data-f="Famille" value="${esc(o.Famille||'')}"></td>
-    <td><select class="admin-input" data-f="Periodicite_Prix"><option ${o.Periodicite_Prix==='Mensuel'?'selected':''}>Mensuel</option><option ${o.Periodicite_Prix==='Annuel'?'selected':''}>Annuel</option><option ${o.Periodicite_Prix==='Devis'?'selected':''}>Devis</option></select></td>
-    <td><input class="admin-input compact" data-f="Devise" value="${esc(o.Devise||'USD')}"></td>
-    <td><input class="admin-input" data-f="Tarif_Catalogue_Mensuel" type="number" step="0.01" value="${+o.Tarif_Catalogue_Mensuel||0}"></td>
-    <td><input class="admin-input" data-f="Tarif_Catalogue_Annuel" type="number" step="0.01" value="${+o.Tarif_Catalogue_Annuel||0}"></td>
-    <td><input class="admin-input" data-f="Tarif_Reference_Mensuel" type="number" step="0.01" value="${+o.Tarif_Reference_Mensuel||0}"></td>
-    <td><input class="admin-input" data-f="Tarif_Reference_Annuel" type="number" step="0.01" value="${+o.Tarif_Reference_Annuel||0}"></td>
-    <td><input class="admin-input" data-f="Tarif_Negocie_Mensuel" type="number" step="0.01" value="${+o.Tarif_Negocie_Mensuel||0}"></td>
-    <td><input class="admin-input" data-f="Tarif_Negocie_Annuel" type="number" step="0.01" value="${+o.Tarif_Negocie_Annuel||0}"></td>
-    <td><input class="admin-input" data-f="Enveloppe_Usage_Incluse_Mois_Licence" type="number" step="0.01" value="${+o.Enveloppe_Usage_Incluse_Mois_Licence||0}"></td>
-    <td><textarea class="admin-input admin-textarea" data-f="Usage_Inclus_Description">${esc(o.Usage_Inclus_Description||'')}</textarea></td>
-    <td>${yn('Overage_Disponible')}</td>
-    <td>${yn('Facturer_Engagement_Minimum')}</td>
-    <td><input class="admin-input" data-f="Engagement_Defaut_Mois" type="number" min="0" value="${+o.Engagement_Defaut_Mois||0}"></td>
-    <td><input class="admin-input" data-f="Mois_Factures_Defaut" type="number" min="0" value="${+o.Mois_Factures_Defaut||0}"></td>
-    <td>${yn('Compatible_Devis')}</td>
-    <td>${yn('Compatible_PO')}</td>
-    <td>${yn('Compatible_Facture')}</td>
-    <td>${yn('Compatible_Virement')}</td>
-    <td>${yn('Compatible_Prepaiement')}</td>
-    <td><input class="admin-input" data-f="Statut_Tarif" value="${esc(o.Statut_Tarif||'')}"></td>
-    <td><textarea class="admin-input admin-textarea" data-f="Source_Tarif">${esc(o.Source_Tarif||'')}</textarea></td>
-    <td><textarea class="admin-input admin-textarea" data-f="Note_Procurement">${esc(o.Note_Procurement||'')}</textarea></td>
-    <td>${yn('Actif')}</td>
-    <td><button class="btn danger small offer-delete">${isNew?'Annuler':'Supprimer'}</button></td>
-  </tr>`;
-}
-function renderOffersAdmin(){
-  const el=document.getElementById('v-offersadmin');if(!el)return;
-  const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Paramétrage offre de service</h3><p>Vue d'administration indépendante des scénarios. Tous les champs affichés sont des colonnes persistées de la table Grist Offres ; les champs de calcul sont ceux consommés par Allocations.</p></div><div class="table-actions"><button id="newOffer" class="btn secondary">+ Nouvelle offre</button><button id="saveAllOffers" class="btn primary">Enregistrer les modifications</button></div></div><div class="offer-schema-note"><b>Champs de calcul :</b> fournisseur, périodicité, devise, tarifs catalogue/référence/négociés, usage inclus, overage et engagement. <b>Champs complémentaires persistés :</b> description usage, compatibilités procurement, statut tarif, source et note procurement.</div><div class="tablewrap service-offers-admin"><table><thead><tr><th>Fournisseur</th><th>Offre / Code</th><th>Famille</th><th>Période</th><th>Devise</th><th>Catalogue /mois</th><th>Catalogue /an</th><th>Réf. /mois</th><th>Réf. /an</th><th>Négocié /mois</th><th>Négocié /an</th><th>Usage inclus</th><th>Description usage</th><th>Overage</th><th>Facturer engagement min.</th><th>Engagement défaut</th><th>Mois défaut</th><th>Devis</th><th>PO</th><th>Facture</th><th>Virement</th><th>Prépayé</th><th>Statut tarif</th><th>Source</th><th>Note procurement</th><th>Actif</th><th></th></tr></thead><tbody id="offersAdminBody">${D[T.offers].map(o=>offerAdminRow(o,providers)).join('')}</tbody></table></div></article>`;
-  document.getElementById('newOffer').onclick=()=>{
-    document.getElementById('offersAdminBody').insertAdjacentHTML('beforeend',offerAdminRow({Actif:true,Devise:'USD',Periodicite_Prix:'Mensuel',Overage_Disponible:false,Facturer_Engagement_Minimum:false,Compatible_Devis:false,Compatible_PO:false,Compatible_Facture:false,Compatible_Virement:false,Compatible_Prepaiement:false},providers));
-    bindOfferDeleteButtons();
-  };
-  document.getElementById('saveAllOffers').onclick=saveAllOffersV20;
-  bindOfferDeleteButtons();
-}
-function bindOfferDeleteButtons(){
-  document.querySelectorAll('#offersAdminBody .offer-delete').forEach(btn=>btn.onclick=async()=>{
-    const tr=btn.closest('tr');
-    if(tr.dataset.new==='1'){tr.remove();return}
-    const id=+tr.dataset.o;
-    const offer=D[T.offers].find(o=>+o.id===id);
-    if(!confirm(`Supprimer l'offre "${offer?.Nom||id}" ?\n\nLa suppression échouera si cette offre est encore référencée dans des allocations.`))return;
-    try{
-      await apply([["RemoveRecord",T.offers,id]]);
-      toast("Offre supprimée.");
-      await reload();
-    }catch(e){toast("Suppression impossible : "+(e.message||String(e)),true)}
-  });
-}
-async function saveAllOffersV20(){
-  const actions=[];
-  let invalid=false;
-  const codes=[];
-  document.querySelectorAll('#offersAdminBody tr').forEach(tr=>{
-    const id=+tr.dataset.o||0;
-    const fields=readFields(tr,'[data-f]');
-    fields.Fournisseur=+fields.Fournisseur||0;
-    fields.Nom=String(fields.Nom||'').trim();
-    fields.Code=String(fields.Code||'').trim();
-    fields.Famille=String(fields.Famille||'').trim();
-    fields.Devise=String(fields.Devise||'USD').trim()||'USD';
-    fields.Statut_Tarif=String(fields.Statut_Tarif||'').trim();
-    fields.Source_Tarif=String(fields.Source_Tarif||'').trim();
-    fields.Note_Procurement=String(fields.Note_Procurement||'').trim();
-    fields.Usage_Inclus_Description=String(fields.Usage_Inclus_Description||'').trim();
-    if(!fields.Fournisseur||!fields.Nom||!fields.Code){
-      invalid=true;
-      if(!fields.Nom)tr.querySelector('[data-f="Nom"]')?.classList.add('input-error');
-      if(!fields.Code)tr.querySelector('[data-f="Code"]')?.classList.add('input-error');
-      if(!fields.Fournisseur)tr.querySelector('[data-f="Fournisseur"]')?.classList.add('input-error');
-      return;
-    }
-    codes.push(fields.Code.toLocaleLowerCase());
-    actions.push(id?["UpdateRecord",T.offers,id,fields]:["AddRecord",T.offers,null,fields]);
-  });
-  if(invalid){toast("Fournisseur, nom et code sont obligatoires pour chaque offre.",true);return}
-  if(new Set(codes).size!==codes.length){toast("Deux offres utilisent le même code.",true);return}
-  if(!actions.length){toast("Aucune modification à enregistrer.");return}
-  try{
-    await apply(actions);
-    toast("Offre de service enregistrée.");
-    await reload();
-  }catch(e){toast(e.message||String(e),true)}
-}
+function offerVisibleColumns(view){return offerColumnConfig(view).filter(c=>c.visible)}
+function offerCellRead(o,c){const v=o[c.key];if(c.kind==='ref-provider')return esc(D.providerById[v]?.Nom||'');if(c.kind==='money')return +v?money(v):'—';if(c.kind==='bool')return ynBadge(v);if(c.kind==='int')return num(+v||0);if(c.key==='Statut_Tarif')return v==='Devis à confirmer'?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(v||'')}</span>`;return esc(v??'')}
+function offerCellAdmin(o,c,providers){const v=o[c.key];if(c.kind==='ref-provider'){const opts=providers.map(p=>`<option value="${p.id}" ${+v===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('');return `<select class="admin-input" data-f="${c.key}"><option value="">—</option>${opts}</select>`}if(c.kind==='bool')return `<input data-f="${c.key}" type="checkbox" ${v!==false?'checked':''}>`;if(c.kind==='money')return `<input class="admin-input" data-f="${c.key}" type="number" step="0.01" value="${+v||0}">`;if(c.kind==='int')return `<input class="admin-input" data-f="${c.key}" type="number" min="0" step="1" value="${+v||0}">`;if(c.kind==='text-long')return `<textarea class="admin-input admin-textarea" data-f="${c.key}">${esc(v||'')}</textarea>`;if(c.key==='Periodicite_Prix')return `<select class="admin-input" data-f="${c.key}"><option ${v==='Mensuel'?'selected':''}>Mensuel</option><option ${v==='Annuel'?'selected':''}>Annuel</option><option ${v==='Devis'?'selected':''}>Devis</option></select>`;return `<input class="admin-input" data-f="${c.key}" value="${esc(v||'')}">`}
+function columnPickerHtml(view){const cols=offerColumnConfig(view);return `<details class="column-picker read-only-exempt"><summary class="btn secondary">Colonnes</summary><div class="column-picker-panel">${cols.map(c=>`<label><input type="checkbox" data-col-view="${view}" data-col-key="${c.key}" ${c.visible?'checked':''}> ${esc(c.label)}</label>`).join('')}<div class="column-picker-actions"><button class="btn small secondary" data-col-all="${view}">Tout afficher</button><button class="btn small secondary" data-col-none="${view}">Tout masquer</button>${ACCESS.role==='OWNER'?`<button class="btn small primary" data-col-save="${view}">Enregistrer la vue</button>`:''}</div></div></details>`}
+function bindColumnPicker(view){document.querySelectorAll(`[data-col-view="${view}"]`).forEach(cb=>cb.onchange=()=>applyColumnVisibilityLocally(view));document.querySelector(`[data-col-all="${view}"]`)?.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=true);applyColumnVisibilityLocally(view)});document.querySelector(`[data-col-none="${view}"]`)?.addEventListener('click',e=>{e.preventDefault();document.querySelectorAll(`[data-col-view="${view}"]`).forEach(x=>x.checked=false);applyColumnVisibilityLocally(view)});document.querySelector(`[data-col-save="${view}"]`)?.addEventListener('click',async e=>{e.preventDefault();await saveOfferColumnView(view)})}
+function applyColumnVisibilityLocally(view){const checked=new Set([...document.querySelectorAll(`[data-col-view="${view}"]:checked`)].map(x=>x.dataset.colKey));const root=document.getElementById(view==='read'?'v-offers':'v-offersadmin');root?.querySelectorAll('[data-col]').forEach(el=>el.style.display=checked.has(el.dataset.col)?'':'none')}
+async function saveOfferColumnView(view){if(ACCESS.role!=='OWNER')return;const state=new Map([...document.querySelectorAll(`[data-col-view="${view}"]`)].map(x=>[x.dataset.colKey,x.checked])),existing=new Map((D[T.offerCols]||[]).map(r=>[r.Cle_Colonne,r])),actions=[];OFFER_COLUMNS.forEach((c,i)=>{const r=existing.get(c.key),fields={Libelle:c.label,Ordre:r?.Ordre??i*10,[view==='read'?'Visible_Lecture':'Visible_Admin']:!!state.get(c.key)};if(r)actions.push(['UpdateRecord',T.offerCols,r.id,fields]);else actions.push(['AddRecord',T.offerCols,null,{Cle_Colonne:c.key,Libelle:c.label,Ordre:i*10,Visible_Lecture:view==='read'?!!state.get(c.key):true,Visible_Admin:view==='admin'?!!state.get(c.key):true}])});try{await apply(actions);toast('Configuration des colonnes enregistrée.');await reload()}catch(e){toast(e.message||String(e),true)}}
+function serviceOfferRowsHtml(edit=false){const view=edit?'admin':'read',cols=offerVisibleColumns(view),providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));return D[T.offers].slice().sort((a,b)=>{const pa=D.providerById[a.Fournisseur]?.Nom||'',pb=D.providerById[b.Fournisseur]?.Nom||'';return pa.localeCompare(pb,'fr')||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr')}).map(o=>edit?offerAdminRow(o,providers,cols):offerReadOnlyRow(o,cols)).join('')}
+function offerReadOnlyRow(o,cols=offerVisibleColumns('read')){return `<tr>${cols.map(c=>`<td data-col="${c.key}">${offerCellRead(o,c)}</td>`).join('')}</tr>`}
+function renderOffersReadOnly(){const el=document.getElementById('v-offers');if(!el)return;const cols=offerVisibleColumns('read');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Offre de service</h3><p>Lecture seule de la table Grist <b>Offres</b>. Même jeu de colonnes que l'écran de paramétrage.</p></div><div>${columnPickerHtml('read')}</div></div><div class="tablewrap service-offers-table"><table><thead><tr>${cols.map(c=>`<th data-col="${c.key}">${esc(c.label)}</th>`).join('')}</tr></thead><tbody>${serviceOfferRowsHtml(false)}</tbody></table></div></article>`;bindColumnPicker('read')}
+function offerAdminRow(o={},providers=[],cols=offerVisibleColumns('admin')){const isNew=!o.id,id=o.id||'';return `<tr data-o="${id}" data-new="${isNew?'1':'0'}">${cols.map(c=>`<td data-col="${c.key}">${offerCellAdmin(o,c,providers)}</td>`).join('')}<td class="row-action"><button class="btn danger small offer-delete">${isNew?'Annuler':'Supprimer'}</button></td></tr>`}
+function renderOffersAdmin(){const el=document.getElementById('v-offersadmin');if(!el)return;const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr')),cols=offerVisibleColumns('admin');el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Paramétrage offre de service</h3><p>Édition de la même table Grist <b>Offres</b> et du même dictionnaire de colonnes que la vue en lecture.</p></div><div class="table-actions">${columnPickerHtml('admin')}<button id="newOffer" class="btn secondary">+ Nouvelle offre</button><button id="saveAllOffers" class="btn primary">Enregistrer les modifications</button></div></div><div class="offer-schema-note"><b>Une seule source de vérité :</b> les deux écrans lisent exactement les mêmes colonnes de <code>Offres</code>. Seul le mode d'affichage change : lecture ou édition.</div><div class="tablewrap service-offers-admin"><table><thead><tr>${cols.map(c=>`<th data-col="${c.key}">${esc(c.label)}</th>`).join('')}<th></th></tr></thead><tbody id="offersAdminBody">${D[T.offers].map(o=>offerAdminRow(o,providers,cols)).join('')}</tbody></table></div></article>`;document.getElementById('newOffer').onclick=()=>{document.getElementById('offersAdminBody').insertAdjacentHTML('beforeend',offerAdminRow({Actif:true,Devise:'USD',Periodicite_Prix:'Mensuel',Overage_Disponible:false,Facturer_Engagement_Minimum:false,Compatible_Devis:false,Compatible_PO:false,Compatible_Facture:false,Compatible_Virement:false,Compatible_Prepaiement:false},providers,cols));bindOfferDeleteButtons()};document.getElementById('saveAllOffers').onclick=saveAllOffersV22;bindOfferDeleteButtons();bindColumnPicker('admin')}
+function bindOfferDeleteButtons(){document.querySelectorAll('#offersAdminBody .offer-delete').forEach(btn=>btn.onclick=async()=>{const tr=btn.closest('tr');if(tr.dataset.new==='1'){tr.remove();return}const id=+tr.dataset.o,offer=D[T.offers].find(o=>+o.id===id);if(!confirm(`Supprimer l'offre "${offer?.Nom||id}" ?\n\nLa suppression échouera si cette offre est encore référencée dans des allocations.`))return;try{await apply([['RemoveRecord',T.offers,id]]);toast('Offre supprimée.');await reload()}catch(e){toast('Suppression impossible : '+(e.message||String(e)),true)}})}
+async function saveAllOffersV22(){const actions=[];let invalid=false;const codes=[];document.querySelectorAll('#offersAdminBody tr').forEach(tr=>{const id=+tr.dataset.o||0,original=id?(D[T.offers].find(o=>+o.id===id)||{}):{},fields={...original};tr.querySelectorAll('[data-f]').forEach(el=>{const k=el.dataset.f;if(el.type==='checkbox')fields[k]=el.checked;else if(el.type==='number')fields[k]=Number(el.value||0);else fields[k]=el.value});delete fields.id;fields.Fournisseur=+fields.Fournisseur||0;fields.Nom=String(fields.Nom||'').trim();fields.Code=String(fields.Code||'').trim();fields.Famille=String(fields.Famille||'').trim();fields.Devise=String(fields.Devise||'USD').trim()||'USD';fields.Statut_Tarif=String(fields.Statut_Tarif||'').trim();fields.Source_Tarif=String(fields.Source_Tarif||'').trim();fields.Note_Procurement=String(fields.Note_Procurement||'').trim();fields.Usage_Inclus_Description=String(fields.Usage_Inclus_Description||'').trim();if(!fields.Fournisseur||!fields.Nom||!fields.Code){invalid=true;if(!fields.Nom)tr.querySelector('[data-f="Nom"]')?.classList.add('input-error');if(!fields.Code)tr.querySelector('[data-f="Code"]')?.classList.add('input-error');if(!fields.Fournisseur)tr.querySelector('[data-f="Fournisseur"]')?.classList.add('input-error');return}codes.push(fields.Code.toLocaleLowerCase());actions.push(id?['UpdateRecord',T.offers,id,fields]:['AddRecord',T.offers,null,fields])});if(invalid){toast('Fournisseur, nom et code sont obligatoires pour chaque offre.',true);return}if(new Set(codes).size!==codes.length){toast('Deux offres utilisent le même code.',true);return}if(!actions.length){toast('Aucune modification à enregistrer.');return}try{await apply(actions);toast('Offre de service enregistrée.');await reload()}catch(e){toast(e.message||String(e),true)}}
 
 function renderDomainsAdmin(){
   const el=document.getElementById('v-domains');

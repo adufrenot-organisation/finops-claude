@@ -74,3 +74,7 @@ Séparation Offre de service en lecture et Paramétrage offre de service en CRUD
 
 ## V21
 Le paramétrage de l'offre de service est strictement adossé aux colonnes persistées de la table Offres ; un script de réconciliation ajoute les champs manquants.
+
+
+## V22
+Même dictionnaire de colonnes Offres pour lecture/admin et visibilité persistée par vue.
