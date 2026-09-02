@@ -466,3 +466,13 @@
 .roi-tier-table th{white-space:nowrap}
 .roi-tier-table .roi-tier{min-width:145px}
 .roi-tier-table .roi-tier input{min-width:120px}
+
+/* V27 — Paramétrage des libellés plus lisible */
+.labels-home{padding-bottom:12px}
+.labels-tabs{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+.labels-tab{border:1px solid var(--line,#dbe3ef);background:#fff;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+.labels-tab.active{background:#eef2ff;border-color:#6d5dfc;color:#4338ca}
+.labels-panel.hidden{display:none}
+.labels-menu-table td:nth-child(3){min-width:360px}
+.labels-admin-table td:nth-child(4){min-width:360px}
+.labels-tabs .badge{margin-left:6px}

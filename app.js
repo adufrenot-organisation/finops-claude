@@ -9,7 +9,7 @@ async function fetchAll(){const names=Object.values(T),raw=await Promise.all(nam
 async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
 function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
 function deriveAccess(){const rr=D[T.rights].filter(r=>r.Actif!==false);if(rr.some(r=>String(r.Role_App).toLowerCase()==="admin")){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:rr};return}if(rr.length){const ids=[];rr.forEach(r=>{const multi=refListIds(r.Domaines_Autorises);if(multi.length)ids.push(...multi);else if(+r.Domaine)ids.push(+r.Domaine)});ACCESS={role:"DOMAIN_USER",domainIds:[...new Set(ids)],rights:rr};return}const visibleDomains=[...new Set(D[T.alloc].map(r=>+r.Domaine).filter(Boolean))];if(D[T.domains].length>1&&visibleDomains.length>1){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:[]};return}ACCESS={role:"DENIED",domainIds:[]}}
-function menuConfigRows(){
+function menuConfigAllRows(){
   const fallback=[
     {Cle:'dashboard',Libelle:'Dashboard',Ordre:10,Actif:true,Owner_Seulement:false},
     {Cle:'simulation',Libelle:'Simulation',Ordre:20,Actif:true,Owner_Seulement:false},
@@ -28,8 +28,10 @@ function menuConfigRows(){
   const source=(D?.[T.menu]||[]).filter(r=>known.has(String(r.Cle||'')));
   const byKey=Object.fromEntries(source.map(r=>[String(r.Cle),r]));
   return fallback.map(f=>({...f,...(byKey[f.Cle]||{})}))
-    .filter(r=>r.Actif!==false)
     .sort((a,b)=>(+a.Ordre||9999)-(+b.Ordre||9999)||String(a.Cle).localeCompare(String(b.Cle)));
+}
+function menuConfigRows(){
+  return menuConfigAllRows().filter(r=>r.Actif!==false);
 }
 function menuLabel(view){
   const r=menuConfigRows().find(x=>x.Cle===view);
@@ -448,7 +450,7 @@ async function saveAllDomainsV17(){
 
 function renderMenuAdmin(){
   const el=document.getElementById('v-menuadmin');if(!el)return;
-  const rows=menuConfigRows();
+  const rows=menuConfigAllRows();
   el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Configuration du menu <span class="badge ok">V14</span></h3><p>Configuration globale stockée dans Grist. Tu peux changer l’ordre, le libellé, l’activation et le niveau d’accès de chaque onglet, puis enregistrer l’ensemble. Cet écran est réservé à l’Owner.</p></div><div class="table-actions"><button id="saveMenuConfig" class="btn primary">Enregistrer les modifications</button><button id="resetMenuConfig" class="btn secondary">Ordre et noms par défaut</button></div></div><div class="tablewrap"><table class="menu-admin-table"><thead><tr><th class="drag-col"></th><th>Item technique</th><th>Libellé affiché</th><th>Actif</th><th>Accès</th></tr></thead><tbody id="menuAdminBody">${rows.map(r=>`<tr draggable="true" data-menu-id="${r.id||''}" data-menu-key="${esc(r.Cle)}"><td class="menu-row-grip" title="Déplacer">⋮⋮</td><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input" data-f="Libelle" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}" maxlength="60"></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><select class="admin-input menu-access-select" data-f="Owner_Seulement"><option value="false" ${!r.Owner_Seulement?'selected':''}>Utilisateurs autorisés</option><option value="true" ${r.Owner_Seulement?'selected':''}>Owner uniquement</option></select></td></tr>`).join('')}</tbody></table></div><div class="menu-admin-note">La visibilité métier reste contrôlée par les droits de l’application et les Access Rules Grist. Désactiver un item ici le masque globalement.</div></article>`;
   initMenuAdminSorting();
   document.getElementById('saveMenuConfig').onclick=saveMenuConfig;
@@ -559,23 +561,79 @@ function collectUILabelCandidates(){
   uiLabelRows().forEach(r=>{const k=`${r.Ecran||'*'}||${r.Libelle_Defaut||''}`;if(!uniq.has(k))uniq.set(k,{Ecran:r.Ecran||'*',Libelle_Defaut:r.Libelle_Defaut||'',Cle:r.Cle||`${r.Ecran}.${slugLabel(r.Libelle_Defaut)}`})});
   return [...uniq.values()].sort((a,b)=>String(a.Ecran).localeCompare(String(b.Ecran),'fr')||String(a.Libelle_Defaut).localeCompare(String(b.Libelle_Defaut),'fr'));
 }
+
+let LABEL_ADMIN_TAB='menu';
 function renderLabelsAdmin(){
   const el=document.getElementById('v-labelsadmin');if(!el)return;
   const rows=uiLabelRows(),byPair=new Map(rows.map(r=>[`${r.Ecran||'*'}||${r.Libelle_Defaut||''}`,r]));
   const candidates=collectUILabelCandidates();
-  const menuRows=menuConfigRows();
+  const menuRows=menuConfigAllRows();
   const colRows=offerColumnConfig('read');
+  const screens=[...new Set(candidates.map(c=>c.Ecran))].sort((a,b)=>String(a).localeCompare(String(b),'fr'));
+  const screenOptions=['<option value="">Tous les écrans</option>',...screens.map(s=>`<option value="${esc(s)}">${esc(s==='global'?'Global':menuLabel(s)||s)}</option>`)].join('');
+
   el.innerHTML=`
-  <article class="card"><div class="cardhead"><div><h3>Paramétrage des libellés</h3><p>Personnalise et persiste les textes visibles de toute l'application. Les libellés sont resynchronisés après chaque rerendu partiel, notamment sur le Dashboard.</p></div><div class="table-actions"><input id="labelSearch" class="admin-input" placeholder="Rechercher un écran ou un libellé"><button id="saveUILabels" class="btn primary">Enregistrer les textes</button></div></div>
-    <div class="tablewrap labels-admin-wrap"><table class="labels-admin-table"><thead><tr><th>Écran</th><th>Clé</th><th>Libellé par défaut</th><th>Libellé affiché</th><th>Actif</th></tr></thead><tbody id="uiLabelsBody">${candidates.map(c=>{const r=byPair.get(`${c.Ecran}||${c.Libelle_Defaut}`);return `<tr data-label-id="${r?.id||''}" data-screen="${esc(c.Ecran)}" data-default="${esc(c.Libelle_Defaut)}"><td><code>${esc(c.Ecran)}</code></td><td><code>${esc(r?.Cle||c.Cle)}</code></td><td>${esc(c.Libelle_Defaut)}</td><td><input class="admin-input wide" data-f="Libelle" value="${esc(r?.Libelle||c.Libelle_Defaut)}"></td><td><input type="checkbox" data-f="Actif" ${r?.Actif===false?'':'checked'}></td></tr>`}).join('')}</tbody></table></div>
+  <article class="card labels-home">
+    <div class="cardhead"><div><h3>Paramétrage des libellés</h3>
+      <p>Choisis d'abord ce que tu veux renommer. Les noms des menus, les textes des écrans et les colonnes sont séparés pour éviter les doublons et rendre le paramétrage plus lisible.</p>
+    </div></div>
+    <div class="labels-tabs read-only-exempt">
+      <button class="labels-tab ${LABEL_ADMIN_TAB==='menu'?'active':''}" data-label-tab="menu">Menus <span class="badge">${menuRows.length}</span></button>
+      <button class="labels-tab ${LABEL_ADMIN_TAB==='screens'?'active':''}" data-label-tab="screens">Textes des écrans <span class="badge">${candidates.length}</span></button>
+      <button class="labels-tab ${LABEL_ADMIN_TAB==='offers'?'active':''}" data-label-tab="offers">Colonnes offre <span class="badge">${colRows.length}</span></button>
+    </div>
   </article>
-  <article class="card"><div class="cardhead"><div><h3>Libellés du menu</h3><p>Les noms des onglets restent stockés dans Configuration_Menu et sont éditables ici également.</p></div><button id="saveMenuLabelsFromLabels" class="btn primary">Enregistrer le menu</button></div><div class="tablewrap"><table><thead><tr><th>Clé</th><th>Libellé</th></tr></thead><tbody>${menuRows.map(r=>`<tr data-menu-label-id="${r.id||''}" data-menu-label-key="${esc(r.Cle)}"><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input wide" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}"></td></tr>`).join('')}</tbody></table></div></article>
-  <article class="card"><div class="cardhead"><div><h3>Colonnes Offre de service</h3><p>Ces libellés sont communs aux vues lecture et paramétrage et restent stockés dans Configuration_Colonnes_Offres.</p></div><button id="saveOfferColLabels" class="btn primary">Enregistrer les colonnes</button></div><div class="tablewrap"><table><thead><tr><th>Clé colonne</th><th>Libellé</th></tr></thead><tbody>${colRows.map(c=>`<tr data-offer-col-key="${esc(c.key)}"><td><code>${esc(c.key)}</code></td><td><input class="admin-input wide" value="${esc(c.label)}"></td></tr>`).join('')}</tbody></table></div></article>`;
-  document.getElementById('saveUILabels').onclick=saveUILabelsV23;
-  document.getElementById('saveMenuLabelsFromLabels').onclick=saveMenuLabelsV23;
-  document.getElementById('saveOfferColLabels').onclick=saveOfferColumnLabelsV23;
-  document.getElementById('labelSearch').oninput=e=>{const q=String(e.target.value||'').toLowerCase();document.querySelectorAll('#uiLabelsBody tr').forEach(tr=>tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none')};
+
+  <article class="card labels-panel ${LABEL_ADMIN_TAB==='menu'?'':'hidden'}" data-label-panel="menu">
+    <div class="cardhead"><div><h3>Libellés des menus</h3>
+      <p>Tous les onglets sont affichés ici, y compris ceux qui sont désactivés. Le libellé enregistré est utilisé dans la barre latérale et comme titre de l'écran.</p>
+    </div><button id="saveMenuLabelsFromLabels" class="btn primary">Enregistrer les menus</button></div>
+    <div class="tablewrap"><table class="labels-menu-table"><thead><tr><th>Ordre</th><th>Clé technique</th><th>Libellé affiché</th><th>État</th><th>Accès</th></tr></thead>
+    <tbody>${menuRows.map(r=>`<tr data-menu-label-id="${r.id||''}" data-menu-label-key="${esc(r.Cle)}">
+      <td class="num">${+r.Ordre||0}</td>
+      <td><code>${esc(r.Cle)}</code></td>
+      <td><input class="admin-input wide" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}"></td>
+      <td>${r.Actif===false?'<span class="badge warn">Masqué</span>':'<span class="badge ok">Visible</span>'}</td>
+      <td>${r.Owner_Seulement?'<span class="badge">Owner</span>':'<span class="badge ok">Utilisateurs autorisés</span>'}</td>
+    </tr>`).join('')}</tbody></table></div>
+    <div class="menu-admin-note">Pour modifier l'ordre, activer/masquer un onglet ou changer son niveau d'accès, utilise « Configuration du menu ». Ici, on ne modifie que les libellés.</div>
+  </article>
+
+  <article class="card labels-panel ${LABEL_ADMIN_TAB==='screens'?'':'hidden'}" data-label-panel="screens">
+    <div class="cardhead"><div><h3>Textes des écrans</h3>
+      <p>Titres, boutons, KPI, filtres, en-têtes et textes d'aide détectés dans les écrans du widget.</p>
+    </div><div class="table-actions"><select id="labelScreenFilter" class="admin-input">${screenOptions}</select><input id="labelSearch" class="admin-input" placeholder="Rechercher un libellé"><button id="saveUILabels" class="btn primary">Enregistrer les textes</button></div></div>
+    <div class="tablewrap labels-admin-wrap"><table class="labels-admin-table"><thead><tr><th>Écran</th><th>Clé</th><th>Valeur par défaut</th><th>Libellé affiché</th><th>Actif</th></tr></thead>
+    <tbody id="uiLabelsBody">${candidates.map(c=>{const r=byPair.get(`${c.Ecran}||${c.Libelle_Defaut}`);return `<tr data-label-id="${r?.id||''}" data-screen="${esc(c.Ecran)}" data-default="${esc(c.Libelle_Defaut)}"><td><code>${esc(c.Ecran)}</code></td><td><code>${esc(r?.Cle||c.Cle)}</code></td><td>${esc(c.Libelle_Defaut)}</td><td><input class="admin-input wide" data-f="Libelle" value="${esc(r?.Libelle||c.Libelle_Defaut)}"></td><td><input type="checkbox" data-f="Actif" ${r?.Actif===false?'':'checked'}></td></tr>`}).join('')}</tbody></table></div>
+  </article>
+
+  <article class="card labels-panel ${LABEL_ADMIN_TAB==='offers'?'':'hidden'}" data-label-panel="offers">
+    <div class="cardhead"><div><h3>Colonnes Offre de service</h3><p>Libellés communs à la vue lecture et à la vue de paramétrage.</p></div><button id="saveOfferColLabels" class="btn primary">Enregistrer les colonnes</button></div>
+    <div class="tablewrap"><table><thead><tr><th>Clé colonne</th><th>Libellé affiché</th></tr></thead><tbody>${colRows.map(c=>`<tr data-offer-col-key="${esc(c.key)}"><td><code>${esc(c.key)}</code></td><td><input class="admin-input wide" value="${esc(c.label)}"></td></tr>`).join('')}</tbody></table></div>
+  </article>`;
+
+  el.querySelectorAll('[data-label-tab]').forEach(b=>b.onclick=()=>{
+    LABEL_ADMIN_TAB=b.dataset.labelTab;
+    renderLabelsAdmin();
+  });
+
+  document.getElementById('saveUILabels')?.addEventListener('click',saveUILabelsV23);
+  document.getElementById('saveMenuLabelsFromLabels')?.addEventListener('click',saveMenuLabelsV27);
+  document.getElementById('saveOfferColLabels')?.addEventListener('click',saveOfferColumnLabelsV23);
+
+  const applyFilter=()=>{
+    const q=String(document.getElementById('labelSearch')?.value||'').toLowerCase();
+    const screen=String(document.getElementById('labelScreenFilter')?.value||'');
+    document.querySelectorAll('#uiLabelsBody tr').forEach(tr=>{
+      const okText=!q||tr.textContent.toLowerCase().includes(q);
+      const okScreen=!screen||tr.dataset.screen===screen;
+      tr.style.display=okText&&okScreen?'':'none';
+    });
+  };
+  document.getElementById('labelSearch')?.addEventListener('input',applyFilter);
+  document.getElementById('labelScreenFilter')?.addEventListener('change',applyFilter);
 }
+
 async function saveUILabelsV23(){
   if(ACCESS.role!=='OWNER'){toast('Action réservée à l’Owner.',true);return}
   const actions=[];
@@ -586,9 +644,29 @@ async function saveUILabelsV23(){
   });
   try{await apply(actions);toast('Libellés des écrans enregistrés.');await boot()}catch(e){toast(e.message||String(e),true)}
 }
+
+async function saveMenuLabelsV27(){
+  if(ACCESS.role!=='OWNER'){toast('Action réservée à l’Owner.',true);return}
+  const current=Object.fromEntries(menuConfigAllRows().map(r=>[r.Cle,r])),actions=[];
+  document.querySelectorAll('[data-menu-label-key]').forEach(tr=>{
+    const key=tr.dataset.menuLabelKey,old=current[key]||{};
+    const id=+tr.dataset.menuLabelId||+old.id||0;
+    const lib=tr.querySelector('input')?.value.trim()||DEFAULT_MENU_LABELS[key]||key;
+    const fields={Cle:key,Libelle:lib,Ordre:+old.Ordre||999,Actif:old.Actif!==false,Owner_Seulement:!!old.Owner_Seulement};
+    actions.push(id?["UpdateRecord",T.menu,id,fields]:["AddRecord",T.menu,null,fields]);
+  });
+  try{
+    await apply(actions);
+    await boot();
+    LABEL_ADMIN_TAB='menu';
+    switchView('labelsadmin');
+    toast('Tous les libellés de menu ont été enregistrés.');
+  }catch(e){toast(e.message||String(e),true)}
+}
+
 async function saveMenuLabelsV23(){
   const actions=[];
-  document.querySelectorAll('[data-menu-label-key]').forEach(tr=>{const id=+tr.dataset.menuLabelId||0,key=tr.dataset.menuLabelKey,old=menuConfigRows().find(r=>r.Cle===key)||{},lib=tr.querySelector('input')?.value.trim()||DEFAULT_MENU_LABELS[key]||key;const fields={Cle:key,Libelle:lib,Ordre:old.Ordre||999,Actif:old.Actif!==false,Owner_Seulement:!!old.Owner_Seulement};actions.push(id?["UpdateRecord",T.menu,id,fields]:["AddRecord",T.menu,null,fields])});
+  document.querySelectorAll('[data-menu-label-key]').forEach(tr=>{const id=+tr.dataset.menuLabelId||0,key=tr.dataset.menuLabelKey,old=menuConfigAllRows().find(r=>r.Cle===key)||{},lib=tr.querySelector('input')?.value.trim()||DEFAULT_MENU_LABELS[key]||key;const fields={Cle:key,Libelle:lib,Ordre:old.Ordre||999,Actif:old.Actif!==false,Owner_Seulement:!!old.Owner_Seulement};actions.push(id?["UpdateRecord",T.menu,id,fields]:["AddRecord",T.menu,null,fields])});
   try{await apply(actions);toast('Libellés du menu enregistrés.');await boot()}catch(e){toast(e.message||String(e),true)}
 }
 async function saveOfferColumnLabelsV23(){
