@@ -626,7 +626,10 @@ function scenarioDetailRows(m){
 
 function scenarioDomainGroups(m){
   const groups={};
+  // V39 : le détail et l'impression ne montrent que les allocations qui
+  // contribuent réellement au budget connu (coût fixe ou variable non nul).
   for(const r of scenarioDetailRows(m)){
+    if(Math.abs(r.fixed)<0.000001 && Math.abs(r.variable)<0.000001 && Math.abs(r.total)<0.000001)continue;
     (groups[r.domain]??=[]).push(r);
   }
   return Object.entries(groups).map(([domain,rows])=>({
@@ -635,7 +638,7 @@ function scenarioDomainGroups(m){
     fixed:rows.reduce((s,r)=>s+r.fixed,0),
     variable:rows.reduce((s,r)=>s+r.variable,0),
     total:rows.reduce((s,r)=>s+r.total,0)
-  }));
+  })).filter(g=>Math.abs(g.fixed)>0.000001||Math.abs(g.variable)>0.000001||Math.abs(g.total)>0.000001);
 }
 function renderCompare(){
   const el=document.getElementById('v-compare');
