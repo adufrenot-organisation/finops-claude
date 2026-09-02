@@ -106,7 +106,7 @@ const DEFAULT_MENU_LABELS={
 };
 
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
-function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['presim','offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v)?'none':''}
+function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['presim','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v)?'none':''}
 function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))}
 function scopedAlloc(sid){
   const scenarioId=+sid||+selectedScenario()?.id||0;
@@ -595,7 +595,7 @@ async function savePreResourcesV28(){
   }catch(e){toast(e.message||String(e),true)}
 }
 
-let SCENARIO_FILTER={q:'',year:'',status:''};
+let SCENARIO_FILTER={q:'',scenarioId:'',year:'',status:''};
 let NEW_SCENARIOS=[];
 function scenarioDefaults(){
   const now=new Date();
@@ -624,9 +624,10 @@ function renderScenarios(){
   const filtered=allExisting.filter(s=>{
     const text=[s.Nom,s.Annee,s.Statut,s.Commentaire].map(v=>String(v||'').toLowerCase()).join(' ');
     const okQ=!q || text.includes(q);
+    const okScenario=!SCENARIO_FILTER.scenarioId || String(s.id)===String(SCENARIO_FILTER.scenarioId);
     const okYear=!SCENARIO_FILTER.year || String(s.Annee||'')===String(SCENARIO_FILTER.year);
     const okStatus=!SCENARIO_FILTER.status || String(s.Statut||'')===String(SCENARIO_FILTER.status);
-    return okQ && okYear && okStatus;
+    return okQ && okScenario && okYear && okStatus;
   });
 
   const rows=[...filtered,...NEW_SCENARIOS];
@@ -649,6 +650,14 @@ function renderScenarios(){
         <input id="scenarioSearch" class="admin-input" type="search"
           placeholder="Nom, année, statut, commentaire…"
           value="${esc(SCENARIO_FILTER.q||'')}">
+      </label>
+
+      <label>
+        <span>Scénario</span>
+        <select id="scenarioIdFilter" class="admin-input">
+          <option value="">Tous les scénarios</option>
+          ${allExisting.map(s=>`<option value="${s.id}" ${String(SCENARIO_FILTER.scenarioId)===String(s.id)?'selected':''}>${esc(s.Nom||'Sans nom')}</option>`).join('')}
+        </select>
       </label>
 
       <label>
@@ -698,6 +707,7 @@ function renderScenarios(){
   const updateFilters=()=>{
     SCENARIO_FILTER={
       q:document.getElementById('scenarioSearch')?.value||'',
+      scenarioId:document.getElementById('scenarioIdFilter')?.value||'',
       year:document.getElementById('scenarioYearFilter')?.value||'',
       status:document.getElementById('scenarioStatusFilter')?.value||''
     };
@@ -711,10 +721,11 @@ function renderScenarios(){
     search?.focus();
     if(search) search.setSelectionRange(search.value.length,search.value.length);
   });
+  document.getElementById('scenarioIdFilter')?.addEventListener('change',updateFilters);
   document.getElementById('scenarioYearFilter')?.addEventListener('change',updateFilters);
   document.getElementById('scenarioStatusFilter')?.addEventListener('change',updateFilters);
   document.getElementById('resetScenarioFilters')?.addEventListener('click',()=>{
-    SCENARIO_FILTER={q:'',year:'',status:''};
+    SCENARIO_FILTER={q:'',scenarioId:'',year:'',status:''};
     renderScenarios();
   });
 

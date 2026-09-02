@@ -498,7 +498,7 @@
 /* V30 — Recherche et filtres Scénarios */
 .scenario-filters{
   display:grid;
-  grid-template-columns:minmax(260px,2fr) minmax(150px,1fr) minmax(170px,1fr) auto;
+  grid-template-columns:minmax(230px,1.6fr) minmax(210px,1.4fr) minmax(135px,.8fr) minmax(160px,1fr) auto;
   gap:12px;
   align-items:end;
   margin:14px 0 18px;
