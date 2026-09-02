@@ -8,7 +8,82 @@ function toast(m,e=false){const x=document.getElementById("toast");if(!x)return;
 async function fetchAll(){const names=Object.values(T),raw=await Promise.all(names.map(n=>grist.docApi.fetchTable(n).catch(()=>({id:[]}))));const o={};names.forEach((n,i)=>o[n]=rows(raw[i]));o.domainById=Object.fromEntries(o[T.domains].map(r=>[r.id,r]));o.scenarioById=Object.fromEntries(o[T.scenarios].map(r=>[r.id,r]));o.providerById=Object.fromEntries(o[T.providers].map(r=>[r.id,r]));o.offerById=Object.fromEntries(o[T.offers].map(r=>[r.id,r]));return o}
 async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
 function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
-function deriveAccess(){const rr=D[T.rights].filter(r=>r.Actif!==false);if(rr.some(r=>String(r.Role_App).toLowerCase()==="admin")){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:rr};return}if(rr.length){const ids=[];rr.forEach(r=>{const multi=refListIds(r.Domaines_Autorises);if(multi.length)ids.push(...multi);else if(+r.Domaine)ids.push(+r.Domaine)});ACCESS={role:"DOMAIN_USER",domainIds:[...new Set(ids)],rights:rr};return}const visibleDomains=[...new Set(D[T.alloc].map(r=>+r.Domaine).filter(Boolean))];if(D[T.domains].length>1&&visibleDomains.length>1){ACCESS={role:"OWNER",domainIds:D[T.domains].map(d=>+d.id),rights:[]};return}ACCESS={role:"DENIED",domainIds:[]}}
+
+const APP_ROLES={
+  LECTEUR:'LECTEUR',
+  CONTRIBUTEUR:'CONTRIBUTEUR',
+  OBSERVATEUR:'OBSERVATEUR',
+  ADMINISTRATEUR:'ADMINISTRATEUR',
+  CONTRIBUTEUR_AVANCE:'CONTRIBUTEUR_AVANCE',
+  OWNER:'OWNER',
+  DENIED:'DENIED'
+};
+const ROLE_LABELS={
+  OWNER:'Owner Grist',
+  LECTEUR:'Lecteur',
+  CONTRIBUTEUR:'Contributeur',
+  OBSERVATEUR:'Observateur',
+  ADMINISTRATEUR:'Administrateur',
+  CONTRIBUTEUR_AVANCE:'Contributeur avancé',
+  DENIED:'Accès refusé'
+};
+function normalizeAppRole(v){
+  const x=String(v||'').trim().toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[\s-]+/g,'_');
+  if(x==='lecteur')return APP_ROLES.LECTEUR;
+  if(x==='contributeur'||x==='domaine')return APP_ROLES.CONTRIBUTEUR;
+  if(x==='observateur')return APP_ROLES.OBSERVATEUR;
+  if(x==='administrateur'||x==='admin')return APP_ROLES.ADMINISTRATEUR;
+  if(x==='contributeur_avance'||x==='contributeur_avancee')return APP_ROLES.CONTRIBUTEUR_AVANCE;
+  return APP_ROLES.LECTEUR;
+}
+function roleLabel(role=ACCESS.role){return ROLE_LABELS[role]||role}
+function roleSeesAdvancedMenus(role=ACCESS.role){
+  return [APP_ROLES.OWNER,APP_ROLES.OBSERVATEUR,APP_ROLES.ADMINISTRATEUR,APP_ROLES.CONTRIBUTEUR_AVANCE].includes(role);
+}
+function roleCanEditUserMenus(role=ACCESS.role){
+  return [APP_ROLES.OWNER,APP_ROLES.CONTRIBUTEUR,APP_ROLES.ADMINISTRATEUR,APP_ROLES.CONTRIBUTEUR_AVANCE].includes(role);
+}
+function roleCanEditAdvancedMenus(role=ACCESS.role){
+  return [APP_ROLES.OWNER,APP_ROLES.ADMINISTRATEUR].includes(role);
+}
+function currentRightRow(){
+  if(ACCESS.role===APP_ROLES.OWNER)return null;
+  return ACCESS.rights?.[0]||null;
+}
+function currentUserLabel(){
+  if(ACCESS.role===APP_ROLES.OWNER)return 'Owner Grist';
+  return currentRightRow()?.Email||'Utilisateur autorisé';
+}
+function deriveAccess(){
+  const rr=(D[T.rights]||[]).filter(r=>r.Actif!==false);
+
+  // Avec les ACL FinOps, un utilisateur normal ne voit que sa propre ligne.
+  // L'Owner Grist contourne les ACL et voit généralement plusieurs utilisateurs.
+  const distinctEmails=new Set(rr.map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean));
+  if(distinctEmails.size>1){
+    ACCESS={role:APP_ROLES.OWNER,domainIds:(D[T.domains]||[]).map(d=>+d.id),rights:rr,isOwner:true};
+    return;
+  }
+
+  if(rr.length){
+    const row=rr[0];
+    const multi=refListIds(row.Domaines_Autorises);
+    const ids=multi.length?multi:(+row.Domaine?[+row.Domaine]:[]);
+    ACCESS={
+      role:normalizeAppRole(row.Role_App),
+      domainIds:[...new Set(ids.map(Number).filter(Boolean))],
+      rights:[row],
+      isOwner:false
+    };
+    return;
+  }
+
+  // Aucun enregistrement Droits_Utilisateurs visible = aucun accès applicatif.
+  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false};
+}
+
 function menuConfigAllRows(){
   const fallback=[
     {Cle:'dashboard',Libelle:'Dashboard',Ordre:10,Actif:true,Owner_Seulement:false},
@@ -41,50 +116,102 @@ function menuLabel(view){
 function navIcon(view){
   return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',presim:'♙',scenarios:'▤',offers:'¤',offersadmin:'⚙',domains:'◎',rights:'♙',menuadmin:'☷',labelsadmin:'✎',acladmin:'🔐'}[view]||'•';
 }
-function buildNavHtml(admin){
+
+function buildNavHtml(){
+  const advanced=roleSeesAdvancedMenus();
   return menuConfigRows()
-    .filter(r=>admin || !r.Owner_Seulement)
+    .filter(r=>advanced || !r.Owner_Seulement)
     .map((r,i)=>`<button class="${i===0?'active':''}" data-view="${esc(r.Cle)}"><span class="nav-icon">${navIcon(r.Cle)}</span><span class="nav-label">${esc(r.Libelle||r.Cle)}</span></button>`)
     .join('');
 }
+
+
 function renderShell(){
-  if(ACCESS.role==="DENIED"){
-    document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">🔒</div><h1>Accès non autorisé</h1><p>Vous ne disposez pas des droits nécessaires pour accéder à ce module.</p><div class="deniednote">Si vous pensez devoir disposer de cet accès, veuillez contacter l’administrateur de la solution afin qu’il vérifie votre rattachement à un domaine.</div></div></div>`;
+  if(ACCESS.role===APP_ROLES.DENIED){
+    document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">🔒</div><h1>Accès non autorisé</h1><p>Votre compte n’est pas inscrit comme utilisateur actif dans la table <b>Droits_Utilisateurs</b>.</p><div class="deniednote">Aucun menu FinOps n’est disponible. Demandez à un administrateur de vous ajouter dans la gestion des droits.</div></div></div>`;
     return;
   }
-  const admin=ACCESS.role==="OWNER";
-  const navHtml=buildNavHtml(admin);
-  document.getElementById("root").innerHTML=`<div class="shell"><aside class="sidebar"><div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><nav class="nav">${navHtml}</nav><div class="sidefoot"><b>${admin?'Owner / Admin':'Utilisateur domaine'}</b><br><span id="sideScope"></span></div></aside><main class="content"><header class="head"><div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div><div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div></header><div id="status" class="status">Données synchronisées avec Grist.</div><section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-presim" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${admin?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-acladmin" class="view"></section>':''}</main></div><div id="toast" class="toast"></div>`;
+
+  const advanced=roleSeesAdvancedMenus();
+  const navHtml=buildNavHtml();
+  const advancedSections=advanced?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-acladmin" class="view"></section>':'';
+
+  document.getElementById("root").innerHTML=`<div class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div>
+      <nav class="nav">${navHtml}</nav>
+      <div class="sidefoot"><b>${esc(roleLabel())}</b><br><span id="sideScope"></span></div>
+    </aside>
+    <main class="content">
+      <header class="head">
+        <div><h1 id="title">${esc(menuLabel('dashboard'))}</h1><div class="sub">Claude · Mistral · Cursor</div><div id="scope" class="scope"></div></div>
+        <div class="head-right">
+          <div class="session-strip" aria-label="Session FinOps">
+            <div class="session-dot" title="Session widget active"></div>
+            <div class="session-ident"><span class="session-label">Connecté</span><b id="sessionUser">${esc(currentUserLabel())}</b></div>
+            <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}</b></div>
+            <div class="session-ident"><span class="session-label">Page</span><b id="sessionPage">${esc(menuLabel('dashboard'))}</b></div>
+          </div>
+          <div class="controls"><label class="field">Scénario<select id="scenarioSelect"></select></label><button id="refresh" class="btn secondary">Actualiser</button></div>
+        </div>
+      </header>
+      <div id="status" class="status">Données synchronisées avec Grist.</div>
+      <section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-presim" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${advancedSections}
+    </main>
+  </div><div id="toast" class="toast"></div>`;
+
   document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
   document.getElementById('refresh').onclick=boot;
   document.getElementById('scenarioSelect').onchange=()=>{
     CURRENT=model(+selectedScenario()?.id||0);
     renderAll();
   };
+
   const toggle=document.getElementById('sidebarToggle');
-  const initial=localStorage.getItem('finopsSidebarCollapsed')==='1';
-  setSidebarCollapsed(initial);
   toggle.onclick=()=>setSidebarCollapsed(!document.querySelector('.shell').classList.contains('sidebar-collapsed'));
+  let collapsed=false;try{collapsed=localStorage.getItem('finopsSidebarCollapsed')==='1'}catch(_){}
+  setSidebarCollapsed(collapsed);
 }
 
-const AUTHORIZED_CAN_EDIT_SCENARIOS=true;
-function isOwner(){return ACCESS.role==='OWNER'}
-function canEditView(view){return isOwner() || (AUTHORIZED_CAN_EDIT_SCENARIOS && view==='scenarios') || view==='presim'}
-function enforceReadOnlyForNonOwner(){
+
+function isOwner(){return ACCESS.role===APP_ROLES.OWNER}
+function isUserMenu(view){
+  const row=menuConfigAllRows().find(r=>r.Cle===view);
+  return !row?.Owner_Seulement;
+}
+function canEditView(view){
+  if(isOwner())return true;
+  return isUserMenu(view)?roleCanEditUserMenus():roleCanEditAdvancedMenus();
+}
+function readOnlyMessage(){
+  if(ACCESS.role===APP_ROLES.LECTEUR)return 'Mode lecture seule : votre rôle Lecteur ne permet aucune modification.';
+  if(ACCESS.role===APP_ROLES.OBSERVATEUR)return 'Mode observation : tous les menus sont visibles, mais aucune modification n’est autorisée.';
+  if(ACCESS.role===APP_ROLES.CONTRIBUTEUR_AVANCE)return 'Mode lecture seule sur cet onglet : le rôle Contributeur avancé ne peut modifier que les onglets autorisés aux utilisateurs.';
+  return 'Vous ne disposez pas des droits de modification sur cet onglet.';
+}
+function enforceRolePermissions(){
   if(isOwner())return;
   document.querySelectorAll('.view').forEach(view=>{
     const key=(view.id||'').replace(/^v-/,'');
-    if(key==='scenarios'||key==='presim')return;
+    const editable=canEditView(key);
+
+    view.querySelector('.role-readonly-banner')?.remove();
+    if(!editable){
+      const banner=document.createElement('div');
+      banner.className='role-readonly-banner';
+      banner.textContent=readOnlyMessage();
+      view.prepend(banner);
+    }
+
     view.querySelectorAll('input,select,textarea,button').forEach(el=>{
-      // Keep harmless navigation/refresh controls outside views untouched.
       if(el.closest('.read-only-exempt'))return;
-      if(el.matches('button')){
-        // Hide action buttons in non-scenario business screens for non-owner users.
-        if(!el.classList.contains('linklike')) el.style.display='none';
-      }else{
-        el.disabled=true;
-        el.classList.add('readonly-control');
-      }
+      if(editable)return;
+
+      // Tous les contrôles de modification restent visibles mais sont désactivés.
+      // Le bandeau de l'onglet explique systématiquement pourquoi.
+      el.disabled=true;
+      el.classList.add('readonly-control');
+      if(el.matches('button'))el.title=readOnlyMessage();
     });
   });
 }
@@ -106,7 +233,20 @@ const DEFAULT_MENU_LABELS={
 };
 
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
-function switchView(v){document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById('v-'+v)?.classList.add('active');document.getElementById('title').textContent=menuLabel(v);const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');if(scenarioField)scenarioField.style.display=['presim','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v)?'none':''}
+function switchView(v){
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
+  document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
+  document.getElementById('v-'+v)?.classList.add('active');
+  const label=menuLabel(v);
+  document.getElementById('title').textContent=label;
+  const page=document.getElementById('sessionPage');if(page)page.textContent=label;
+  const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');
+  const refresh=document.getElementById('refresh');
+  const hideTop=['presim','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v);
+  if(scenarioField)scenarioField.style.display=hideTop?'none':'';
+  if(refresh)refresh.style.display=hideTop?'none':'';
+  enforceRolePermissions();
+}
 function scopedDomains(){return D[T.domains].filter(d=>d.Actif!==false&&ACCESS.domainIds.includes(+d.id))}
 function scopedAlloc(sid){
   const scenarioId=+sid||+selectedScenario()?.id||0;
@@ -166,7 +306,16 @@ for(const d of Object.values(bd)){d.budgetAnnualized=d.eur*12/months;d.baselineP
 const savingPct=baselineAnnual?savingAnnual/baselineAnnual:0;
 return{s,alloc,baseline,baselineDetails,bd,bo,bp,fixed,included,over,total,licenses,unresolved,rate,months,baselineAnnual,budgetPeriodEUR,budgetAnnualizedEUR,baselinePeriod,savingPeriod,savingAnnual,savingPct}
 }
-function renderAll(){CURRENT=model(selectedScenario()?.id);const names=scopedDomains().map(d=>d.Nom).join(', ');document.getElementById('scope').textContent=ACCESS.role==='OWNER'?'Périmètre : tous les domaines':`Périmètre : ${names}`;document.getElementById('sideScope').textContent=ACCESS.role==='OWNER'?'Tous les domaines':names;renderDashboard();renderSimulation();renderCompare();renderROI();renderPreSimulation();renderScenarios();renderOffersReadOnly();if(ACCESS.role==='OWNER'){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAclAdmin()}applyUILabels();enforceReadOnlyForNonOwner()}
+function renderAll(){
+  CURRENT=model(selectedScenario()?.id);
+  const names=scopedDomains().map(d=>d.Nom).join(', ');
+  document.getElementById('scope').textContent=isOwner()?'Périmètre : tous les domaines':`Périmètre : ${names||'aucun domaine'}`;
+  document.getElementById('sideScope').textContent=isOwner()?'Tous les domaines':(names||'Aucun domaine');
+  renderDashboard();renderSimulation();renderCompare();renderROI();renderPreSimulation();renderScenarios();renderOffersReadOnly();
+  if(roleSeesAdvancedMenus()){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAclAdmin()}
+  applyUILabels();
+  enforceRolePermissions();
+}
 function dashboardFilterOptions(){
   const domains=scopedDomains().sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
   const providers=D[T.providers].filter(p=>p.Actif!==false).sort((a,b)=>String(a.Nom).localeCompare(String(b.Nom),'fr'));
@@ -871,7 +1020,7 @@ function initMenuAdminSorting(){
   });
 }
 async function saveMenuConfig(){
-  if(ACCESS.role!=='OWNER'){toast("Action réservée à l’Owner.",true);return}
+  if(!roleCanEditAdvancedMenus()){toast("Action réservée à l’Owner.",true);return}
   const actions=[];
   [...document.querySelectorAll('#menuAdminBody tr[data-menu-key]')].forEach((tr,index)=>{
     const id=+tr.dataset.menuId||0;
@@ -1038,7 +1187,7 @@ function renderLabelsAdmin(){
 }
 
 async function saveUILabelsV23(){
-  if(ACCESS.role!=='OWNER'){toast('Action réservée à l’Owner.',true);return}
+  if(!roleCanEditAdvancedMenus()){toast('Action réservée à l’Owner.',true);return}
   const actions=[];
   document.querySelectorAll('#uiLabelsBody tr').forEach((tr,i)=>{
     const id=+tr.dataset.labelId||0,screen=tr.dataset.screen||'*',def=tr.dataset.default||'',lib=tr.querySelector('[data-f="Libelle"]')?.value.trim()||def,active=!!tr.querySelector('[data-f="Actif"]')?.checked;
@@ -1049,7 +1198,7 @@ async function saveUILabelsV23(){
 }
 
 async function saveMenuLabelsV27(){
-  if(ACCESS.role!=='OWNER'){toast('Action réservée à l’Owner.',true);return}
+  if(!roleCanEditAdvancedMenus()){toast('Action réservée à l’Owner.',true);return}
   const current=Object.fromEntries(menuConfigAllRows().map(r=>[r.Cle,r])),actions=[];
   document.querySelectorAll('[data-menu-label-key]').forEach(tr=>{
     const key=tr.dataset.menuLabelKey,old=current[key]||{};
@@ -1080,20 +1229,21 @@ async function saveOfferColumnLabelsV23(){
 
 const FINOPS_ACL_TAG="FINOPS_V16";
 const FINOPS_ACL_RESOURCES=[
-  {tableId:"Scenarios",colIds:"*",kind:"global",perm:"+CRU"},
-  {tableId:"Configuration_Menu",colIds:"*",kind:"global",perm:"+R"},
-  {tableId:"Configuration_Libelles_UI",colIds:"*",kind:"global",perm:"+R"},
-  {tableId:"Fournisseurs",colIds:"*",kind:"global",perm:"+R"},
-  {tableId:"Offres",colIds:"*",kind:"global",perm:"+R"},
-  {tableId:"Allocations",colIds:"*",kind:"domain",perm:"+R"},
-  {tableId:"Baseline_N_1",colIds:"*",kind:"domain",perm:"+R"},
-  {tableId:"Baseline_N_1_Details",colIds:"*",kind:"domain",perm:"+R"},
-  {tableId:"Pre_Simulations",colIds:"*",kind:"domain",perm:"+CRUD"},
-  {tableId:"Pre_Simulation_Ressources",colIds:"*",kind:"presimdomain",perm:"+CRUD"},
-  {tableId:"Enterprise",colIds:"*",kind:"domain",perm:"+R"},
-  {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",perm:"+R"},
-  {tableId:"Domaines",colIds:"*",kind:"domains",perm:"+R"},
-  {tableId:"Droits_Utilisateurs",colIds:"*",kind:"self",perm:"+R"},
+  {tableId:"Scenarios",colIds:"*",kind:"scenario",mode:"userEdit"},
+  {tableId:"Configuration_Menu",colIds:"*",kind:"global",mode:"config"},
+  {tableId:"Configuration_Libelles_UI",colIds:"*",kind:"global",mode:"config"},
+  {tableId:"Configuration_Colonnes_Offres",colIds:"*",kind:"global",mode:"config"},
+  {tableId:"Fournisseurs",colIds:"*",kind:"global",mode:"adminEdit"},
+  {tableId:"Offres",colIds:"*",kind:"global",mode:"adminEdit"},
+  {tableId:"Allocations",colIds:"*",kind:"domain",mode:"userEdit"},
+  {tableId:"Baseline_N_1",colIds:"*",kind:"domain",mode:"userEdit"},
+  {tableId:"Baseline_N_1_Details",colIds:"*",kind:"domain",mode:"userEdit"},
+  {tableId:"Pre_Simulations",colIds:"*",kind:"domain",mode:"userEdit"},
+  {tableId:"Pre_Simulation_Ressources",colIds:"*",kind:"presimdomain",mode:"userEdit"},
+  {tableId:"Enterprise",colIds:"*",kind:"domain",mode:"read"},
+  {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",mode:"read"},
+  {tableId:"Domaines",colIds:"*",kind:"domains",mode:"domains"},
+  {tableId:"Droits_Utilisateurs",colIds:"*",kind:"rights",mode:"rights"}
 ];
 function internalRows(t){return rows(t)}
 async function readAclMeta(){
@@ -1106,14 +1256,51 @@ async function readAclMeta(){
 function finopsUserAttribute(){
   return JSON.stringify({name:"Droits",tableId:"Droits_Utilisateurs",lookupColId:"Email",charId:"Email"});
 }
-function aclFormulaFor(kind){
-  if(kind==="global")return "user.Droits is not None and user.Droits.Actif";
-  if(kind==="domain")return "user.Droits is not None and user.Droits.Actif and rec.Domaine in user.Droits.Domaines_Autorises";
-  if(kind==="presimdomain")return "user.Droits is not None and user.Droits.Actif and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises";
-  if(kind==="domains")return "user.Droits is not None and user.Droits.Actif and rec.id in user.Droits.Domaines_Autorises";
-  if(kind==="self")return "user.Droits is not None and user.Droits.Actif and rec.Email == user.Email";
+
+function aclRoleFormula(roles){
+  const vals=roles.map(r=>JSON.stringify(r)).join(',');
+  return `user.Droits is not None and user.Droits.Actif and user.Droits.Role_App in [${vals}]`;
+}
+function aclFormulaFor(kind,roles){
+  const base=aclRoleFormula(roles);
+  if(kind==="global"||kind==="scenario")return base;
+  if(kind==="domain")return `${base} and rec.Domaine in user.Droits.Domaines_Autorises`;
+  if(kind==="presimdomain")return `${base} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`;
+  if(kind==="domains")return `${base} and rec.id in user.Droits.Domaines_Autorises`;
+  if(kind==="rights")return base;
   return "False";
 }
+function aclRulesForSpec(spec){
+  const reader=["LECTEUR","CONTRIBUTEUR","OBSERVATEUR","CONTRIBUTEUR_AVANCE","ADMINISTRATEUR"];
+  const contributors=["CONTRIBUTEUR","CONTRIBUTEUR_AVANCE","ADMINISTRATEUR"];
+  if(spec.mode==="userEdit"){
+    return [
+      {roles:contributors,perm:spec.kind==="scenario"?"+CRU":"+CRUD",tag:"WRITE"},
+      {roles:reader,perm:"+R",tag:"READ"}
+    ];
+  }
+  if(spec.mode==="adminEdit"||spec.mode==="config"){
+    return [
+      {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"ADMIN_WRITE"},
+      {roles:reader,perm:"+R",tag:"READ"}
+    ];
+  }
+  if(spec.mode==="domains"){
+    return [
+      {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"ADMIN_WRITE_GLOBAL",formula:aclRoleFormula(["ADMINISTRATEUR"])},
+      {roles:["LECTEUR","CONTRIBUTEUR","OBSERVATEUR","CONTRIBUTEUR_AVANCE"],perm:"+R",tag:"READ"}
+    ];
+  }
+  if(spec.mode==="rights"){
+    return [
+      {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"ADMIN_WRITE_ALL",formula:aclRoleFormula(["ADMINISTRATEUR"])},
+      {roles:["OBSERVATEUR","CONTRIBUTEUR_AVANCE"],perm:"+R",tag:"ADV_READ_ALL",formula:aclRoleFormula(["OBSERVATEUR","CONTRIBUTEUR_AVANCE"])},
+      {roles:["LECTEUR","CONTRIBUTEUR"],perm:"+R",tag:"SELF_READ",formula:`${aclRoleFormula(["LECTEUR","CONTRIBUTEUR"])} and rec.Email == user.Email`}
+    ];
+  }
+  return [{roles:reader,perm:"+R",tag:"READ"}];
+}
+
 function aclPlan(meta){
   const resources=meta.resources||[],rules=meta.rules||[];
   const defaultRes=resources.find(r=>r.tableId==="*"&&r.colIds==="*");
@@ -1200,12 +1387,14 @@ async function applyFinopsAcl(){
         permissionsText:"all",
         memo:`${FINOPS_ACL_TAG}:${spec.tableId}:OWNER`
       }]);
-      actions.push(["AddRecord","_grist_ACLRules",null,{
-        resource:res.id,
-        aclFormula:aclFormulaFor(spec.kind),
-        permissionsText:spec.perm,
-        memo:`${FINOPS_ACL_TAG}:${spec.tableId}:AUTHORIZED`
-      }]);
+      for(const rule of aclRulesForSpec(spec)){
+        actions.push(["AddRecord","_grist_ACLRules",null,{
+          resource:res.id,
+          aclFormula:rule.formula||aclFormulaFor(spec.kind,rule.roles),
+          permissionsText:rule.perm,
+          memo:`${FINOPS_ACL_TAG}:${spec.tableId}:${rule.tag}`
+        }]);
+      }
       actions.push(["AddRecord","_grist_ACLRules",null,{
         resource:res.id,
         aclFormula:"",
@@ -1240,9 +1429,19 @@ async function applyFinopsAcl(){
   }
 }
 
+
 function renderRightsAdmin(){
   const el=document.getElementById('v-rights');
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>Créer, modifier et supprimer les utilisateurs autorisés. Un utilisateur peut être rattaché à plusieurs domaines.</p></div><div class="table-actions"><button id="newRightUser" class="btn secondary">+ Nouvel utilisateur</button><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div></div><div class="tablewrap"><table><thead><tr><th>Email</th><th>Domaines autorisés</th><th>Rôle</th><th>Actif</th><th>Commentaire</th><th></th></tr></thead><tbody id="rightsBody">${D[T.rights].map(r=>rightsAdminRow(r)).join('')}</tbody></table></div></article>`;
+  if(!el)return;
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>La présence d’un utilisateur actif dans cette table est obligatoire pour accéder à FinOps. Les domaines définissent son périmètre de données.</p></div><div class="table-actions"><button id="newRightUser" class="btn secondary">+ Nouvel utilisateur</button><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div></div>
+  <div class="rights-role-help">
+    <div><b>Lecteur</b><span>Menus utilisateurs · lecture seule</span></div>
+    <div><b>Contributeur</b><span>Menus utilisateurs · modification</span></div>
+    <div><b>Observateur</b><span>Tous les menus · lecture seule</span></div>
+    <div><b>Contributeur avancé</b><span>Menus utilisateurs modifiables · autres menus en lecture</span></div>
+    <div><b>Administrateur</b><span>Tous les menus · modification</span></div>
+  </div>
+  <div class="tablewrap"><table><thead><tr><th>Email</th><th>Domaines autorisés</th><th>Rôle applicatif</th><th>Actif</th><th>Commentaire</th><th></th></tr></thead><tbody id="rightsBody">${D[T.rights].map(r=>rightsAdminRow(r)).join('')}</tbody></table></div></article>`;
   document.getElementById('newRightUser').onclick=addRightsDraft;
   document.getElementById('saveAllRights').onclick=saveAllRightsV18;
   bindRightsDeleteButtons();
@@ -1251,17 +1450,34 @@ function rightsAdminRow(r={}){
   const multi=refListIds(r.Domaines_Autorises);
   const selected=new Set(multi.length?multi:(+r.Domaine?[+r.Domaine]:[]));
   const id=r.id||'',isNew=!r.id;
-  return `<tr data-r="${id}" data-new="${isNew?'1':'0'}"><td><input class="admin-input" data-f="Email" value="${esc(r.Email||'')}" placeholder="prenom.nom@domaine.fr"></td><td><div class="domain-multiselect">${D[T.domains].filter(d=>d.Actif!==false).map(d=>`<label class="domain-chip"><input type="checkbox" data-domain-id="${d.id}" ${selected.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></td><td><select class="admin-input" data-f="Role_App"><option ${(!r.Role_App||r.Role_App==='Domaine')?'selected':''}>Domaine</option><option ${r.Role_App==='Admin'?'selected':''}>Admin</option></select></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}" placeholder="Commentaire"></td><td><button class="btn danger small rights-delete" title="${isNew?'Annuler':'Supprimer'}">${isNew?'Annuler':'Supprimer'}</button></td></tr>`;
+  const role=normalizeAppRole(r.Role_App||'Lecteur');
+  const options=[
+    [APP_ROLES.LECTEUR,'Lecteur'],
+    [APP_ROLES.CONTRIBUTEUR,'Contributeur'],
+    [APP_ROLES.OBSERVATEUR,'Observateur'],
+    [APP_ROLES.CONTRIBUTEUR_AVANCE,'Contributeur avancé'],
+    [APP_ROLES.ADMINISTRATEUR,'Administrateur']
+  ];
+  return `<tr data-r="${id}" data-new="${isNew?'1':'0'}">
+    <td><input class="admin-input" data-f="Email" value="${esc(r.Email||'')}" placeholder="prenom.nom@domaine.fr"></td>
+    <td><div class="domain-multiselect">${D[T.domains].filter(d=>d.Actif!==false).map(d=>`<label class="domain-chip"><input type="checkbox" data-domain-id="${d.id}" ${selected.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></td>
+    <td><select class="admin-input" data-f="Role_App">${options.map(([value,label])=>`<option value="${value}" ${role===value?'selected':''}>${label}</option>`).join('')}</select></td>
+    <td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td>
+    <td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}" placeholder="Commentaire"></td>
+    <td><button class="btn danger small rights-delete" title="${isNew?'Annuler':'Supprimer'}">${isNew?'Annuler':'Supprimer'}</button></td>
+  </tr>`;
 }
+
 function addRightsDraft(){
   const tbody=document.getElementById('rightsBody');
-  tbody.insertAdjacentHTML('beforeend',rightsAdminRow({Actif:true,Role_App:'Domaine'}));
+  tbody.insertAdjacentHTML('beforeend',rightsAdminRow({Actif:true,Role_App:APP_ROLES.LECTEUR}));
   bindRightsDeleteButtons();
   const rows=tbody.querySelectorAll('tr');
   rows[rows.length-1]?.querySelector('[data-f="Email"]')?.focus();
 }
 function bindRightsDeleteButtons(){
   document.querySelectorAll('#rightsBody .rights-delete').forEach(btn=>btn.onclick=async()=>{
+    if(!roleCanEditAdvancedMenus()){toast(readOnlyMessage(),true);return}
     const tr=btn.closest('tr');
     if(tr.dataset.new==='1'){tr.remove();return}
     const id=+tr.dataset.r;
@@ -1275,6 +1491,7 @@ function bindRightsDeleteButtons(){
   });
 }
 async function saveAllRightsV18(){
+  if(!roleCanEditAdvancedMenus()){toast(readOnlyMessage(),true);return}
   const actions=[];
   let invalid=false;
   const emails=[];
