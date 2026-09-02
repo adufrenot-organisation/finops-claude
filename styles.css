@@ -439,3 +439,14 @@
 .service-offers-admin td{
   vertical-align:top;
 }
+
+/* V21 — explicitation du modèle Offres */
+.offer-schema-note{
+  margin:0 0 14px 0;
+  padding:10px 12px;
+  border:1px solid var(--border,#d9dde5);
+  border-radius:8px;
+  font-size:13px;
+  line-height:1.45;
+  background:rgba(127,127,127,.04);
+}

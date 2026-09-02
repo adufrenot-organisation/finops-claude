@@ -70,3 +70,7 @@ Synchronisation immédiate des noms de scénarios dans le filtre global après e
 
 ## V20
 Séparation Offre de service en lecture et Paramétrage offre de service en CRUD Owner, indépendants du scénario.
+
+
+## V21
+Le paramétrage de l'offre de service est strictement adossé aux colonnes persistées de la table Offres ; un script de réconciliation ajoute les champs manquants.
