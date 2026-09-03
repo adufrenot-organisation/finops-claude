@@ -647,7 +647,7 @@ function renderCompare(){
   const selected=new Set(COMPARE_SELECTED_IDS);
   el.innerHTML=`<article class="card synthesis-card">
     <div class="cardhead synthesis-head"><div><h3>Comparer les scénarios</h3><p>Sélectionne jusqu’à 6 scénarios. Clique sur une carte pour ouvrir le détail financier par domaine.</p></div>
-      <button id="printSynthesis" class="btn primary">🖨 Imprimer la synthèse</button>
+      <button id="openSynthesisHtml" class="btn primary">🌐 Ouvrir en HTML</button>
     </div>
     <div class="checklist">${scenarios.map(s=>`<label class="checkpill"><input type="checkbox" class="cmp" value="${s.id}" ${selected.has(+s.id)?'checked':''}>${esc(s.Nom)}</label>`).join('')}</div>
     <div id="cmpOut" style="margin-top:14px"></div>
@@ -658,7 +658,7 @@ function renderCompare(){
     if(ids.length>6){x.checked=false;toast('Maximum 6 scénarios.',true);return}
     COMPARE_SELECTED_IDS=ids;drawCompare();
   });
-  document.getElementById('printSynthesis').onclick=printSynthesisV36;
+  document.getElementById('openSynthesisHtml').onclick=openSynthesisHtmlV42;
   drawCompare();
 }
 function drawCompare(){
@@ -707,14 +707,13 @@ function openScenarioDetailV36(sid){
   const m=model(sid),host=document.getElementById('scenarioDetailModal');if(!m?.s||!host)return;
   host.innerHTML=`<div class="modal-backdrop scenario-detail-backdrop">
     <div class="scenario-detail-modal" role="dialog" aria-modal="true" aria-label="Détail du scénario">
-      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue imprimable</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="openScenarioHtml" class="btn secondary">🌐 Ouvrir en HTML</button></div></div>
+      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue détaillée</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="openScenarioHtml" class="btn secondary">🌐 Ouvrir en HTML</button></div></div>
       <div class="scenario-detail-scroll">${scenarioDetailHtmlV36(m)}</div>
     </div>
   </div>`;
   document.getElementById('closeScenarioDetail').onclick=()=>host.innerHTML='';
   host.querySelector('.scenario-detail-backdrop').onclick=e=>{if(e.target===e.currentTarget)host.innerHTML=''};
   document.getElementById('openScenarioHtml').onclick=()=>openScenarioHtmlV41(sid);
-  
 }
 function safeFilenameV41(value){
   return String(value||'scenario')
@@ -764,6 +763,50 @@ function openScenarioHtmlV41(sid){
   w.document.write(scenarioHtmlDocumentV41(m));
   w.document.close();
 }
+function synthesisHtmlDocumentV42(ms){
+  const reportTitle='FinOps - Synthèse des scénarios';
+  const filename=`FinOps_Synthese_${new Date().toISOString().slice(0,10)}.html`;
+  const summary=`<div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>${ms.length} scénario(s) sélectionné(s)</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+    <h2 class="print-section-title">01 · Synthèse</h2>
+    <table class="summary-table"><thead><tr><th>Scénario</th><th>Licences</th><th>Fixe</th><th>Variable</th><th>Budget USD</th><th>Budget EUR</th><th>Économie annuelle</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${num(m.licenses)}</td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num"><b>${money(m.total)}</b></td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td></tr>`).join('')}</tbody></table>
+    <div class="page-break"></div><h2 class="print-section-title">02 · Détails des scénarios</h2>${ms.map((m,i)=>`${i?'<div class="page-break"></div>':''}${scenarioDetailHtmlV36(m,true)}`).join('')}`;
+  const body=`<div class="html-report-toolbar no-print">
+      <div><b>Synthèse FinOps IA</b><span>Rapport HTML autonome · ${ms.length} scénario(s)</span></div>
+      <div class="html-report-actions"><button id="htmlPrint">🖨 Imprimer / PDF</button><button id="htmlSave">💾 Enregistrer le fichier HTML</button></div>
+    </div>
+    <main class="html-report-page">${summary}</main>`;
+  const screenCss=`
+    body{background:#eef2f7;padding:0 0 36px;font-size:12px}
+    .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
+    .html-report-toolbar>div:first-child{display:flex;flex-direction:column;gap:2px}.html-report-toolbar span{font-size:11px;color:#cbd5e1}
+    .html-report-actions{display:flex;gap:8px;flex-wrap:wrap}.html-report-actions button{border:0;border-radius:9px;padding:9px 13px;font-weight:700;cursor:pointer}.html-report-actions button:first-child{background:#fff;color:#10213e}.html-report-actions button:last-child{background:#635bdb;color:#fff}
+    .html-report-page{width:min(1460px,calc(100% - 32px));margin:24px auto;background:#fff;padding:22px;border-radius:16px;box-shadow:0 12px 34px rgba(15,23,42,.10)}
+    @media(max-width:760px){.html-report-toolbar{align-items:flex-start;flex-direction:column}.html-report-actions{width:100%}.html-report-actions button{flex:1 1 220px}.html-report-page{width:calc(100% - 12px);margin:8px auto;padding:10px}}
+    @media print{.no-print{display:none!important}.html-report-page{width:auto;margin:0;padding:0;box-shadow:none;border-radius:0}body{padding:0;background:#fff}}
+  `;
+  const js=`
+    const REPORT_FILENAME=${JSON.stringify(filename)};
+    document.getElementById('htmlPrint').addEventListener('click',()=>window.print());
+    document.getElementById('htmlSave').addEventListener('click',()=>{
+      const source='<!doctype html>\\n'+document.documentElement.outerHTML;
+      const blob=new Blob([source],{type:'text/html;charset=utf-8'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download=REPORT_FILENAME;document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+    });
+  `;
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(reportTitle)}</title><style>${PRINT_CSS_V36}${screenCss}</style></head><body>${body}<script>${js}<\/script></body></html>`;
+}
+function openSynthesisHtmlV42(){
+  const ids=compareSelectedIds(),ms=ids.map(model).filter(m=>m?.s);
+  if(!ms.length){toast('Sélectionne au moins un scénario.',true);return}
+  const w=window.open('','_blank');
+  if(!w){toast("Le navigateur a bloqué l’ouverture du rapport HTML.",true);return}
+  w.document.open();
+  w.document.write(synthesisHtmlDocumentV42(ms));
+  w.document.close();
+}
+
 function printWindowV36(title,body){
   const w=window.open('','_blank','width=1280,height=900');
   if(!w){toast("Le navigateur a bloqué la fenêtre d'impression.",true);return}
