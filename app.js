@@ -228,7 +228,8 @@ function ensureNavGroupStyles(){
     .shell:not(.sidebar-collapsed) .sidebar{width:auto!important;min-width:0!important;padding-left:8px!important;padding-right:8px!important}
     .shell:not(.sidebar-collapsed) .brand{gap:7px!important;padding-left:3px!important;padding-right:3px!important}
     .shell:not(.sidebar-collapsed) .brandtext h2{font-size:14px!important}
-    .shell:not(.sidebar-collapsed) .brandtext small{font-size:8px!important;line-height:1.2!important}.app-author{display:block;margin-top:3px;font-size:8.5px;line-height:1.2;color:inherit;opacity:.62;font-weight:500;letter-spacing:0}.app-author strong{font-weight:700}.sidebar-collapsed .app-author{display:none!important}
+    .shell:not(.sidebar-collapsed) .brandtext small{font-size:8px!important;line-height:1.2!important}
+    .app-author{display:block;margin:-2px 6px 8px 52px;font-size:8.5px;line-height:1.2;color:inherit;opacity:.68;font-weight:500;letter-spacing:0;white-space:nowrap;overflow:visible}.app-author strong{font-weight:700}.sidebar-collapsed .app-author{display:none!important}
     .shell:not(.sidebar-collapsed) .nav button[data-view]{padding:7px 8px!important;gap:7px!important;font-size:11px!important;line-height:1.18!important;min-height:30px!important}
     .shell:not(.sidebar-collapsed) .nav-icon{font-size:13px!important;min-width:16px!important}
     .shell:not(.sidebar-collapsed) .nav-label{font-size:11px!important;white-space:normal!important;overflow-wrap:anywhere}
@@ -383,7 +384,7 @@ function renderShell(){
 
   document.getElementById("root").innerHTML=`<div class="shell">
     <aside class="sidebar">
-      <div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small><span class="app-author">Réalisé par <strong>Alex Dufrenot</strong></span></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div>
+      <div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><div class="app-author">Réalisé par <strong>Alex Dufrenot</strong></div>
       <nav class="nav">${navHtml}</nav>
       <div class="sidefoot"><b>${esc(roleLabel())}</b><br><span id="sideScope"></span></div>
     </aside>
