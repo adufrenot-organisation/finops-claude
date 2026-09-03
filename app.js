@@ -87,46 +87,83 @@ function accessFromRightRow(row){
     ambiguous:false
   };
 }
+function extractAclAsUserFromUrlV49(raw){
+  let text=String(raw||'');
+  if(!text)return '';
+  const candidates=[text];
+  for(let i=0;i<3;i++){
+    try{
+      const d=decodeURIComponent(candidates[candidates.length-1]);
+      if(d===candidates[candidates.length-1])break;
+      candidates.push(d);
+    }catch(_){break;}
+  }
+  for(const candidate of candidates){
+    try{
+      const u=new URL(candidate,window.location.href);
+      for(const key of ['aclAsUser_','aclAsUser']){
+        const v=String(u.searchParams.get(key)||'').trim().toLowerCase();
+        if(v)return v;
+      }
+    }catch(_){}
+    const m=candidate.match(/(?:[?&#]|^)(?:aclAsUser_|aclAsUser)=([^&#]+)/i);
+    if(m){
+      try{return decodeURIComponent(m[1]).trim().toLowerCase()}catch(_){return String(m[1]||'').trim().toLowerCase()}
+    }
+  }
+  return '';
+}
+function detectViewAsEmailV49(){
+  // Grist implémente « Voir comme » via le paramètre aclAsUser_.
+  // Dans un Custom Widget il peut être présent dans l'URL du widget ou dans le referrer du document parent.
+  const sources=[window.location.href,document.referrer];
+  for(const src of sources){
+    const email=extractAclAsUserFromUrlV49(src);
+    if(email)return email;
+  }
+  return '';
+}
 function deriveAccess(){
   const rr=(D[T.rights]||[]).filter(r=>r.Actif!==false);
   const distinctEmails=[...new Set(rr.map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean))];
+  const viewAsEmail=detectViewAsEmailV49();
 
-  // Cas normal : les ACL ne rendent visible que la ligne de l'utilisateur courant.
-  if(distinctEmails.length===1){
-    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===distinctEmails[0])||rr[0];
-    ACCESS=accessFromRightRow(row);
-    try{sessionStorage.removeItem('finopsAccessTestEmail')}catch(_){}
-    return;
-  }
-
-  // V48 : plusieurs identités visibles ne signifient JAMAIS automatiquement Owner.
-  // Cela arrive notamment lors des tests « voir comme » effectués depuis un compte Owner.
-  // On exige alors une identité de test explicite et on reste deny-by-default.
-  if(distinctEmails.length>1){
-    let selected='';
-    try{selected=String(sessionStorage.getItem('finopsAccessTestEmail')||'').trim().toLowerCase()}catch(_){}
-    const row=selected?rr.find(r=>String(r.Email||'').trim().toLowerCase()===selected):null;
+  // V49 : lorsqu'un Owner utilise « Voir comme », le paramètre Grist aclAsUser_
+  // est prioritaire sur toute heuristique liée au nombre de lignes visibles.
+  if(viewAsEmail){
+    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===viewAsEmail);
     if(row){
-      ACCESS={...accessFromRightRow(row),ambiguous:true,visibleRights:rr,testIdentity:true};
+      ACCESS={...accessFromRightRow(row),viewAs:true,viewAsEmail,accessSource:'grist-view-as'};
       return;
     }
-    ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:true,visibleRights:rr};
+    // Un utilisateur simulé absent/inactif dans Droits_Utilisateurs ne reçoit aucun accès FinOps.
+    ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false,viewAs:true,viewAsEmail,accessSource:'grist-view-as-missing'};
     return;
   }
 
-  // Aucun enregistrement Droits_Utilisateurs visible = aucun accès applicatif.
-  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false};
-}
-function renderAccessIdentityChooser(){
-  const rr=(ACCESS.visibleRights||[]).slice().sort((a,b)=>String(a.Email||'').localeCompare(String(b.Email||''),'fr'));
-  const opts=rr.map(r=>`<option value="${esc(String(r.Email||'').trim().toLowerCase())}">${esc(r.Email||'Utilisateur')} — ${esc(roleLabel(normalizeAppRole(r.Role_App)))}</option>`).join('');
-  document.getElementById('root').innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">👤</div><h1>Identité FinOps à confirmer</h1><p>Plusieurs lignes actives de <b>Droits_Utilisateurs</b> sont visibles. FinOps ne vous attribue plus automatiquement le rôle Owner.</p><div class="deniednote">Pour tester les droits depuis un compte privilégié, choisissez explicitement l’utilisateur à simuler. Le choix reste limité à cet onglet.</div><label class="field" style="text-align:left;margin-top:18px">Utilisateur à simuler<select id="accessIdentitySelect">${opts}</select></label><button id="accessIdentityApply" class="btn primary" style="margin-top:12px">Appliquer ce profil</button></div></div>`;
-  document.getElementById('accessIdentityApply')?.addEventListener('click',()=>{
-    const email=document.getElementById('accessIdentitySelect')?.value||'';
-    if(!email)return;
-    try{sessionStorage.setItem('finopsAccessTestEmail',email)}catch(_){}
-    boot();
-  });
+  // Cas normal non-Owner : les ACL doivent rendre visible uniquement la ligne de l'utilisateur courant.
+  if(distinctEmails.length===1){
+    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===distinctEmails[0])||rr[0];
+    ACCESS={...accessFromRightRow(row),accessSource:'rights-row'};
+    return;
+  }
+
+  // Cas Owner normal : il voit plusieurs lignes de Droits_Utilisateurs et aucun aclAsUser_ n'est actif.
+  // On restaure l'ouverture transparente en Owner sans écran intermédiaire.
+  if(distinctEmails.length>1){
+    ACCESS={
+      role:APP_ROLES.OWNER,
+      domainIds:(D[T.domains]||[]).filter(d=>d.Actif!==false).map(d=>+d.id).filter(Boolean),
+      rights:rr,
+      isOwner:true,
+      ambiguous:false,
+      accessSource:'owner-multiple-rights'
+    };
+    return;
+  }
+
+  // Aucun enregistrement visible : deny-by-default.
+  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false,accessSource:'no-rights'};
 }
 
 function menuConfigAllRows(){
@@ -358,7 +395,6 @@ function startPresence(){
 
 function renderShell(){
   if(ACCESS.role===APP_ROLES.DENIED){
-    if(ACCESS.ambiguous){renderAccessIdentityChooser();return;}
     document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">🔒</div><h1>Accès non autorisé</h1><p>Votre compte n’est pas inscrit comme utilisateur actif dans la table <b>Droits_Utilisateurs</b>.</p><div class="deniednote">Aucun menu FinOps n’est disponible. Demandez à un administrateur de vous ajouter dans la gestion des droits.</div></div></div>`;
     return;
   }
@@ -379,7 +415,7 @@ function renderShell(){
         <div class="head-right">
           <div class="session-strip" aria-label="Session FinOps">
             <div class="session-ident"><span class="session-label">Moi</span><b id="sessionUser">${esc(currentUserLabel())}</b></div>
-            <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}${ACCESS.testIdentity?' · TEST':''}</b></div>
+            <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}${ACCESS.viewAs?' · VUE COMME':''}</b></div>
             <div class="session-ident"><span class="session-label">Page</span><b id="sessionPage">${esc(menuLabel('dashboard'))}</b></div>
             <div id="presenceWidget" class="presence-widget">
               <button id="presenceToggle" type="button" class="presence-toggle" aria-expanded="false">
