@@ -137,12 +137,49 @@ function navIcon(view){
   return {dashboard:'◧',simulation:'⌘',compare:'⇄',roi:'↗',presim:'♙',scenarios:'▤',offers:'¤',offersadmin:'⚙',domains:'◎',rights:'♙',menuadmin:'☷',labelsadmin:'✎',acladmin:'🔐'}[view]||'•';
 }
 
+function navGroupCollapsed(group){
+  // V45 : état par défaut = User ouvert, Admin fermé.
+  // Dès que l'utilisateur ouvre/ferme une rubrique, son choix est mémorisé localement.
+  try{
+    const stored=localStorage.getItem(`finopsNavGroup:${group}`);
+    if(stored!==null)return stored==='1';
+  }catch(_){}
+  return group==='admin';
+}
+function setNavGroupCollapsed(group,collapsed){
+  const section=document.querySelector(`.nav-group[data-nav-group="${group}"]`);if(!section)return;
+  section.classList.toggle('collapsed',collapsed);
+  const toggle=section.querySelector('.nav-group-toggle');
+  if(toggle){toggle.setAttribute('aria-expanded',collapsed?'false':'true');const arrow=toggle.querySelector('.nav-group-arrow');if(arrow)arrow.textContent=collapsed?'›':'⌄'}
+  try{localStorage.setItem(`finopsNavGroup:${group}`,collapsed?'1':'0')}catch(_){}
+}
+function bindNavGroups(){
+  document.querySelectorAll('.nav-group').forEach(section=>{
+    const group=section.dataset.navGroup;
+    setNavGroupCollapsed(group,navGroupCollapsed(group));
+    section.querySelector('.nav-group-toggle')?.addEventListener('click',()=>setNavGroupCollapsed(group,!section.classList.contains('collapsed')));
+  });
+}
+function ensureNavGroupStyles(){
+  if(document.getElementById('finops-nav-group-styles'))return;
+  const style=document.createElement('style');style.id='finops-nav-group-styles';
+  style.textContent=`
+    .nav-group{margin:4px 0 8px}.nav-group-toggle{width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.nav-group-toggle:hover{opacity:1}.nav-group-title{flex:1;text-align:left}.nav-group-count{font-size:10px;opacity:.7}.nav-group-arrow{font-size:16px;line-height:1}.nav-group-items{display:flex;flex-direction:column;gap:2px}.nav-group.collapsed .nav-group-items{display:none}.sidebar-collapsed .nav-group-toggle{justify-content:center;padding:9px 4px}.sidebar-collapsed .nav-group-title,.sidebar-collapsed .nav-group-count{display:none}.sidebar-collapsed .nav-group-arrow{transform:none}.menu-section-badge{display:inline-block;min-width:54px;text-align:center;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:800}.menu-section-badge.user{background:#e8f1ff;color:#2457a6}.menu-section-badge.admin{background:#f2ebff;color:#6a35a8}
+  `;
+  document.head.appendChild(style);
+}
 function buildNavHtml(){
   const advanced=roleSeesAdvancedMenus();
-  return menuConfigRows()
-    .filter(r=>advanced || !r.Owner_Seulement)
-    .map((r,i)=>`<button class="${i===0?'active':''}" data-view="${esc(r.Cle)}"><span class="nav-icon">${navIcon(r.Cle)}</span><span class="nav-label">${esc(r.Libelle||r.Cle)}</span></button>`)
-    .join('');
+  const visible=menuConfigRows().filter(r=>advanced || !r.Owner_Seulement);
+  const groups=[
+    {key:'user',label:'User',rows:visible.filter(r=>!r.Owner_Seulement)},
+    {key:'admin',label:'Admin',rows:visible.filter(r=>!!r.Owner_Seulement)}
+  ].filter(g=>g.rows.length);
+  let first=true;
+  return groups.map(g=>`<div class="nav-group" data-nav-group="${g.key}">
+    <button type="button" class="nav-group-toggle" aria-expanded="true"><span class="nav-group-title">${g.label}</span><span class="nav-group-count">${g.rows.length}</span><span class="nav-group-arrow">⌄</span></button>
+    <div class="nav-group-items">${g.rows.map(r=>{const active=first;first=false;return `<button class="${active?'active':''}" data-view="${esc(r.Cle)}"><span class="nav-icon">${navIcon(r.Cle)}</span><span class="nav-label">${esc(r.Libelle||r.Cle)}</span></button>`}).join('')}</div>
+  </div>`).join('');
 }
 
 
@@ -303,7 +340,9 @@ function renderShell(){
     </main>
   </div><div id="toast" class="toast"></div>`;
 
-  document.querySelectorAll('.nav button').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+  ensureNavGroupStyles();
+  bindNavGroups();
+  document.querySelectorAll('.nav button[data-view]').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
   document.getElementById('refresh').onclick=boot;
   document.getElementById('scenarioSelect').onchange=()=>{
     CURRENT=model(+selectedScenario()?.id||0);
@@ -1702,8 +1741,9 @@ async function saveAllDomainsV17(){
 function renderMenuAdmin(){
   const el=document.getElementById('v-menuadmin');if(!el)return;
   const rows=menuConfigAllRows();
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Configuration du menu <span class="badge ok">V14</span></h3><p>Configuration globale stockée dans Grist. Tu peux changer l’ordre, le libellé, l’activation et le niveau d’accès de chaque onglet, puis enregistrer l’ensemble. Cet écran est réservé à l’Owner.</p></div><div class="table-actions"><button id="saveMenuConfig" class="btn primary">Enregistrer les modifications</button><button id="resetMenuConfig" class="btn secondary">Ordre et noms par défaut</button></div></div><div class="tablewrap"><table class="menu-admin-table"><thead><tr><th class="drag-col"></th><th>Item technique</th><th>Libellé affiché</th><th>Actif</th><th>Accès</th></tr></thead><tbody id="menuAdminBody">${rows.map(r=>`<tr draggable="true" data-menu-id="${r.id||''}" data-menu-key="${esc(r.Cle)}"><td class="menu-row-grip" title="Déplacer">⋮⋮</td><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input" data-f="Libelle" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}" maxlength="60"></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><select class="admin-input menu-access-select" data-f="Owner_Seulement"><option value="false" ${!r.Owner_Seulement?'selected':''}>Utilisateurs autorisés</option><option value="true" ${r.Owner_Seulement?'selected':''}>Owner uniquement</option></select></td></tr>`).join('')}</tbody></table></div><div class="menu-admin-note">La visibilité métier reste contrôlée par les droits de l’application et les Access Rules Grist. Désactiver un item ici le masque globalement.</div></article>`;
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Configuration du menu <span class="badge ok">V44</span></h3><p>Le classement est automatique : <b>Utilisateurs autorisés</b> place l’item dans la rubrique <b>User</b>, <b>Owner uniquement</b> le place dans <b>Admin</b>. Modifie l’accès puis enregistre.</p></div><div class="table-actions"><button id="saveMenuConfig" class="btn primary">Enregistrer les modifications</button><button id="resetMenuConfig" class="btn secondary">Ordre et noms par défaut</button></div></div><div class="tablewrap"><table class="menu-admin-table"><thead><tr><th class="drag-col"></th><th>Item technique</th><th>Libellé affiché</th><th>Rubrique</th><th>Actif</th><th>Accès</th></tr></thead><tbody id="menuAdminBody">${rows.map(r=>`<tr draggable="true" data-menu-id="${r.id||''}" data-menu-key="${esc(r.Cle)}"><td class="menu-row-grip" title="Déplacer">⋮⋮</td><td><code>${esc(r.Cle)}</code></td><td><input class="admin-input" data-f="Libelle" value="${esc(r.Libelle||DEFAULT_MENU_LABELS[r.Cle]||r.Cle)}" maxlength="60"></td><td><span class="menu-section-badge ${r.Owner_Seulement?'admin':'user'}" data-menu-section>${r.Owner_Seulement?'Admin':'User'}</span></td><td><input data-f="Actif" type="checkbox" ${r.Actif!==false?'checked':''}></td><td><select class="admin-input menu-access-select" data-f="Owner_Seulement"><option value="false" ${!r.Owner_Seulement?'selected':''}>Utilisateurs autorisés</option><option value="true" ${r.Owner_Seulement?'selected':''}>Owner uniquement</option></select></td></tr>`).join('')}</tbody></table></div><div class="menu-admin-note">La rubrique n’est pas un paramètre séparé : elle est toujours déduite de l’accès, ce qui évite les incohérences. L’ordre reste piloté par glisser-déposer.</div></article>`;
   initMenuAdminSorting();
+  document.querySelectorAll('#menuAdminBody .menu-access-select').forEach(sel=>sel.addEventListener('change',()=>{const badge=sel.closest('tr')?.querySelector('[data-menu-section]');if(!badge)return;const admin=sel.value==='true';badge.textContent=admin?'Admin':'User';badge.classList.toggle('admin',admin);badge.classList.toggle('user',!admin)}));
   document.getElementById('saveMenuConfig').onclick=saveMenuConfig;
   document.getElementById('resetMenuConfig').onclick=resetMenuConfigDraft;
 }
@@ -1736,7 +1776,7 @@ async function saveMenuConfig(){
 function resetMenuConfigDraft(){
   const defaults=[
     ['dashboard','Dashboard'],['simulation','Simulation'],['compare','Comparaison'],['roi','ROI / Économies'],
-    ['scenarios','Scénarios'],['offers','Offre de service'],['offersadmin','Paramétrage offre de service'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu'],['labelsadmin','Paramétrage des libellés'],['acladmin','ACL / Sécurité']
+    ['presim','Pré-simulation nominative'],['scenarios','Scénarios'],['offers','Offre de service'],['offersadmin','Paramétrage offre de service'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu'],['labelsadmin','Paramétrage des libellés'],['acladmin','ACL / Sécurité']
   ];
   const tbody=document.getElementById('menuAdminBody');if(!tbody)return;
   const byKey=Object.fromEntries([...tbody.querySelectorAll('tr[data-menu-key]')].map(tr=>[tr.dataset.menuKey,tr]));
