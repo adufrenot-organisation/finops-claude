@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",identity:"FinOps_Identite_Session"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 let PRESENCE_INTERVAL=null;
@@ -26,7 +26,7 @@ function rows(t){if(!t||!Array.isArray(t.id))return[];return t.id.map((id,i)=>{c
 function money(v,c="USD"){return new Intl.NumberFormat("fr-FR",{style:"currency",currency:c,maximumFractionDigits:0}).format(Number(v||0))} function num(v){return new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Number(v||0))} function pct(v){return new Intl.NumberFormat("fr-FR",{style:"percent",maximumFractionDigits:1}).format(Number(v||0))} function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
 function toast(m,e=false){const x=document.getElementById("toast");if(!x)return;x.textContent=m;x.className="toast show"+(e?" error":"");setTimeout(()=>x.className="toast",2400)}
 async function fetchAll(){const names=Object.values(T),raw=await Promise.all(names.map(n=>grist.docApi.fetchTable(n).catch(()=>({id:[]}))));const o={};names.forEach((n,i)=>o[n]=rows(raw[i]));o.domainById=Object.fromEntries(o[T.domains].map(r=>[r.id,r]));o.scenarioById=Object.fromEntries(o[T.scenarios].map(r=>[r.id,r]));o.providerById=Object.fromEntries(o[T.providers].map(r=>[r.id,r]));o.offerById=Object.fromEntries(o[T.offers].map(r=>[r.id,r]));return o}
-async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();CURRENT_IDENTITY=await resolveCurrentIdentityV50();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe();startPresence()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
+async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe();startPresence()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
 function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
 
 const APP_ROLES={
@@ -87,78 +87,61 @@ function accessFromRightRow(row){
     ambiguous:false
   };
 }
-let CURRENT_IDENTITY=null;
-function normalizeDocAccessV50(value){
-  const v=String(value||'').trim().toUpperCase();
-  if(v.includes('OWNER'))return 'OWNER';
-  if(v.includes('EDITOR'))return 'EDITOR';
-  if(v.includes('VIEWER'))return 'VIEWER';
-  return v;
-}
-async function resolveCurrentIdentityV50(){
-  // V50 : l'identité est résolue côté moteur Grist, pas depuis l'URL/referrer du widget.
-  // Les colonnes Email et Access de FinOps_Identite_Session sont des trigger formulas
-  // (user.Email / user.Access) calculées par Grist lors de la création de la sonde.
-  const sid=`finops-${Date.now()}-${(globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2))}`;
-  try{
-    await grist.docApi.applyUserActions([["AddRecord",T.identity,null,{Session_Id:sid}]]);
-    await new Promise(resolve=>setTimeout(resolve,40));
-    const raw=await grist.docApi.fetchTable(T.identity);
-    const rr=rows(raw);
-    const rec=rr.find(r=>String(r.Session_Id||'')===sid);
-    if(!rec)throw new Error('Sonde créée mais identité non relue.');
-    const identity={
-      email:String(rec.Email||'').trim().toLowerCase(),
-      access:normalizeDocAccessV50(rec.Access),
-      sessionId:sid,
-      source:'grist-trigger-formula'
-    };
-    // Nettoyage best effort : l'identité reste en mémoire, la ligne temporaire n'est plus utile.
-    try{await grist.docApi.applyUserActions([["RemoveRecord",T.identity,+rec.id]])}catch(_){/* ACL/latence : sans impact */}
-    if(!identity.email)throw new Error('La trigger formula user.Email n’a renvoyé aucune identité.');
-    return identity;
-  }catch(e){
-    console.warn('FinOps V50 — résolution identité indisponible',e);
-    return {email:'',access:'',sessionId:sid,source:'identity-unavailable',error:String(e?.message||e)};
-  }
-}
 function deriveAccess(){
   const rr=(D[T.rights]||[]).filter(r=>r.Actif!==false);
-  const identity=CURRENT_IDENTITY||{};
 
-  // Source d'autorité V50 : identité calculée par Grist au moment de l'action.
-  // Cela suit aussi « Voir comme », sans conserver un aclAsUser_ périmé dans le referrer.
-  if(identity.email){
-    if(identity.access==='OWNER'){
-      ACCESS={
-        role:APP_ROLES.OWNER,
-        domainIds:(D[T.domains]||[]).filter(d=>d.Actif!==false).map(d=>+d.id).filter(Boolean),
-        rights:rr,
-        isOwner:true,
-        ambiguous:false,
-        currentEmail:identity.email,
-        accessSource:'grist-identity-owner'
-      };
-      return;
-    }
-    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===identity.email);
-    if(row){
-      ACCESS={...accessFromRightRow(row),currentEmail:identity.email,accessSource:'grist-identity-rights'};
-      return;
-    }
-    ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false,currentEmail:identity.email,accessSource:'identity-no-rights'};
+  // V51 : détection purement par ACL Grist, sans URL, referrer ni trigger formula.
+  // 1) Le sentinel n'est lisible que par le véritable Owner effectif.
+  //    En mode « Voir comme », les ACL de l'utilisateur simulé s'appliquent et le sentinel disparaît.
+  const ownerVisible=(D[T.ownerSentinel]||[]).length>0;
+  if(ownerVisible){
+    ACCESS={
+      role:APP_ROLES.OWNER,
+      domainIds:(D[T.domains]||[]).filter(d=>d.Actif!==false).map(d=>+d.id).filter(Boolean),
+      rights:rr,
+      isOwner:true,
+      ambiguous:false,
+      currentEmail:'',
+      accessSource:'owner-sentinel'
+    };
     return;
   }
 
-  // Aucun fallback permissif : plusieurs lignes visibles ne permettent JAMAIS de déduire Owner.
-  // Une seule ligne reste tolérée pour faciliter le diagnostic si la migration V50 n'est pas terminée.
+  // 2) FinOps_Identites est une table miroir minimale (Email uniquement) dont les ACL
+  //    n'autorisent chaque non-Owner à lire que sa propre ligne.
+  const visibleIdentities=(D[T.selfIdentity]||[])
+    .map(r=>String(r.Email||'').trim().toLowerCase())
+    .filter(Boolean);
+  const unique=[...new Set(visibleIdentities)];
+  if(unique.length===1){
+    const email=unique[0];
+    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===email);
+    if(row){
+      ACCESS={...accessFromRightRow(row),currentEmail:email,accessSource:'self-identity'};
+      return;
+    }
+    // Une identité technique peut rester après suppression des droits : elle ne donne aucun accès.
+    ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false,currentEmail:email,accessSource:'identity-no-active-rights'};
+    return;
+  }
+
+  // 3) Compatibilité de secours uniquement lorsqu'une seule ligne de droits est réellement visible.
+  //    Jamais de promotion Owner à partir de cette heuristique.
   const distinctEmails=[...new Set(rr.map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean))];
   if(distinctEmails.length===1){
     const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===distinctEmails[0])||rr[0];
-    ACCESS={...accessFromRightRow(row),accessSource:'legacy-single-right-row'};
+    ACCESS={...accessFromRightRow(row),currentEmail:distinctEmails[0],accessSource:'single-visible-right-fallback'};
     return;
   }
-  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:distinctEmails.length>1,accessSource:'identity-unavailable',identityError:identity.error||''};
+
+  ACCESS={
+    role:APP_ROLES.DENIED,
+    domainIds:[],
+    rights:[],
+    isOwner:false,
+    ambiguous:unique.length>1||distinctEmails.length>1,
+    accessSource:'identity-unresolved'
+  };
 }
 
 function menuConfigAllRows(){
@@ -670,8 +653,7 @@ async function waitForGristRecalc(){
 async function reload(){
   const previousScenarioId=+(document.getElementById('scenarioSelect')?.value||selectedScenario()?.id||0);
   await waitForGristRecalc();
-  await fetchAll();
-  CURRENT_IDENTITY=await resolveCurrentIdentityV50();
+  D=await fetchAll();
   deriveAccess();
   populateScenario(previousScenarioId);
   CURRENT=model(selectedScenario()?.id);
@@ -2074,7 +2056,9 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Domaines",colIds:"*",kind:"domains",mode:"domains"},
   {tableId:"Droits_Utilisateurs",colIds:"*",kind:"rights",mode:"rights"},
   {tableId:"Presence_Utilisateurs",colIds:"*",kind:"presence",mode:"presence"},
-  {tableId:"FinOps_Identite_Session",colIds:"*",kind:"identity",mode:"identity"},
+  {tableId:"FinOps_Identites",colIds:"*",kind:"selfidentity",mode:"selfidentity"},
+  {tableId:"FinOps_Owner_Sentinel",colIds:"*",kind:"ownersentinel",mode:"owneronly"},
+  {tableId:"FinOps_Identite_Session",colIds:"*",kind:"legacyidentity",mode:"owneronly"},
   {tableId:"Claude_Scenarios",colIds:"*",kind:"global",mode:"userEdit"},
   {tableId:"Claude_Organisations",colIds:"*",kind:"global",mode:"userEdit"},
   {tableId:"Claude_Groupes",colIds:"*",kind:"global",mode:"userEdit"},
@@ -2099,7 +2083,7 @@ function aclRoleFormula(roles){
 }
 function aclFormulaFor(kind,roles){
   const base=aclRoleFormula(roles);
-  if(kind==="global"||kind==="scenario"||kind==="presence"||kind==="identity")return base;
+  if(kind==="global"||kind==="scenario"||kind==="presence"||kind==="selfidentity"||kind==="ownersentinel"||kind==="legacyidentity")return base;
   if(kind==="domain")return `${base} and rec.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="presimdomain")return `${base} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="domains")return `${base} and rec.id in user.Droits.Domaines_Autorises`;
@@ -2134,12 +2118,15 @@ function aclRulesForSpec(spec){
       {roles:["LECTEUR","CONTRIBUTEUR"],perm:"+R",tag:"SELF_READ",formula:`${aclRoleFormula(["LECTEUR","CONTRIBUTEUR"])} and rec.Email == user.Email`}
     ];
   }
-  if(spec.mode==="identity"){
+  if(spec.mode==="selfidentity"){
     return [
-      {roles:reader,perm:"+C",tag:"CREATE_PROBE",formula:aclRoleFormula(reader)},
-      {roles:reader,perm:"+R",tag:"READ_OWN_PROBE",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`},
-      {roles:reader,perm:"+D",tag:"DELETE_OWN_PROBE",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`}
+      {roles:["ADMINISTRATEUR"],perm:"+C",tag:"ADMIN_CREATE_IDENTITY",formula:aclRoleFormula(["ADMINISTRATEUR"])},
+      {roles:reader,perm:"+R",tag:"READ_SELF_IDENTITY",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`}
     ];
+  }
+  if(spec.mode==="owneronly"){
+    // La règle Owner générique est ajoutée par applyFinopsAcl(); le défaut none ferme la table aux autres.
+    return [];
   }
   if(spec.mode==="presence"){
     return [
@@ -2279,6 +2266,21 @@ async function applyFinopsAcl(){
 }
 
 
+async function ensureFinopsIdentityRowsV51(emails){
+  const clean=[...new Set((emails||[]).map(x=>String(x||'').trim().toLowerCase()).filter(x=>x.includes('@')))];
+  if(!clean.length)return;
+  // Les doublons sont sans danger mais on les évite lorsque les lignes sont visibles (Owner).
+  const visible=new Set((D?.[T.selfIdentity]||[]).map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean));
+  const missing=clean.filter(e=>!visible.has(e));
+  if(!missing.length)return;
+  try{
+    await apply(missing.map(email=>["AddRecord",T.selfIdentity,null,{Email:email}]));
+  }catch(e){
+    console.warn('FinOps V51 — synchronisation des identités incomplète',e);
+    // Ne pas annuler la sauvegarde des droits : un Owner pourra relancer migrate_identity_v51.py.
+  }
+}
+
 function renderRightsAdmin(){
   const el=document.getElementById('v-rights');
   if(!el)return;
@@ -2344,6 +2346,7 @@ async function saveAllRightsV18(){
   const actions=[];
   let invalid=false;
   const emails=[];
+  const existingRightEmails=new Set((D[T.rights]||[]).map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean));
   document.querySelectorAll('#rightsBody tr').forEach(tr=>{
     const id=+tr.dataset.r||0;
     const fields=readFields(tr,'[data-f]');
@@ -2365,6 +2368,7 @@ async function saveAllRightsV18(){
   if(!actions.length){toast("Aucune modification à enregistrer.");return}
   try{
     await apply(actions);
+    await ensureFinopsIdentityRowsV51(emails.filter(e=>!existingRightEmails.has(e)));
     toast("Droits utilisateurs enregistrés.");
     await boot();
   }catch(e){toast(e.message||String(e),true)}
