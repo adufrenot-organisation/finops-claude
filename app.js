@@ -1408,26 +1408,44 @@ function renderScenarios(){
   });
 }
 
+function scenarioFieldsChangedV43(original,fields){
+  const textKeys=['Nom','Statut'];
+  const numberKeys=['Annee','Nb_Mois','Taux_USD_EUR','Taux_Utilisation','Nb_Jours_Ouvres_Annuels'];
+  return textKeys.some(k=>String(original?.[k]??'').trim()!==String(fields?.[k]??'').trim()) ||
+    numberKeys.some(k=>Number(original?.[k]||0)!==Number(fields?.[k]||0));
+}
 async function saveAllScenariosV26(){
-  const root=document.getElementById('v-scenarios'),actions=[];
+  const root=document.getElementById('v-scenarios'),actions=[],labels=[];
   for(const tr of root.querySelectorAll('tbody tr')){
+    if(!tr.dataset.s && !tr.dataset.draft)continue;
     const fields=readFields(tr);
-    if(!String(fields.Nom||'').trim()){toast('Le nom du scénario est obligatoire.',true);return}
-    if((+fields.Nb_Mois||0)<1){toast('Le nombre de mois doit être supérieur à 0.',true);return}
-    if(tr.dataset.s) actions.push(["UpdateRecord",T.scenarios,+tr.dataset.s,fields]);
-    else if(tr.dataset.draft) actions.push(["AddRecord",T.scenarios,null,{...fields,Commentaire:''}]);
+    fields.Nom=String(fields.Nom||'').trim();
+    fields.Statut=String(fields.Statut||'').trim();
+    if(!fields.Nom){toast('Le nom du scénario est obligatoire.',true);tr.querySelector('[data-f="Nom"]')?.focus();return}
+    if((+fields.Nb_Mois||0)<1){toast(`Le nombre de mois doit être supérieur à 0 pour « ${fields.Nom} ».`,true);return}
+    if(tr.dataset.s){
+      const id=+tr.dataset.s;
+      const original=(D[T.scenarios]||[]).find(s=>+s.id===id);
+      if(!scenarioFieldsChangedV43(original,fields))continue;
+      actions.push(["UpdateRecord",T.scenarios,id,fields]);
+      labels.push(fields.Nom||original?.Nom||`Scénario ${id}`);
+    }else if(tr.dataset.draft){
+      actions.push(["AddRecord",T.scenarios,null,{...fields,Commentaire:''}]);
+      labels.push(fields.Nom||'Nouveau scénario');
+    }
   }
-  if(!actions.length){toast('Aucun scénario à enregistrer.');return}
+  if(!actions.length){toast('Aucune modification de scénario à enregistrer.');return}
   try{
     await apply(actions);
     NEW_SCENARIOS=[];
     await reload();
     toast(`${actions.length} scénario(s) enregistré(s).`);
   }catch(e){
-    // Keep drafts visible so the user does not lose typed values.
-    if(String(e?.message||e).toLowerCase().includes('permission')){
-      toast("Création refusée par les règles d'accès Grist. Applique la règle Scenarios +CRU de la V26.",true);
-    }
+    const message=String(e?.message||e||'Erreur inconnue');
+    console.error('Échec enregistrement scénarios', {message,scenarios:labels,actions,e});
+    const permission=/permission|access|acl|denied|interdit|autorisation/i.test(message);
+    const prefix=permission?'Droits Grist insuffisants':'Échec de l’enregistrement';
+    toast(`${prefix} pour ${labels.length===1?'« '+labels[0]+' »':labels.length+' scénario(s)'} : ${message}`,true);
   }
 }
 
