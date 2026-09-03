@@ -228,7 +228,7 @@ function ensureNavGroupStyles(){
     .shell:not(.sidebar-collapsed) .sidebar{width:auto!important;min-width:0!important;padding-left:8px!important;padding-right:8px!important}
     .shell:not(.sidebar-collapsed) .brand{gap:7px!important;padding-left:3px!important;padding-right:3px!important}
     .shell:not(.sidebar-collapsed) .brandtext h2{font-size:14px!important}
-    .shell:not(.sidebar-collapsed) .brandtext small{font-size:8px!important;line-height:1.2!important}
+    .shell:not(.sidebar-collapsed) .brandtext small{font-size:8px!important;line-height:1.2!important}.app-author{display:block;margin-top:3px;font-size:8.5px;line-height:1.2;color:inherit;opacity:.62;font-weight:500;letter-spacing:0}.app-author strong{font-weight:700}.sidebar-collapsed .app-author{display:none!important}
     .shell:not(.sidebar-collapsed) .nav button[data-view]{padding:7px 8px!important;gap:7px!important;font-size:11px!important;line-height:1.18!important;min-height:30px!important}
     .shell:not(.sidebar-collapsed) .nav-icon{font-size:13px!important;min-width:16px!important}
     .shell:not(.sidebar-collapsed) .nav-label{font-size:11px!important;white-space:normal!important;overflow-wrap:anywhere}
@@ -383,7 +383,7 @@ function renderShell(){
 
   document.getElementById("root").innerHTML=`<div class="shell">
     <aside class="sidebar">
-      <div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div>
+      <div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small><span class="app-author">Réalisé par <strong>Alex Dufrenot</strong></span></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div>
       <nav class="nav">${navHtml}</nav>
       <div class="sidefoot"><b>${esc(roleLabel())}</b><br><span id="sideScope"></span></div>
     </aside>
@@ -2120,8 +2120,8 @@ function aclRulesForSpec(spec){
   }
   if(spec.mode==="selfidentity"){
     return [
-      {roles:["ADMINISTRATEUR"],perm:"+C",tag:"ADMIN_CREATE_IDENTITY",formula:aclRoleFormula(["ADMINISTRATEUR"])},
-      {roles:reader,perm:"+R",tag:"READ_SELF_IDENTITY",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`}
+      {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"ADMIN_SYNC_IDENTITIES",formula:aclRoleFormula(["ADMINISTRATEUR"])},
+      {roles:["LECTEUR","CONTRIBUTEUR","OBSERVATEUR","CONTRIBUTEUR_AVANCE"],perm:"+R",tag:"READ_SELF_IDENTITY",formula:`${aclRoleFormula(["LECTEUR","CONTRIBUTEUR","OBSERVATEUR","CONTRIBUTEUR_AVANCE"])} and rec.Email == user.Email`}
     ];
   }
   if(spec.mode==="owneronly"){
@@ -2266,25 +2266,36 @@ async function applyFinopsAcl(){
 }
 
 
-async function ensureFinopsIdentityRowsV51(emails){
-  const clean=[...new Set((emails||[]).map(x=>String(x||'').trim().toLowerCase()).filter(x=>x.includes('@')))];
-  if(!clean.length)return;
-  // Les doublons sont sans danger mais on les évite lorsque les lignes sont visibles (Owner).
-  const visible=new Set((D?.[T.selfIdentity]||[]).map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean));
-  const missing=clean.filter(e=>!visible.has(e));
-  if(!missing.length)return;
-  try{
-    await apply(missing.map(email=>["AddRecord",T.selfIdentity,null,{Email:email}]));
-  }catch(e){
-    console.warn('FinOps V51 — synchronisation des identités incomplète',e);
-    // Ne pas annuler la sauvegarde des droits : un Owner pourra relancer migrate_identity_v51.py.
-  }
+async function syncFinopsIdentitiesV52(activeEmails){
+  const desired=[...new Set((activeEmails||[])
+    .map(x=>String(x||'').trim().toLowerCase())
+    .filter(x=>x.includes('@')))];
+  const rowsNow=D?.[T.selfIdentity]||[];
+  const byEmail=new Map();
+  rowsNow.forEach(r=>{
+    const email=String(r.Email||'').trim().toLowerCase();
+    if(email&&!byEmail.has(email))byEmail.set(email,r);
+  });
+  const desiredSet=new Set(desired);
+  const actions=[];
+  desired.forEach(email=>{
+    if(!byEmail.has(email))actions.push(["AddRecord",T.selfIdentity,null,{Email:email}]);
+  });
+  rowsNow.forEach(r=>{
+    const email=String(r.Email||'').trim().toLowerCase();
+    if(email&&!desiredSet.has(email))actions.push(["RemoveRecord",T.selfIdentity,+r.id]);
+  });
+  if(!actions.length)return {added:0,removed:0};
+  const added=actions.filter(a=>a[0]==='AddRecord').length;
+  const removed=actions.filter(a=>a[0]==='RemoveRecord').length;
+  await apply(actions);
+  return {added,removed};
 }
 
 function renderRightsAdmin(){
   const el=document.getElementById('v-rights');
   if(!el)return;
-  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>La présence d’un utilisateur actif dans cette table est obligatoire pour accéder à FinOps. Les domaines définissent son périmètre de données.</p></div><div class="table-actions"><button id="newRightUser" class="btn secondary">+ Nouvel utilisateur</button><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div></div>
+  el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Droits utilisateurs</h3><p>La présence d’un utilisateur actif dans cette table est obligatoire pour accéder à FinOps. Les domaines définissent son périmètre de données. <span class="badge ok">Identité technique synchronisée automatiquement</span></p></div><div class="table-actions"><button id="newRightUser" class="btn secondary">+ Nouvel utilisateur</button><button id="saveAllRights" class="btn primary">Enregistrer les modifications</button></div></div>
   <div class="rights-role-help">
     <div><b>Lecteur</b><span>Menus utilisateurs · lecture seule</span></div>
     <div><b>Contributeur</b><span>Menus utilisateurs · modification</span></div>
@@ -2336,7 +2347,12 @@ function bindRightsDeleteButtons(){
     if(!confirm(`Supprimer les droits de "${user?.Email||id}" ?`))return;
     try{
       await apply([["RemoveRecord",T.rights,id]]);
-      toast("Utilisateur supprimé des droits.");
+      const remainingActive=(D[T.rights]||[])
+        .filter(r=>+r.id!==id&&r.Actif!==false)
+        .map(r=>String(r.Email||'').trim().toLowerCase())
+        .filter(Boolean);
+      await syncFinopsIdentitiesV52(remainingActive);
+      toast("Utilisateur supprimé des droits et identité technique synchronisée.");
       await boot();
     }catch(e){toast("Suppression impossible : "+(e.message||String(e)),true)}
   });
@@ -2346,7 +2362,7 @@ async function saveAllRightsV18(){
   const actions=[];
   let invalid=false;
   const emails=[];
-  const existingRightEmails=new Set((D[T.rights]||[]).map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean));
+  const activeEmails=[];
   document.querySelectorAll('#rightsBody tr').forEach(tr=>{
     const id=+tr.dataset.r||0;
     const fields=readFields(tr,'[data-f]');
@@ -2357,7 +2373,8 @@ async function saveAllRightsV18(){
       tr.querySelector('[data-f="Email"]')?.classList.add('input-error');
       return;
     }
-    emails.push(fields.Email.toLocaleLowerCase());
+    emails.push(fields.Email.toLowerCase());
+    if(fields.Actif!==false)activeEmails.push(fields.Email.toLowerCase());
     const ids=[...tr.querySelectorAll('input[data-domain-id]:checked')].map(x=>+x.dataset.domainId).filter(Boolean);
     fields.Domaines_Autorises=['L',...ids];
     fields.Domaine=ids[0]||0; // compatibilité historique
@@ -2368,8 +2385,9 @@ async function saveAllRightsV18(){
   if(!actions.length){toast("Aucune modification à enregistrer.");return}
   try{
     await apply(actions);
-    await ensureFinopsIdentityRowsV51(emails.filter(e=>!existingRightEmails.has(e)));
-    toast("Droits utilisateurs enregistrés.");
+    const sync=await syncFinopsIdentitiesV52(activeEmails);
+    const detail=(sync.added||sync.removed)?` · identités +${sync.added} / -${sync.removed}`:'';
+    toast("Droits utilisateurs enregistrés"+detail+".");
     await boot();
   }catch(e){toast(e.message||String(e),true)}
 }
