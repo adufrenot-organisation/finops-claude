@@ -76,32 +76,57 @@ function currentUserLabel(){
   if(ACCESS.role===APP_ROLES.OWNER)return 'Owner Grist';
   return currentRightRow()?.Email||'Utilisateur autorisé';
 }
+function accessFromRightRow(row){
+  const multi=refListIds(row.Domaines_Autorises);
+  const ids=multi.length?multi:(+row.Domaine?[+row.Domaine]:[]);
+  return {
+    role:normalizeAppRole(row.Role_App),
+    domainIds:[...new Set(ids.map(Number).filter(Boolean))],
+    rights:[row],
+    isOwner:false,
+    ambiguous:false
+  };
+}
 function deriveAccess(){
   const rr=(D[T.rights]||[]).filter(r=>r.Actif!==false);
+  const distinctEmails=[...new Set(rr.map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean))];
 
-  // Avec les ACL FinOps, un utilisateur normal ne voit que sa propre ligne.
-  // L'Owner Grist contourne les ACL et voit généralement plusieurs utilisateurs.
-  const distinctEmails=new Set(rr.map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean));
-  if(distinctEmails.size>1){
-    ACCESS={role:APP_ROLES.OWNER,domainIds:(D[T.domains]||[]).map(d=>+d.id),rights:rr,isOwner:true};
+  // Cas normal : les ACL ne rendent visible que la ligne de l'utilisateur courant.
+  if(distinctEmails.length===1){
+    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===distinctEmails[0])||rr[0];
+    ACCESS=accessFromRightRow(row);
+    try{sessionStorage.removeItem('finopsAccessTestEmail')}catch(_){}
     return;
   }
 
-  if(rr.length){
-    const row=rr[0];
-    const multi=refListIds(row.Domaines_Autorises);
-    const ids=multi.length?multi:(+row.Domaine?[+row.Domaine]:[]);
-    ACCESS={
-      role:normalizeAppRole(row.Role_App),
-      domainIds:[...new Set(ids.map(Number).filter(Boolean))],
-      rights:[row],
-      isOwner:false
-    };
+  // V48 : plusieurs identités visibles ne signifient JAMAIS automatiquement Owner.
+  // Cela arrive notamment lors des tests « voir comme » effectués depuis un compte Owner.
+  // On exige alors une identité de test explicite et on reste deny-by-default.
+  if(distinctEmails.length>1){
+    let selected='';
+    try{selected=String(sessionStorage.getItem('finopsAccessTestEmail')||'').trim().toLowerCase()}catch(_){}
+    const row=selected?rr.find(r=>String(r.Email||'').trim().toLowerCase()===selected):null;
+    if(row){
+      ACCESS={...accessFromRightRow(row),ambiguous:true,visibleRights:rr,testIdentity:true};
+      return;
+    }
+    ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:true,visibleRights:rr};
     return;
   }
 
   // Aucun enregistrement Droits_Utilisateurs visible = aucun accès applicatif.
-  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false};
+  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false};
+}
+function renderAccessIdentityChooser(){
+  const rr=(ACCESS.visibleRights||[]).slice().sort((a,b)=>String(a.Email||'').localeCompare(String(b.Email||''),'fr'));
+  const opts=rr.map(r=>`<option value="${esc(String(r.Email||'').trim().toLowerCase())}">${esc(r.Email||'Utilisateur')} — ${esc(roleLabel(normalizeAppRole(r.Role_App)))}</option>`).join('');
+  document.getElementById('root').innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">👤</div><h1>Identité FinOps à confirmer</h1><p>Plusieurs lignes actives de <b>Droits_Utilisateurs</b> sont visibles. FinOps ne vous attribue plus automatiquement le rôle Owner.</p><div class="deniednote">Pour tester les droits depuis un compte privilégié, choisissez explicitement l’utilisateur à simuler. Le choix reste limité à cet onglet.</div><label class="field" style="text-align:left;margin-top:18px">Utilisateur à simuler<select id="accessIdentitySelect">${opts}</select></label><button id="accessIdentityApply" class="btn primary" style="margin-top:12px">Appliquer ce profil</button></div></div>`;
+  document.getElementById('accessIdentityApply')?.addEventListener('click',()=>{
+    const email=document.getElementById('accessIdentitySelect')?.value||'';
+    if(!email)return;
+    try{sessionStorage.setItem('finopsAccessTestEmail',email)}catch(_){}
+    boot();
+  });
 }
 
 function menuConfigAllRows(){
@@ -333,6 +358,7 @@ function startPresence(){
 
 function renderShell(){
   if(ACCESS.role===APP_ROLES.DENIED){
+    if(ACCESS.ambiguous){renderAccessIdentityChooser();return;}
     document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">🔒</div><h1>Accès non autorisé</h1><p>Votre compte n’est pas inscrit comme utilisateur actif dans la table <b>Droits_Utilisateurs</b>.</p><div class="deniednote">Aucun menu FinOps n’est disponible. Demandez à un administrateur de vous ajouter dans la gestion des droits.</div></div></div>`;
     return;
   }
@@ -353,7 +379,7 @@ function renderShell(){
         <div class="head-right">
           <div class="session-strip" aria-label="Session FinOps">
             <div class="session-ident"><span class="session-label">Moi</span><b id="sessionUser">${esc(currentUserLabel())}</b></div>
-            <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}</b></div>
+            <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}${ACCESS.testIdentity?' · TEST':''}</b></div>
             <div class="session-ident"><span class="session-label">Page</span><b id="sessionPage">${esc(menuLabel('dashboard'))}</b></div>
             <div id="presenceWidget" class="presence-widget">
               <button id="presenceToggle" type="button" class="presence-toggle" aria-expanded="false">
