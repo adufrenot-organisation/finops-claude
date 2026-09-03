@@ -155,17 +155,46 @@ function setNavGroupCollapsed(group,collapsed){
   try{localStorage.setItem(`finopsNavGroup:${group}`,collapsed?'1':'0')}catch(_){}
 }
 function bindNavGroups(){
-  document.querySelectorAll('.nav-group').forEach(section=>{
+  const sections=[...document.querySelectorAll('.nav-group')];
+  sections.forEach(section=>{
     const group=section.dataset.navGroup;
     setNavGroupCollapsed(group,navGroupCollapsed(group));
-    section.querySelector('.nav-group-toggle')?.addEventListener('click',()=>setNavGroupCollapsed(group,!section.classList.contains('collapsed')));
+    section.querySelector('.nav-group-toggle')?.addEventListener('click',()=>{
+      const willOpen=section.classList.contains('collapsed');
+      if(willOpen){
+        // V47 : comportement accordéon. Ouvrir une rubrique referme les autres
+        // afin de préserver un maximum de hauteur utile pour le menu central.
+        sections.forEach(other=>{
+          if(other!==section)setNavGroupCollapsed(other.dataset.navGroup,true);
+        });
+      }
+      setNavGroupCollapsed(group,!section.classList.contains('collapsed'));
+    });
   });
+}
+function revealNavGroupForView(view){
+  const btn=document.querySelector(`.nav button[data-view="${CSS.escape(String(view||''))}"]`);
+  const section=btn?.closest('.nav-group');
+  if(!section)return;
+  document.querySelectorAll('.nav-group').forEach(other=>setNavGroupCollapsed(other.dataset.navGroup,other!==section));
 }
 function ensureNavGroupStyles(){
   if(document.getElementById('finops-nav-group-styles'))return;
   const style=document.createElement('style');style.id='finops-nav-group-styles';
   style.textContent=`
-    .nav-group{margin:4px 0 8px}.nav-group-toggle{width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.72}.nav-group-toggle:hover{opacity:1}.nav-group-title{flex:1;text-align:left}.nav-group-count{font-size:10px;opacity:.7}.nav-group-arrow{font-size:16px;line-height:1}.nav-group-items{display:flex;flex-direction:column;gap:2px}.nav-group.collapsed .nav-group-items{display:none}.sidebar-collapsed .nav-group-toggle{justify-content:center;padding:9px 4px}.sidebar-collapsed .nav-group-title,.sidebar-collapsed .nav-group-count{display:none}.sidebar-collapsed .nav-group-arrow{transform:none}.menu-section-badge{display:inline-block;min-width:54px;text-align:center;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:800}.menu-section-badge.user{background:#e8f1ff;color:#2457a6}.menu-section-badge.admin{background:#f2ebff;color:#6a35a8}
+    .nav-group{margin:2px 0 5px}.nav-group-toggle{width:100%;display:flex;align-items:center;gap:6px;padding:6px 9px;border:0;background:transparent;color:inherit;cursor:pointer;font:inherit;font-size:10px;font-weight:800;letter-spacing:.075em;text-transform:uppercase;opacity:.74}.nav-group-toggle:hover{opacity:1}.nav-group-title{flex:1;text-align:left}.nav-group-count{font-size:9px;opacity:.7}.nav-group-arrow{font-size:14px;line-height:1}.nav-group-items{display:flex;flex-direction:column;gap:1px}.nav-group.collapsed .nav-group-items{display:none}.sidebar-collapsed .nav-group-toggle{justify-content:center;padding:7px 4px}.sidebar-collapsed .nav-group-title,.sidebar-collapsed .nav-group-count{display:none}.sidebar-collapsed .nav-group-arrow{transform:none}.menu-section-badge{display:inline-block;min-width:50px;text-align:center;padding:3px 6px;border-radius:999px;font-size:9px;font-weight:800}.menu-section-badge.user{background:#e8f1ff;color:#2457a6}.menu-section-badge.admin{background:#f2ebff;color:#6a35a8}
+    /* V47 : menu plus compact pour réserver davantage de largeur et de hauteur au contenu. */
+    .shell:not(.sidebar-collapsed){grid-template-columns:minmax(178px,198px) minmax(0,1fr)!important}
+    .shell:not(.sidebar-collapsed) .sidebar{width:auto!important;min-width:0!important;padding-left:8px!important;padding-right:8px!important}
+    .shell:not(.sidebar-collapsed) .brand{gap:7px!important;padding-left:3px!important;padding-right:3px!important}
+    .shell:not(.sidebar-collapsed) .brandtext h2{font-size:14px!important}
+    .shell:not(.sidebar-collapsed) .brandtext small{font-size:8px!important;line-height:1.2!important}
+    .shell:not(.sidebar-collapsed) .nav button[data-view]{padding:7px 8px!important;gap:7px!important;font-size:11px!important;line-height:1.18!important;min-height:30px!important}
+    .shell:not(.sidebar-collapsed) .nav-icon{font-size:13px!important;min-width:16px!important}
+    .shell:not(.sidebar-collapsed) .nav-label{font-size:11px!important;white-space:normal!important;overflow-wrap:anywhere}
+    .shell:not(.sidebar-collapsed) .sidefoot{font-size:10px!important;line-height:1.25!important}
+    @media (min-width:1500px){.shell:not(.sidebar-collapsed){grid-template-columns:190px minmax(0,1fr)!important}}
+    @media (max-width:1180px) and (min-width:901px){.shell:not(.sidebar-collapsed){grid-template-columns:172px minmax(0,1fr)!important}.shell:not(.sidebar-collapsed) .nav button[data-view]{font-size:10.5px!important;padding:6px 7px!important}.shell:not(.sidebar-collapsed) .nav-label{font-size:10.5px!important}}
   `;
   document.head.appendChild(style);
 }
@@ -434,6 +463,7 @@ const DEFAULT_MENU_LABELS={
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
 function switchView(v){
   document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
+  revealNavGroupForView(v);
   document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));
   document.getElementById('v-'+v)?.classList.add('active');
   const label=menuLabel(v);
