@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",identity:"FinOps_Identite_Session"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 let PRESENCE_INTERVAL=null;
@@ -26,7 +26,7 @@ function rows(t){if(!t||!Array.isArray(t.id))return[];return t.id.map((id,i)=>{c
 function money(v,c="USD"){return new Intl.NumberFormat("fr-FR",{style:"currency",currency:c,maximumFractionDigits:0}).format(Number(v||0))} function num(v){return new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Number(v||0))} function pct(v){return new Intl.NumberFormat("fr-FR",{style:"percent",maximumFractionDigits:1}).format(Number(v||0))} function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
 function toast(m,e=false){const x=document.getElementById("toast");if(!x)return;x.textContent=m;x.className="toast show"+(e?" error":"");setTimeout(()=>x.className="toast",2400)}
 async function fetchAll(){const names=Object.values(T),raw=await Promise.all(names.map(n=>grist.docApi.fetchTable(n).catch(()=>({id:[]}))));const o={};names.forEach((n,i)=>o[n]=rows(raw[i]));o.domainById=Object.fromEntries(o[T.domains].map(r=>[r.id,r]));o.scenarioById=Object.fromEntries(o[T.scenarios].map(r=>[r.id,r]));o.providerById=Object.fromEntries(o[T.providers].map(r=>[r.id,r]));o.offerById=Object.fromEntries(o[T.offers].map(r=>[r.id,r]));return o}
-async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe();startPresence()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
+async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();CURRENT_IDENTITY=await resolveCurrentIdentityV50();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe();startPresence()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
 function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
 
 const APP_ROLES={
@@ -87,83 +87,78 @@ function accessFromRightRow(row){
     ambiguous:false
   };
 }
-function extractAclAsUserFromUrlV49(raw){
-  let text=String(raw||'');
-  if(!text)return '';
-  const candidates=[text];
-  for(let i=0;i<3;i++){
-    try{
-      const d=decodeURIComponent(candidates[candidates.length-1]);
-      if(d===candidates[candidates.length-1])break;
-      candidates.push(d);
-    }catch(_){break;}
-  }
-  for(const candidate of candidates){
-    try{
-      const u=new URL(candidate,window.location.href);
-      for(const key of ['aclAsUser_','aclAsUser']){
-        const v=String(u.searchParams.get(key)||'').trim().toLowerCase();
-        if(v)return v;
-      }
-    }catch(_){}
-    const m=candidate.match(/(?:[?&#]|^)(?:aclAsUser_|aclAsUser)=([^&#]+)/i);
-    if(m){
-      try{return decodeURIComponent(m[1]).trim().toLowerCase()}catch(_){return String(m[1]||'').trim().toLowerCase()}
-    }
-  }
-  return '';
+let CURRENT_IDENTITY=null;
+function normalizeDocAccessV50(value){
+  const v=String(value||'').trim().toUpperCase();
+  if(v.includes('OWNER'))return 'OWNER';
+  if(v.includes('EDITOR'))return 'EDITOR';
+  if(v.includes('VIEWER'))return 'VIEWER';
+  return v;
 }
-function detectViewAsEmailV49(){
-  // Grist implémente « Voir comme » via le paramètre aclAsUser_.
-  // Dans un Custom Widget il peut être présent dans l'URL du widget ou dans le referrer du document parent.
-  const sources=[window.location.href,document.referrer];
-  for(const src of sources){
-    const email=extractAclAsUserFromUrlV49(src);
-    if(email)return email;
+async function resolveCurrentIdentityV50(){
+  // V50 : l'identité est résolue côté moteur Grist, pas depuis l'URL/referrer du widget.
+  // Les colonnes Email et Access de FinOps_Identite_Session sont des trigger formulas
+  // (user.Email / user.Access) calculées par Grist lors de la création de la sonde.
+  const sid=`finops-${Date.now()}-${(globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2))}`;
+  try{
+    await grist.docApi.applyUserActions([["AddRecord",T.identity,null,{Session_Id:sid}]]);
+    await new Promise(resolve=>setTimeout(resolve,40));
+    const raw=await grist.docApi.fetchTable(T.identity);
+    const rr=rows(raw);
+    const rec=rr.find(r=>String(r.Session_Id||'')===sid);
+    if(!rec)throw new Error('Sonde créée mais identité non relue.');
+    const identity={
+      email:String(rec.Email||'').trim().toLowerCase(),
+      access:normalizeDocAccessV50(rec.Access),
+      sessionId:sid,
+      source:'grist-trigger-formula'
+    };
+    // Nettoyage best effort : l'identité reste en mémoire, la ligne temporaire n'est plus utile.
+    try{await grist.docApi.applyUserActions([["RemoveRecord",T.identity,+rec.id]])}catch(_){/* ACL/latence : sans impact */}
+    if(!identity.email)throw new Error('La trigger formula user.Email n’a renvoyé aucune identité.');
+    return identity;
+  }catch(e){
+    console.warn('FinOps V50 — résolution identité indisponible',e);
+    return {email:'',access:'',sessionId:sid,source:'identity-unavailable',error:String(e?.message||e)};
   }
-  return '';
 }
 function deriveAccess(){
   const rr=(D[T.rights]||[]).filter(r=>r.Actif!==false);
-  const distinctEmails=[...new Set(rr.map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean))];
-  const viewAsEmail=detectViewAsEmailV49();
+  const identity=CURRENT_IDENTITY||{};
 
-  // V49 : lorsqu'un Owner utilise « Voir comme », le paramètre Grist aclAsUser_
-  // est prioritaire sur toute heuristique liée au nombre de lignes visibles.
-  if(viewAsEmail){
-    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===viewAsEmail);
-    if(row){
-      ACCESS={...accessFromRightRow(row),viewAs:true,viewAsEmail,accessSource:'grist-view-as'};
+  // Source d'autorité V50 : identité calculée par Grist au moment de l'action.
+  // Cela suit aussi « Voir comme », sans conserver un aclAsUser_ périmé dans le referrer.
+  if(identity.email){
+    if(identity.access==='OWNER'){
+      ACCESS={
+        role:APP_ROLES.OWNER,
+        domainIds:(D[T.domains]||[]).filter(d=>d.Actif!==false).map(d=>+d.id).filter(Boolean),
+        rights:rr,
+        isOwner:true,
+        ambiguous:false,
+        currentEmail:identity.email,
+        accessSource:'grist-identity-owner'
+      };
       return;
     }
-    // Un utilisateur simulé absent/inactif dans Droits_Utilisateurs ne reçoit aucun accès FinOps.
-    ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false,viewAs:true,viewAsEmail,accessSource:'grist-view-as-missing'};
+    const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===identity.email);
+    if(row){
+      ACCESS={...accessFromRightRow(row),currentEmail:identity.email,accessSource:'grist-identity-rights'};
+      return;
+    }
+    ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false,currentEmail:identity.email,accessSource:'identity-no-rights'};
     return;
   }
 
-  // Cas normal non-Owner : les ACL doivent rendre visible uniquement la ligne de l'utilisateur courant.
+  // Aucun fallback permissif : plusieurs lignes visibles ne permettent JAMAIS de déduire Owner.
+  // Une seule ligne reste tolérée pour faciliter le diagnostic si la migration V50 n'est pas terminée.
+  const distinctEmails=[...new Set(rr.map(r=>String(r.Email||'').trim().toLowerCase()).filter(Boolean))];
   if(distinctEmails.length===1){
     const row=rr.find(r=>String(r.Email||'').trim().toLowerCase()===distinctEmails[0])||rr[0];
-    ACCESS={...accessFromRightRow(row),accessSource:'rights-row'};
+    ACCESS={...accessFromRightRow(row),accessSource:'legacy-single-right-row'};
     return;
   }
-
-  // Cas Owner normal : il voit plusieurs lignes de Droits_Utilisateurs et aucun aclAsUser_ n'est actif.
-  // On restaure l'ouverture transparente en Owner sans écran intermédiaire.
-  if(distinctEmails.length>1){
-    ACCESS={
-      role:APP_ROLES.OWNER,
-      domainIds:(D[T.domains]||[]).filter(d=>d.Actif!==false).map(d=>+d.id).filter(Boolean),
-      rights:rr,
-      isOwner:true,
-      ambiguous:false,
-      accessSource:'owner-multiple-rights'
-    };
-    return;
-  }
-
-  // Aucun enregistrement visible : deny-by-default.
-  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:false,accessSource:'no-rights'};
+  ACCESS={role:APP_ROLES.DENIED,domainIds:[],rights:[],isOwner:false,ambiguous:distinctEmails.length>1,accessSource:'identity-unavailable',identityError:identity.error||''};
 }
 
 function menuConfigAllRows(){
@@ -415,7 +410,7 @@ function renderShell(){
         <div class="head-right">
           <div class="session-strip" aria-label="Session FinOps">
             <div class="session-ident"><span class="session-label">Moi</span><b id="sessionUser">${esc(currentUserLabel())}</b></div>
-            <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}${ACCESS.viewAs?' · VUE COMME':''}</b></div>
+            <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}</b></div>
             <div class="session-ident"><span class="session-label">Page</span><b id="sessionPage">${esc(menuLabel('dashboard'))}</b></div>
             <div id="presenceWidget" class="presence-widget">
               <button id="presenceToggle" type="button" class="presence-toggle" aria-expanded="false">
@@ -676,6 +671,7 @@ async function reload(){
   const previousScenarioId=+(document.getElementById('scenarioSelect')?.value||selectedScenario()?.id||0);
   await waitForGristRecalc();
   await fetchAll();
+  CURRENT_IDENTITY=await resolveCurrentIdentityV50();
   deriveAccess();
   populateScenario(previousScenarioId);
   CURRENT=model(selectedScenario()?.id);
@@ -2078,6 +2074,7 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Domaines",colIds:"*",kind:"domains",mode:"domains"},
   {tableId:"Droits_Utilisateurs",colIds:"*",kind:"rights",mode:"rights"},
   {tableId:"Presence_Utilisateurs",colIds:"*",kind:"presence",mode:"presence"},
+  {tableId:"FinOps_Identite_Session",colIds:"*",kind:"identity",mode:"identity"},
   {tableId:"Claude_Scenarios",colIds:"*",kind:"global",mode:"userEdit"},
   {tableId:"Claude_Organisations",colIds:"*",kind:"global",mode:"userEdit"},
   {tableId:"Claude_Groupes",colIds:"*",kind:"global",mode:"userEdit"},
@@ -2102,7 +2099,7 @@ function aclRoleFormula(roles){
 }
 function aclFormulaFor(kind,roles){
   const base=aclRoleFormula(roles);
-  if(kind==="global"||kind==="scenario"||kind==="presence")return base;
+  if(kind==="global"||kind==="scenario"||kind==="presence"||kind==="identity")return base;
   if(kind==="domain")return `${base} and rec.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="presimdomain")return `${base} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="domains")return `${base} and rec.id in user.Droits.Domaines_Autorises`;
@@ -2135,6 +2132,13 @@ function aclRulesForSpec(spec){
       {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"ADMIN_WRITE_ALL",formula:aclRoleFormula(["ADMINISTRATEUR"])},
       {roles:["OBSERVATEUR","CONTRIBUTEUR_AVANCE"],perm:"+R",tag:"ADV_READ_ALL",formula:aclRoleFormula(["OBSERVATEUR","CONTRIBUTEUR_AVANCE"])},
       {roles:["LECTEUR","CONTRIBUTEUR"],perm:"+R",tag:"SELF_READ",formula:`${aclRoleFormula(["LECTEUR","CONTRIBUTEUR"])} and rec.Email == user.Email`}
+    ];
+  }
+  if(spec.mode==="identity"){
+    return [
+      {roles:reader,perm:"+C",tag:"CREATE_PROBE",formula:aclRoleFormula(reader)},
+      {roles:reader,perm:"+R",tag:"READ_OWN_PROBE",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`},
+      {roles:reader,perm:"+D",tag:"DELETE_OWN_PROBE",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`}
     ];
   }
   if(spec.mode==="presence"){
