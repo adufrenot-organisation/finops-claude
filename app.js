@@ -236,6 +236,62 @@ function ensureNavGroupStyles(){
     .shell:not(.sidebar-collapsed) .sidefoot{font-size:10px!important;line-height:1.25!important}
     @media (min-width:1500px){.shell:not(.sidebar-collapsed){grid-template-columns:190px minmax(0,1fr)!important}}
     @media (max-width:1180px) and (min-width:901px){.shell:not(.sidebar-collapsed){grid-template-columns:172px minmax(0,1fr)!important}.shell:not(.sidebar-collapsed) .nav button[data-view]{font-size:10.5px!important;padding:6px 7px!important}.shell:not(.sidebar-collapsed) .nav-label{font-size:10.5px!important}}
+
+    /* V55 — responsive complet : tablette + mobile en tiroir, contenu fluide et contrôles empilables. */
+    .mobile-nav-toggle,.mobile-nav-backdrop{display:none}
+    @media (max-width:900px){
+      .shell,.shell:not(.sidebar-collapsed),.shell.sidebar-collapsed{grid-template-columns:minmax(0,1fr)!important}
+      .sidebar,.shell.sidebar-collapsed .sidebar{position:fixed!important;inset:0 auto 0 0!important;width:min(286px,86vw)!important;height:100dvh!important;z-index:1002!important;padding:14px 10px!important;transform:translateX(-105%);transition:transform .2s ease,box-shadow .2s ease;overflow-y:auto;box-shadow:none}
+      .shell.mobile-nav-open .sidebar{transform:translateX(0);box-shadow:18px 0 40px rgba(10,24,48,.28)}
+      .shell.sidebar-collapsed .brandtext,.shell.sidebar-collapsed .nav-label,.shell.sidebar-collapsed .sidefoot,.shell.sidebar-collapsed .app-author{display:block!important}
+      .shell.sidebar-collapsed .nav-group-title,.shell.sidebar-collapsed .nav-group-count{display:inline!important}
+      .shell.sidebar-collapsed .nav button[data-view]{justify-content:flex-start!important;padding:8px!important}
+      .shell.sidebar-collapsed .nav-group-toggle{justify-content:flex-start!important;padding:7px 9px!important}
+      .shell.sidebar-collapsed .sidebar-toggle,.sidebar-toggle{position:static!important;width:30px!important;height:30px!important;border-radius:8px!important;background:rgba(255,255,255,.07)!important;box-shadow:none!important}
+      .app-author{margin:-2px 6px 8px 52px!important;white-space:normal!important}
+      .mobile-nav-toggle{display:grid;place-items:center;position:fixed;left:12px;top:12px;z-index:1001;width:40px;height:40px;border:1px solid #d7deea;border-radius:11px;background:#fff;color:#172033;box-shadow:0 6px 18px rgba(15,35,66,.14);font-size:20px;cursor:pointer}
+      .mobile-nav-backdrop{display:block;position:fixed;inset:0;z-index:1000;background:rgba(10,18,30,.38);opacity:0;pointer-events:none;transition:opacity .2s ease}
+      .shell.mobile-nav-open .mobile-nav-backdrop{opacity:1;pointer-events:auto}
+      .content,.shell.sidebar-collapsed .content{padding:14px!important;min-width:0!important;width:100%!important}
+      .head{padding-top:48px!important;align-items:stretch!important;flex-direction:column!important;gap:10px!important}
+      .head h1{font-size:clamp(22px,6vw,28px)!important}
+      .head-right{width:100%!important;min-width:0!important}
+      .session-strip{max-width:100%!important;overflow-x:auto!important;overscroll-behavior-inline:contain;padding-bottom:3px}
+      .controls{width:100%!important;flex-wrap:wrap!important;align-items:end!important}
+      .controls .field{flex:1 1 220px!important;min-width:0!important}
+      .controls select{width:100%!important;min-width:0!important}
+      .toolbar,.table-actions,.ce-actions{max-width:100%;flex-wrap:wrap!important}
+      .toolbar .field{flex:1 1 180px;min-width:0}.toolbar select,.toolbar input{max-width:100%}
+      .kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      .grid2,.grid3{grid-template-columns:1fr!important}
+      .card{padding:14px!important}
+      .tablewrap{max-width:100%;overflow-x:auto!important;-webkit-overflow-scrolling:touch;box-shadow:inset -12px 0 12px -16px rgba(15,35,66,.35)}
+      table{min-width:max-content}
+      th,td{white-space:nowrap}
+      td .editor,td .admin-input{min-width:100px}
+      .donutlayout{flex-direction:column;align-items:flex-start!important;min-height:0!important}
+      .barrow{grid-template-columns:minmax(88px,110px) minmax(90px,1fr) 76px!important}
+      .ce-scenario .field{min-width:min(230px,100%)!important;flex:1 1 210px}.ce-tabs{overflow-x:auto;white-space:nowrap}.ce-tab{flex:0 0 auto}
+    }
+    @media (max-width:560px){
+      .content,.shell.sidebar-collapsed .content{padding:10px!important}
+      .head{padding-top:50px!important}.head h1{font-size:22px!important}
+      .kpis,.roi-kpis,.ce-kpis{grid-template-columns:1fr!important}
+      .kpi,.ce-kpi{padding:13px!important}.kpi .v,.ce-kpi .v{font-size:20px!important}
+      .card{padding:12px!important;border-radius:11px!important}
+      .cardhead{align-items:stretch!important;flex-direction:column!important}
+      .table-actions{justify-content:flex-start!important;width:100%!important}
+      .table-actions .btn,.toolbar>.btn{flex:1 1 140px}
+      .btn{padding:8px 10px!important}
+      .session-strip{gap:6px!important}.session-ident{min-width:max-content}
+      .controls{gap:7px!important}.controls .btn{flex:1 1 120px}
+      .dashboard-filters{align-items:stretch!important;flex-direction:column!important}.dashboard-filters>.field,.dash-domain-field{width:100%!important}
+      .dash-domain-picker,.dash-domain-btn{width:100%!important}.dash-domain-menu{max-width:calc(100vw - 28px)!important}
+      .comparegrid{grid-template-columns:1fr!important}.checklist{gap:6px!important}.checkpill{width:100%;justify-content:flex-start}
+      .ce-dialog{padding:8px!important}.ce-dialog-card{width:100%!important;max-height:96dvh!important;padding:14px!important;border-radius:12px!important}
+      .ce-formgrid{grid-template-columns:1fr!important}.ce-formgrid .full{grid-column:auto!important}
+      .denied{padding:12px!important}.deniedcard h1{font-size:28px!important}.deniedcard p{font-size:14px!important}.deniednote{margin:0 16px 24px!important}
+    }
   `;
   document.head.appendChild(style);
 }
@@ -383,6 +439,8 @@ function renderShell(){
   const advancedSections=advanced?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-acladmin" class="view"></section>':'';
 
   document.getElementById("root").innerHTML=`<div class="shell">
+    <button id="mobileNavToggle" class="mobile-nav-toggle" type="button" title="Ouvrir le menu" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
+    <div id="mobileNavBackdrop" class="mobile-nav-backdrop" aria-hidden="true"></div>
     <aside class="sidebar">
       <div class="brand"><div class="logo">F</div><div class="brandtext"><h2>FINOPS IA</h2><small>SIMULATEUR MULTI-FOURNISSEURS</small></div><button id="sidebarToggle" class="sidebar-toggle" title="Rétracter le menu" aria-label="Rétracter le menu">‹</button></div><div class="app-author">Réalisé par <strong>Alex Dufrenot</strong></div>
       <nav class="nav">${navHtml}</nav>
@@ -413,7 +471,11 @@ function renderShell(){
 
   ensureNavGroupStyles();
   bindNavGroups();
-  document.querySelectorAll('.nav button[data-view]').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+  document.querySelectorAll('.nav button[data-view]').forEach(b=>b.onclick=()=>{switchView(b.dataset.view);closeMobileNav()});
+  const mobileToggle=document.getElementById('mobileNavToggle');
+  const mobileBackdrop=document.getElementById('mobileNavBackdrop');
+  mobileToggle?.addEventListener('click',()=>toggleMobileNav());
+  mobileBackdrop?.addEventListener('click',()=>closeMobileNav());
   document.getElementById('refresh').onclick=boot;
   document.getElementById('scenarioSelect').onchange=()=>{
     CURRENT=model(+selectedScenario()?.id||0);
@@ -439,6 +501,8 @@ function renderShell(){
   toggle.onclick=()=>setSidebarCollapsed(!document.querySelector('.shell').classList.contains('sidebar-collapsed'));
   let collapsed=false;try{collapsed=localStorage.getItem('finopsSidebarCollapsed')==='1'}catch(_){}
   setSidebarCollapsed(collapsed);
+  bindResponsiveShell();
+  closeMobileNav();
 }
 
 
@@ -502,6 +566,11 @@ const DEFAULT_MENU_LABELS={
 };
 
 function setSidebarCollapsed(collapsed){const shell=document.querySelector('.shell'),toggle=document.getElementById('sidebarToggle');if(!shell)return;shell.classList.toggle('sidebar-collapsed',collapsed);if(toggle){toggle.textContent=collapsed?'›':'‹';toggle.title=collapsed?'Déployer le menu':'Rétracter le menu';toggle.setAttribute('aria-label',toggle.title)}try{localStorage.setItem('finopsSidebarCollapsed',collapsed?'1':'0')}catch(_){}}
+function isMobileLayout(){return window.matchMedia?.('(max-width:900px)').matches}
+function setMobileNav(open){const shell=document.querySelector('.shell'),btn=document.getElementById('mobileNavToggle');if(!shell)return;const effective=!!open&&isMobileLayout();shell.classList.toggle('mobile-nav-open',effective);if(btn){btn.setAttribute('aria-expanded',effective?'true':'false');btn.title=effective?'Fermer le menu':'Ouvrir le menu';btn.setAttribute('aria-label',btn.title);btn.textContent=effective?'×':'☰'}}
+function toggleMobileNav(){setMobileNav(!document.querySelector('.shell')?.classList.contains('mobile-nav-open'))}
+function closeMobileNav(){setMobileNav(false)}
+function bindResponsiveShell(){if(window.__finopsResponsiveBound)return;let wasMobile=isMobileLayout();window.addEventListener('resize',()=>{const mobile=isMobileLayout();if(!mobile)closeMobileNav();if(mobile&&!wasMobile)closeMobileNav();wasMobile=mobile},{passive:true});window.addEventListener('keydown',e=>{if(e.key==='Escape')closeMobileNav()});window.__finopsResponsiveBound=true}
 function switchView(v){
   document.querySelectorAll('.nav button').forEach(x=>x.classList.toggle('active',x.dataset.view===v));
   revealNavGroupForView(v);
