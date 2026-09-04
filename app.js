@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures",appConfig:"FinOps_Configuration"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 let PRESENCE_INTERVAL=null;
@@ -13,7 +13,14 @@ let CHAT_READS=[];
 let CHAT_CHANNEL='GENERAL';
 let CHAT_PEER='';
 let CHAT_OPEN=false;
-const CHAT_REFRESH_MS=7000;
+let CHAT_DRAFTS={};
+const CHAT_DEFAULT_REFRESH_SECONDS=7;
+function chatRefreshSecondsV57(){
+  const row=(D?.[T.appConfig]||[]).find(r=>String(r.Cle||'')==='CHAT_REFRESH_SECONDS');
+  const n=Number(row?.Valeur||CHAT_DEFAULT_REFRESH_SECONDS);
+  return Math.max(3,Math.min(60,Number.isFinite(n)?n:CHAT_DEFAULT_REFRESH_SECONDS));
+}
+function chatRefreshMsV57(){return chatRefreshSecondsV57()*1000}
 function presenceSessionId(){
   try{
     let id=sessionStorage.getItem('finopsPresenceSessionId');
@@ -509,33 +516,71 @@ function ensureChatStylesV56(){
   .chat-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px;border-bottom:1px solid #e6ebf1}.chat-panel-head h3{margin:2px 0 0;font-size:1rem}.chat-kicker{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:#635bdb;font-weight:800}.chat-close{border:0;background:#f5f7fb;border-radius:9px;width:34px;height:34px;cursor:pointer;font-size:18px}
   .chat-tabs{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #e8edf3;overflow-x:auto}.chat-tab{border:1px solid #dfe5ed;background:#fff;border-radius:99px;padding:7px 10px;font-size:.76rem;font-weight:700;white-space:nowrap;cursor:pointer}.chat-tab.active{background:#eeeeff;color:#5146d8;border-color:#cbc8ff}
   .chat-body{flex:1;overflow:auto;padding:12px;background:#f7f8fb}.chat-empty{padding:28px 16px;text-align:center;color:#667085;font-size:.84rem}
-  .chat-message{display:flex;margin:7px 0}.chat-message.mine{justify-content:flex-end}.chat-bubble{max-width:82%;padding:9px 11px;border-radius:13px;background:#fff;border:1px solid #e1e6ed;box-shadow:0 1px 2px rgba(15,23,42,.03)}.chat-message.mine .chat-bubble{background:#eeeefe;border-color:#d7d4ff}.chat-author{font-size:.68rem;font-weight:800;color:#635bdb;margin-bottom:3px}.chat-text{font-size:.84rem;line-height:1.42;white-space:pre-wrap;overflow-wrap:anywhere}.chat-time{font-size:.62rem;color:#8a94a4;margin-top:4px;text-align:right}
+  .chat-message{display:flex;margin:7px 0}.chat-message.mine{justify-content:flex-end}.chat-bubble{max-width:82%;padding:9px 11px;border-radius:13px;background:#fff;border:1px solid #e1e6ed;box-shadow:0 1px 2px rgba(15,23,42,.03)}.chat-message.mine .chat-bubble{background:#eeeefe;border-color:#d7d4ff}.chat-author{font-size:.68rem;font-weight:800;color:#635bdb;margin-bottom:3px}.chat-text{font-size:.84rem;line-height:1.42;white-space:pre-wrap;overflow-wrap:anywhere}.chat-bubble.deleted{opacity:.72;background:#f8fafc!important;border-style:dashed}.chat-bubble.deleted .chat-text{color:#667085}.chat-message-foot{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:4px}.chat-time{font-size:.62rem;color:#8a94a4}.chat-delete-btn{border:0;background:transparent;color:#8a94a4;font-size:.62rem;font-weight:700;padding:0;cursor:pointer}.chat-delete-btn:hover{color:#b42318;text-decoration:underline}
   .chat-compose{padding:11px;border-top:1px solid #e1e6ed;background:#fff}.chat-compose textarea{width:100%;min-height:70px;max-height:150px;resize:vertical;border:1px solid #d7dee8;border-radius:11px;padding:9px 10px;font:inherit;font-size:.84rem;outline:none}.chat-compose textarea:focus{border-color:#8f88ef;box-shadow:0 0 0 3px rgba(99,91,219,.10)}.chat-compose-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:7px}.chat-compose-hint{font-size:.66rem;color:#8a94a4}.chat-send{border:0;background:#635bdb;color:#fff;border-radius:9px;padding:8px 13px;font-weight:750;cursor:pointer}.chat-send:disabled{opacity:.45;cursor:not-allowed}
   @media(max-width:900px){.finops-chat-layer .chat-shade{display:none}.chat-panel{width:100vw;border-left:0}.chat-panel-head{padding-top:max(14px,env(safe-area-inset-top))}.chat-body{padding-bottom:12px}.chat-compose{padding-bottom:max(11px,env(safe-area-inset-bottom))}.session-strip .chat-header-btn{min-width:42px;justify-content:center}.chat-header-label{display:none}}
-  @media(max-width:560px){.chat-panel-head{padding:12px}.chat-tabs{padding:8px}.chat-body{padding:8px}.chat-bubble{max-width:90%}}
+  @media(max-width:560px){.chat-panel-head{padding:12px}.chat-tabs{padding:8px}.chat-body{padding:8px}.chat-bubble{max-width:90%}}.settings-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}.setting-inline{display:flex;align-items:center;gap:8px}.setting-inline input{max-width:120px}
   `;document.head.appendChild(st);
+}
+
+function chatMessageHtmlV57(m,me){
+  const mine=String(m.Expediteur||'').toLowerCase()===String(me||'').toLowerCase();
+  const deleted=!!m.Supprime;
+  const canDelete=!deleted&&(mine||isOwner());
+  return `<div class="chat-message ${mine?'mine':''}" data-chat-message-id="${m.id}">
+    <div class="chat-bubble ${deleted?'deleted':''}">
+      ${mine?'':`<div class="chat-author">${esc(m.Expediteur||'')}</div>`}
+      <div class="chat-text">${deleted?'<em>Message supprimé</em>':esc(m.Texte||'')}</div>
+      <div class="chat-message-foot">
+        <span class="chat-time">${esc(formatChatTimeV56(m.Envoye_MS))}</span>
+        ${canDelete?`<button class="chat-delete-btn" type="button" data-chat-delete="${m.id}" title="Effacer définitivement ce message">Effacer</button>`:''}
+      </div>
+    </div>
+  </div>`;
+}
+function bindChatDeleteButtonsV57(root=document){
+  root.querySelectorAll?.('[data-chat-delete]').forEach(btn=>btn.addEventListener('click',()=>softDeleteChatMessageV57(+btn.dataset.chatDelete)));
+}
+function updateChatMessagesOnlyV57({forceBottom=false}={}){
+  const body=document.getElementById('chatBody');if(!body)return;
+  const messages=chatMessagesForChannelV56(CHAT_CHANNEL),me=chatIdentityV56();
+  const distanceFromBottom=body.scrollHeight-body.scrollTop-body.clientHeight;
+  const stickToBottom=forceBottom||distanceFromBottom<80;
+  body.innerHTML=messages.length?messages.map(m=>chatMessageHtmlV57(m,me)).join(''):'<div class="chat-empty">Aucun message dans cette conversation.</div>';
+  bindChatDeleteButtonsV57(body);
+  if(stickToBottom)requestAnimationFrame(()=>{body.scrollTop=body.scrollHeight});
+}
+function saveCurrentChatDraftV57(){
+  const input=document.getElementById('chatText');
+  if(input)CHAT_DRAFTS[CHAT_CHANNEL]=input.value;
 }
 function renderChatPanelV56(){
   const host=document.getElementById('finopsChatHost');if(!host)return;
   const messages=chatMessagesForChannelV56(CHAT_CHANNEL),me=chatIdentityV56();
   const activePeers=activePresenceRows(PRESENCE_ROWS).map(r=>String(r.Email||'')).filter(x=>x&&x!==me);
+  const draft=CHAT_DRAFTS[CHAT_CHANNEL]||'';
   host.innerHTML=`<div class="finops-chat-layer ${CHAT_OPEN?'open':''}" id="finopsChatLayer">
     <div class="chat-shade" id="chatShade"></div>
     <aside class="chat-panel" role="dialog" aria-modal="true" aria-label="Chat FinOps">
       <div class="chat-panel-head"><div><div class="chat-kicker">MESSAGERIE FINOPS</div><h3>${esc(chatChannelLabelV56(CHAT_CHANNEL))}</h3></div><button id="chatClose" class="chat-close" type="button" aria-label="Fermer">×</button></div>
       <div class="chat-tabs"><button class="chat-tab ${CHAT_CHANNEL==='GENERAL'?'active':''}" data-chat-general>Général</button>${activePeers.map(p=>`<button class="chat-tab ${CHAT_PEER===p?'active':''}" data-chat-peer="${esc(p)}">${esc(p)}</button>`).join('')}</div>
-      <div class="chat-body" id="chatBody">${messages.length?messages.map(m=>{const mine=String(m.Expediteur||'').toLowerCase()===me.toLowerCase();return `<div class="chat-message ${mine?'mine':''}"><div class="chat-bubble">${mine?'':`<div class="chat-author">${esc(m.Expediteur||'')}</div>`}<div class="chat-text">${esc(m.Texte||'')}</div><div class="chat-time">${esc(formatChatTimeV56(m.Envoye_MS))}</div></div></div>`}).join(''):'<div class="chat-empty">Aucun message dans cette conversation.</div>'}</div>
-      <div class="chat-compose"><textarea id="chatText" maxlength="2000" placeholder="Écrire un message…"></textarea><div class="chat-compose-actions"><span class="chat-compose-hint">Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne</span><button id="chatSend" class="chat-send" type="button">Envoyer</button></div></div>
+      <div class="chat-body" id="chatBody">${messages.length?messages.map(m=>chatMessageHtmlV57(m,me)).join(''):'<div class="chat-empty">Aucun message dans cette conversation.</div>'}</div>
+      <div class="chat-compose"><textarea id="chatText" maxlength="2000" placeholder="Écrire un message…">${esc(draft)}</textarea><div class="chat-compose-actions"><span class="chat-compose-hint">Actualisation ${chatRefreshSecondsV57()} s · Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne</span><button id="chatSend" class="chat-send" type="button">Envoyer</button></div></div>
     </aside>
   </div>`;
   document.getElementById('chatClose')?.addEventListener('click',closeChatV56);
   document.getElementById('chatShade')?.addEventListener('click',closeChatV56);
-  host.querySelector('[data-chat-general]')?.addEventListener('click',()=>openGeneralChatV56());
-  host.querySelectorAll('[data-chat-peer]').forEach(b=>b.addEventListener('click',()=>openDirectChatV56(b.dataset.chatPeer||'')));
+  host.querySelector('[data-chat-general]')?.addEventListener('click',()=>{saveCurrentChatDraftV57();openGeneralChatV56()});
+  host.querySelectorAll('[data-chat-peer]').forEach(b=>b.addEventListener('click',()=>{saveCurrentChatDraftV57();openDirectChatV56(b.dataset.chatPeer||'')}));
   const textarea=document.getElementById('chatText');
   document.getElementById('chatSend')?.addEventListener('click',sendChatV56);
+  textarea?.addEventListener('input',()=>{CHAT_DRAFTS[CHAT_CHANNEL]=textarea.value});
   textarea?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChatV56()}});
-  if(CHAT_OPEN){setTimeout(()=>{const body=document.getElementById('chatBody');if(body)body.scrollTop=body.scrollHeight;textarea?.focus()},30);markChatReadV56(CHAT_CHANNEL)}
+  bindChatDeleteButtonsV57(host);
+  if(CHAT_OPEN){
+    setTimeout(()=>{const body=document.getElementById('chatBody');if(body)body.scrollTop=body.scrollHeight;textarea?.focus()},30);
+    markChatReadV56(CHAT_CHANNEL);
+  }
 }
 async function markChatReadV56(channel){
   if(!channel)return;const me=chatIdentityV56(),now=Date.now();
@@ -543,21 +588,54 @@ async function markChatReadV56(channel){
     const own=CHAT_READS.find(r=>String(r.Email||'').toLowerCase()===me.toLowerCase()&&String(r.Canal||'')===channel);
     const fields={Email:me,Canal:channel,Derniere_Lecture_MS:now};
     await grist.docApi.applyUserActions([own?["UpdateRecord",T.chatReads,own.id,fields]:["AddRecord",T.chatReads,null,fields]]);
-    await refreshChatV56(false);
+    await refreshChatV57(false);
   }catch(e){console.warn('Chat read marker failed',e)}
 }
 async function sendChatV56(){
   const input=document.getElementById('chatText');const text=String(input?.value||'').trim();if(!text)return;
   const me=chatIdentityV56();
-  const fields={Canal:CHAT_CHANNEL,Type:CHAT_CHANNEL==='GENERAL'?'GENERAL':'DIRECT',Expediteur:me,Destinataire:CHAT_CHANNEL==='GENERAL'?'':CHAT_PEER,Texte:text,Envoye_MS:Date.now()};
-  try{await grist.docApi.applyUserActions([["AddRecord",T.chatMessages,null,fields]]);if(input)input.value='';await refreshChatV56(true);await markChatReadV56(CHAT_CHANNEL)}catch(e){toast('Message non envoyé : '+(e.message||String(e)),true)}
+  const fields={Canal:CHAT_CHANNEL,Type:CHAT_CHANNEL==='GENERAL'?'GENERAL':'DIRECT',Expediteur:me,Destinataire:CHAT_CHANNEL==='GENERAL'?'':CHAT_PEER,Texte:text,Envoye_MS:Date.now(),Supprime:false,Supprime_Par:'',Supprime_MS:0};
+  try{
+    await grist.docApi.applyUserActions([["AddRecord",T.chatMessages,null,fields]]);
+    CHAT_DRAFTS[CHAT_CHANNEL]='';
+    if(input)input.value='';
+    await refreshChatV57(true,true);
+    await markChatReadV56(CHAT_CHANNEL);
+    input?.focus();
+  }catch(e){toast('Message non envoyé : '+(e.message||String(e)),true)}
 }
+
+async function softDeleteChatMessageV57(id){
+  const msg=CHAT_MESSAGES.find(m=>+m.id===+id);if(!msg)return;
+  const me=chatIdentityV56();
+  const mine=String(msg.Expediteur||'').toLowerCase()===String(me||'').toLowerCase();
+  if(!mine&&!isOwner()){toast("Vous ne pouvez effacer que vos propres messages.",true);return}
+  if(!confirm("Effacer définitivement ce message ?"))return;
+  try{
+    await grist.docApi.applyUserActions([["RemoveRecord",T.chatMessages,+id]]);
+    CHAT_MESSAGES=CHAT_MESSAGES.filter(m=>+m.id!==+id);
+    updateChatMessagesOnlyV57({forceBottom:false});updateChatBadgeV56();
+    toast("Message effacé.");
+  }catch(e){toast("Effacement impossible. Réconcilie les ACL V58 : "+(e.message||String(e)),true)}
+}
+
 function openGeneralChatV56(){CHAT_CHANNEL='GENERAL';CHAT_PEER='';CHAT_OPEN=true;renderChatPanelV56()}
 function openDirectChatV56(peer){if(!peer)return;CHAT_PEER=peer;CHAT_CHANNEL=chatChannelV56(chatIdentityV56(),peer);CHAT_OPEN=true;renderChatPanelV56()}
-function closeChatV56(){CHAT_OPEN=false;renderChatPanelV56()}
-async function refreshChatV56(rerender=true){await fetchChatV56();updateChatBadgeV56();if(rerender&&CHAT_OPEN)renderChatPanelV56()}
+function closeChatV56(){saveCurrentChatDraftV57();CHAT_OPEN=false;renderChatPanelV56()}
+async function refreshChatV57(updateMessages=true,forceBottom=false){
+  await fetchChatV56();
+  updateChatBadgeV56();
+  if(updateMessages&&CHAT_OPEN)updateChatMessagesOnlyV57({forceBottom});
+}
+async function refreshChatV56(rerender=true){return refreshChatV57(rerender,false)}
+function restartChatIntervalV57(){
+  if(CHAT_INTERVAL)clearInterval(CHAT_INTERVAL);
+  CHAT_INTERVAL=setInterval(()=>refreshChatV57(true,false),chatRefreshMsV57());
+}
 function startChatV56(){
-  ensureChatStylesV56();if(CHAT_INTERVAL)clearInterval(CHAT_INTERVAL);refreshChatV56(false);CHAT_INTERVAL=setInterval(()=>refreshChatV56(true),CHAT_REFRESH_MS);
+  ensureChatStylesV56();
+  refreshChatV57(false);
+  restartChatIntervalV57();
   if(!window.__finopsChatKeyBound){window.addEventListener('keydown',e=>{if(e.key==='Escape'&&CHAT_OPEN)closeChatV56()});window.__finopsChatKeyBound=true}
 }
 
@@ -569,7 +647,7 @@ function renderShell(){
 
   const advanced=roleSeesAdvancedMenus();
   const navHtml=buildNavHtml();
-  const advancedSections=advanced?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-acladmin" class="view"></section>':'';
+  const advancedSections=advanced?'<section id="v-offersadmin" class="view"></section><section id="v-domains" class="view"></section><section id="v-rights" class="view"></section><section id="v-menuadmin" class="view"></section><section id="v-labelsadmin" class="view"></section><section id="v-appsettings" class="view"></section><section id="v-acladmin" class="view"></section>':'';
 
   document.getElementById("root").innerHTML=`<div class="shell">
     <button id="mobileNavToggle" class="mobile-nav-toggle" type="button" title="Ouvrir le menu" aria-label="Ouvrir le menu" aria-expanded="false">☰</button>
@@ -697,6 +775,7 @@ const DEFAULT_MENU_LABELS={
   rights:'Droits utilisateurs',
   menuadmin:'Configuration du menu',
   labelsadmin:'Paramétrage des libellés',
+  appsettings:'Paramètres application',
   acladmin:'ACL / Sécurité'
 };
 
@@ -716,7 +795,7 @@ function switchView(v){
   const page=document.getElementById('sessionPage');if(page)page.textContent=label;
   const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');
   const refresh=document.getElementById('refresh');
-  const hideTop=['presim','claudeenterprise','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(v);
+  const hideTop=['presim','claudeenterprise','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','appsettings','acladmin'].includes(v);
   if(scenarioField)scenarioField.style.display=hideTop?'none':'';
   if(refresh)refresh.style.display=hideTop?'none':'';
   PRESENCE_CURRENT_VIEW=v;
@@ -788,7 +867,7 @@ function renderAll(){
   document.getElementById('scope').textContent=isOwner()?'Périmètre : tous les domaines':`Périmètre : ${names||'aucun domaine'}`;
   document.getElementById('sideScope').textContent=isOwner()?'Tous les domaines':(names||'Aucun domaine');
   renderDashboard();renderSimulation();renderCompare();renderROI();renderPreSimulation();renderClaudeEnterprise();renderScenarios();renderOffersReadOnly();
-  if(roleSeesAdvancedMenus()){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAclAdmin()}
+  if(roleSeesAdvancedMenus()){renderOffersAdmin();renderDomainsAdmin();renderRightsAdmin();renderMenuAdmin();renderLabelsAdmin();renderAppSettingsV58();renderAclAdmin()}
   applyUILabels();
   enforceRolePermissions();
 }
@@ -2024,6 +2103,41 @@ function renderMenuAdmin(){
   document.getElementById('saveMenuConfig').onclick=saveMenuConfig;
   document.getElementById('resetMenuConfig').onclick=resetMenuConfigDraft;
 }
+
+
+function renderAppSettingsV58(){
+  const el=document.getElementById('v-appsettings');if(!el)return;
+  const refresh=chatRefreshSecondsV57();
+  el.innerHTML=`<article class="card">
+    <div class="cardhead">
+      <div><h3>Paramètres application</h3><p>Réglages globaux du widget FinOps. Ces paramètres s’appliquent à tous les utilisateurs.</p></div>
+      <button id="saveAppSettingsV58" class="btn primary">Enregistrer les paramètres</button>
+    </div>
+    <div class="settings-grid">
+      <label class="field">
+        <span>Rafraîchissement de la messagerie</span>
+        <div class="setting-inline"><input id="chatRefreshSecondsAdmin" class="admin-input" type="number" min="3" max="60" step="1" value="${refresh}"><span>secondes</span></div>
+        <small>Entre 3 et 60 secondes. Le rafraîchissement n’efface jamais le message en cours de saisie.</small>
+      </label>
+    </div>
+    <div class="soft" style="margin-top:14px"><b>Valeur actuelle :</b> ${refresh} seconde(s). Le nouvel intervalle est appliqué immédiatement après enregistrement.</div>
+  </article>`;
+  document.getElementById('saveAppSettingsV58')?.addEventListener('click',saveAppSettingsV57);
+}
+async function saveAppSettingsV57(){
+  if(!roleCanEditAdvancedMenus()){toast(readOnlyMessage(),true);return}
+  const input=document.getElementById('chatRefreshSecondsAdmin');
+  const seconds=Math.max(3,Math.min(60,Math.round(Number(input?.value||CHAT_DEFAULT_REFRESH_SECONDS))));
+  if(input)input.value=String(seconds);
+  const existing=(D[T.appConfig]||[]).find(r=>String(r.Cle||'')==='CHAT_REFRESH_SECONDS');
+  const fields={Cle:'CHAT_REFRESH_SECONDS',Valeur:String(seconds),Description:'Intervalle de rafraîchissement automatique de la messagerie FinOps, en secondes.'};
+  try{
+    await apply([existing?["UpdateRecord",T.appConfig,existing.id,fields]:["AddRecord",T.appConfig,null,fields]]);
+    D=await fetchAll();restartChatIntervalV57();renderAppSettingsV58();
+    toast(`Rafraîchissement réglé sur ${seconds} seconde(s).`);
+  }catch(e){toast(e.message||String(e),true)}
+}
+
 function initMenuAdminSorting(){
   const tbody=document.getElementById('menuAdminBody');if(!tbody)return;
   let dragged=null;
@@ -2053,11 +2167,11 @@ async function saveMenuConfig(){
 function resetMenuConfigDraft(){
   const defaults=[
     ['dashboard','Dashboard'],['simulation','Simulation'],['compare','Comparaison'],['roi','ROI / Économies'],
-    ['presim','Pré-simulation nominative'],['scenarios','Scénarios'],['offers','Offre de service'],['offersadmin','Paramétrage offre de service'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu'],['labelsadmin','Paramétrage des libellés'],['acladmin','ACL / Sécurité']
+    ['presim','Pré-simulation nominative'],['scenarios','Scénarios'],['offers','Offre de service'],['offersadmin','Paramétrage offre de service'],['domains','Domaines'],['rights','Droits utilisateurs'],['menuadmin','Configuration du menu'],['labelsadmin','Paramétrage des libellés'],['appsettings','Paramètres application'],['acladmin','ACL / Sécurité']
   ];
   const tbody=document.getElementById('menuAdminBody');if(!tbody)return;
   const byKey=Object.fromEntries([...tbody.querySelectorAll('tr[data-menu-key]')].map(tr=>[tr.dataset.menuKey,tr]));
-  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;const access=tr.querySelector('[data-f="Owner_Seulement"]');if(access)access.value=['offersadmin','domains','rights','menuadmin','labelsadmin','acladmin'].includes(key)?'true':'false';tbody.appendChild(tr)});
+  defaults.forEach(([key,label])=>{const tr=byKey[key];if(!tr)return;const input=tr.querySelector('[data-f="Libelle"]');if(input)input.value=label;const active=tr.querySelector('[data-f="Actif"]');if(active)active.checked=true;const access=tr.querySelector('[data-f="Owner_Seulement"]');if(access)access.value=['offersadmin','domains','rights','menuadmin','labelsadmin','appsettings','acladmin'].includes(key)?'true':'false';tbody.appendChild(tr)});
   toast("Valeurs par défaut chargées. Clique sur Enregistrer pour les appliquer.");
 }
 
@@ -2263,6 +2377,7 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Presence_Utilisateurs",colIds:"*",kind:"presence",mode:"presence"},
   {tableId:"FinOps_Messages",colIds:"*",kind:"chatmessages",mode:"chatmessages"},
   {tableId:"FinOps_Chat_Lectures",colIds:"*",kind:"chatreads",mode:"chatreads"},
+  {tableId:"FinOps_Configuration",colIds:"*",kind:"global",mode:"config"},
   {tableId:"FinOps_Identites",colIds:"*",kind:"selfidentity",mode:"selfidentity"},
   {tableId:"FinOps_Owner_Sentinel",colIds:"*",kind:"ownersentinel",mode:"owneronly"},
   {tableId:"FinOps_Identite_Session",colIds:"*",kind:"legacyidentity",mode:"owneronly"},
@@ -2334,6 +2449,8 @@ function aclRulesForSpec(spec){
   if(spec.mode==="chatmessages"){
     return [
       {roles:reader,perm:"+C",tag:"CREATE_MESSAGE",formula:`${aclRoleFormula(reader)} and rec.Expediteur == user.Email`},
+      {roles:reader,perm:"+U",tag:"UPDATE_OWN_MESSAGE",formula:`${aclRoleFormula(reader)} and rec.Expediteur == user.Email`},
+      {roles:reader,perm:"+D",tag:"DELETE_OWN_MESSAGE",formula:`${aclRoleFormula(reader)} and rec.Expediteur == user.Email`},
       {roles:reader,perm:"+R",tag:"READ_ALLOWED_MESSAGES",formula:`${aclRoleFormula(reader)} and (rec.Canal == "GENERAL" or rec.Expediteur == user.Email or rec.Destinataire == user.Email)`}
     ];
   }
