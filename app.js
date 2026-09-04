@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 let PRESENCE_INTERVAL=null;
@@ -7,6 +7,13 @@ let PRESENCE_CURRENT_VIEW='dashboard';
 let PRESENCE_ROWS=[];
 const PRESENCE_HEARTBEAT_MS=20000;
 const PRESENCE_TTL_MS=75000;
+let CHAT_INTERVAL=null;
+let CHAT_MESSAGES=[];
+let CHAT_READS=[];
+let CHAT_CHANNEL='GENERAL';
+let CHAT_PEER='';
+let CHAT_OPEN=false;
+const CHAT_REFRESH_MS=7000;
 function presenceSessionId(){
   try{
     let id=sessionStorage.getItem('finopsPresenceSessionId');
@@ -26,7 +33,7 @@ function rows(t){if(!t||!Array.isArray(t.id))return[];return t.id.map((id,i)=>{c
 function money(v,c="USD"){return new Intl.NumberFormat("fr-FR",{style:"currency",currency:c,maximumFractionDigits:0}).format(Number(v||0))} function num(v){return new Intl.NumberFormat("fr-FR",{maximumFractionDigits:0}).format(Number(v||0))} function pct(v){return new Intl.NumberFormat("fr-FR",{style:"percent",maximumFractionDigits:1}).format(Number(v||0))} function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]))}
 function toast(m,e=false){const x=document.getElementById("toast");if(!x)return;x.textContent=m;x.className="toast show"+(e?" error":"");setTimeout(()=>x.className="toast",2400)}
 async function fetchAll(){const names=Object.values(T),raw=await Promise.all(names.map(n=>grist.docApi.fetchTable(n).catch(()=>({id:[]}))));const o={};names.forEach((n,i)=>o[n]=rows(raw[i]));o.domainById=Object.fromEntries(o[T.domains].map(r=>[r.id,r]));o.scenarioById=Object.fromEntries(o[T.scenarios].map(r=>[r.id,r]));o.providerById=Object.fromEntries(o[T.providers].map(r=>[r.id,r]));o.offerById=Object.fromEntries(o[T.offers].map(r=>[r.id,r]));return o}
-async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe();startPresence()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
+async function boot(){document.getElementById("root").innerHTML='<div class="splash">Chargement des données Grist…</div>';try{D=await fetchAll();deriveAccess();renderShell();if(ACCESS.role!=="DENIED"){populateScenario();renderAll();ensureUILabelObserver();applyUILabelsSafe();startPresence();startChatV56()}}catch(e){console.error(e);document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">!</div><h1>Erreur de chargement</h1><p>${esc(e.message)}</p></div></div>`}}
 function refListIds(v){if(Array.isArray(v)){const a=v[0]==='L'?v.slice(1):v;return a.map(Number).filter(x=>Number.isFinite(x)&&x>0)}if(Number.isFinite(+v)&&+v>0)return[+v];return[]}
 
 const APP_ROLES={
@@ -356,15 +363,23 @@ function renderPresenceUI(list=PRESENCE_ROWS){
   if(!menu)return;
   menu.innerHTML=active.length?active.map(r=>{
     const mine=String(r.Session_Id)===presenceSessionId();
+    const who=String(r.Email||'Utilisateur');
     return `<div class="presence-person ${mine?'mine':''}">
       <span class="presence-person-dot"></span>
       <div class="presence-person-main">
-        <div class="presence-person-name">${esc(r.Email||'Utilisateur')}${mine?' <span class="badge ok">vous</span>':''}</div>
+        <div class="presence-person-name">${esc(who)}${mine?' <span class="badge ok">vous</span>':''}</div>
         <div class="presence-person-meta">${esc(r.Role_App||'')} · <b>${esc(presencePageLabel(r.Page))}</b></div>
         <div class="presence-person-domain">${esc(r.Domaine_Texte||'')} · ${esc(presenceAgeLabel(r.Dernier_Heartbeat_MS))}</div>
       </div>
+      ${mine?'':`<button type="button" class="presence-chat-btn" data-chat-with="${esc(who)}" title="Discuter avec ${esc(who)}" aria-label="Discuter avec ${esc(who)}">💬</button>`}
     </div>`;
   }).join(''):'<div class="presence-empty">Aucune autre session FinOps détectée.</div>';
+  menu.querySelectorAll('[data-chat-with]').forEach(btn=>btn.addEventListener('click',e=>{
+    e.stopPropagation();
+    openDirectChatV56(btn.dataset.chatWith||'');
+    menu.classList.add('hidden');
+    document.getElementById('presenceToggle')?.setAttribute('aria-expanded','false');
+  }));
 }
 async function refreshPresenceUI(){
   PRESENCE_ROWS=await fetchPresenceRows();
@@ -428,6 +443,124 @@ function startPresence(){
   cleanupOldPresence();
 }
 
+
+function chatIdentityV56(){
+  return isOwner()?'Owner Grist':String(ACCESS.currentEmail||currentRightRow()?.Email||currentUserLabel()).trim();
+}
+function chatChannelV56(a,b){
+  return 'DM:'+ [String(a||'').trim().toLowerCase(),String(b||'').trim().toLowerCase()].sort().join('|');
+}
+function chatChannelLabelV56(channel){
+  if(channel==='GENERAL')return 'Discussion générale FinOps';
+  return CHAT_PEER?`Conversation avec ${CHAT_PEER}`:'Message direct';
+}
+async function fetchChatV56(){
+  try{
+    const [m,r]=await Promise.all([
+      grist.docApi.fetchTable(T.chatMessages).catch(()=>({id:[]})),
+      grist.docApi.fetchTable(T.chatReads).catch(()=>({id:[]}))
+    ]);
+    CHAT_MESSAGES=rows(m);CHAT_READS=rows(r);
+  }catch(_){CHAT_MESSAGES=[];CHAT_READS=[]}
+}
+function chatReadAtV56(channel){
+  const me=chatIdentityV56().toLowerCase();
+  return Math.max(0,...CHAT_READS.filter(r=>String(r.Email||'').toLowerCase()===me&&String(r.Canal||'')===channel).map(r=>+r.Derniere_Lecture_MS||0));
+}
+function chatAccessibleMessagesV56(){
+  const me=chatIdentityV56().toLowerCase();
+  return CHAT_MESSAGES.filter(m=>{
+    const ch=String(m.Canal||'');
+    if(ch==='GENERAL')return true;
+    return String(m.Expediteur||'').toLowerCase()===me||String(m.Destinataire||'').toLowerCase()===me||isOwner();
+  });
+}
+function chatUnreadCountV56(){
+  const me=chatIdentityV56().toLowerCase();
+  const byChannel=new Map();
+  for(const m of chatAccessibleMessagesV56()){
+    if(String(m.Expediteur||'').toLowerCase()===me)continue;
+    const ch=String(m.Canal||'GENERAL');
+    if((+m.Envoye_MS||0)>chatReadAtV56(ch))byChannel.set(ch,(byChannel.get(ch)||0)+1);
+  }
+  return [...byChannel.values()].reduce((a,b)=>a+b,0);
+}
+function updateChatBadgeV56(){
+  const n=chatUnreadCountV56();
+  const badge=document.getElementById('chatUnreadCount');
+  if(badge){badge.textContent=String(n);badge.classList.toggle('hidden',!n)}
+}
+function chatMessagesForChannelV56(channel){
+  return chatAccessibleMessagesV56().filter(m=>String(m.Canal||'GENERAL')===channel).sort((a,b)=>(+a.Envoye_MS||0)-(+b.Envoye_MS||0));
+}
+function formatChatTimeV56(ms){
+  if(!ms)return '';
+  const d=new Date(+ms);const today=new Date();
+  return d.toDateString()===today.toDateString()?d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}):d.toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+function ensureChatStylesV56(){
+  if(document.getElementById('finops-chat-v56-style'))return;
+  const st=document.createElement('style');st.id='finops-chat-v56-style';st.textContent=`
+  .chat-header-btn{position:relative;display:flex;align-items:center;gap:6px;min-height:34px;padding:6px 9px;border:1px solid var(--line,#dbe3ef);border-radius:9px;background:#fff;color:inherit;cursor:pointer;font:inherit}.chat-header-btn:hover{background:var(--panel,#f8fafc)}
+  .chat-unread{position:absolute;right:-5px;top:-7px;min-width:18px;height:18px;padding:0 5px;border-radius:99px;background:#635bdb;color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center}.chat-unread.hidden{display:none}
+  .presence-chat-btn{flex:0 0 auto;border:1px solid var(--line,#dbe3ef);background:#fff;border-radius:8px;width:32px;height:32px;cursor:pointer}.presence-chat-btn:hover{background:#f2f1ff;border-color:#c7c3ff}
+  .finops-chat-layer{position:fixed;inset:0;z-index:1100;pointer-events:none}.finops-chat-layer.open{pointer-events:auto}.chat-shade{position:absolute;inset:0;background:rgba(15,23,42,.18);opacity:0;transition:opacity .16s}.finops-chat-layer.open .chat-shade{opacity:1}
+  .chat-panel{position:absolute;right:0;top:0;bottom:0;width:min(410px,92vw);display:flex;flex-direction:column;background:#fff;border-left:1px solid #dfe5ed;box-shadow:-16px 0 44px rgba(15,23,42,.14);transform:translateX(102%);transition:transform .18s ease}.finops-chat-layer.open .chat-panel{transform:translateX(0)}
+  .chat-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:16px;border-bottom:1px solid #e6ebf1}.chat-panel-head h3{margin:2px 0 0;font-size:1rem}.chat-kicker{font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;color:#635bdb;font-weight:800}.chat-close{border:0;background:#f5f7fb;border-radius:9px;width:34px;height:34px;cursor:pointer;font-size:18px}
+  .chat-tabs{display:flex;gap:6px;padding:10px 12px;border-bottom:1px solid #e8edf3;overflow-x:auto}.chat-tab{border:1px solid #dfe5ed;background:#fff;border-radius:99px;padding:7px 10px;font-size:.76rem;font-weight:700;white-space:nowrap;cursor:pointer}.chat-tab.active{background:#eeeeff;color:#5146d8;border-color:#cbc8ff}
+  .chat-body{flex:1;overflow:auto;padding:12px;background:#f7f8fb}.chat-empty{padding:28px 16px;text-align:center;color:#667085;font-size:.84rem}
+  .chat-message{display:flex;margin:7px 0}.chat-message.mine{justify-content:flex-end}.chat-bubble{max-width:82%;padding:9px 11px;border-radius:13px;background:#fff;border:1px solid #e1e6ed;box-shadow:0 1px 2px rgba(15,23,42,.03)}.chat-message.mine .chat-bubble{background:#eeeefe;border-color:#d7d4ff}.chat-author{font-size:.68rem;font-weight:800;color:#635bdb;margin-bottom:3px}.chat-text{font-size:.84rem;line-height:1.42;white-space:pre-wrap;overflow-wrap:anywhere}.chat-time{font-size:.62rem;color:#8a94a4;margin-top:4px;text-align:right}
+  .chat-compose{padding:11px;border-top:1px solid #e1e6ed;background:#fff}.chat-compose textarea{width:100%;min-height:70px;max-height:150px;resize:vertical;border:1px solid #d7dee8;border-radius:11px;padding:9px 10px;font:inherit;font-size:.84rem;outline:none}.chat-compose textarea:focus{border-color:#8f88ef;box-shadow:0 0 0 3px rgba(99,91,219,.10)}.chat-compose-actions{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:7px}.chat-compose-hint{font-size:.66rem;color:#8a94a4}.chat-send{border:0;background:#635bdb;color:#fff;border-radius:9px;padding:8px 13px;font-weight:750;cursor:pointer}.chat-send:disabled{opacity:.45;cursor:not-allowed}
+  @media(max-width:900px){.finops-chat-layer .chat-shade{display:none}.chat-panel{width:100vw;border-left:0}.chat-panel-head{padding-top:max(14px,env(safe-area-inset-top))}.chat-body{padding-bottom:12px}.chat-compose{padding-bottom:max(11px,env(safe-area-inset-bottom))}.session-strip .chat-header-btn{min-width:42px;justify-content:center}.chat-header-label{display:none}}
+  @media(max-width:560px){.chat-panel-head{padding:12px}.chat-tabs{padding:8px}.chat-body{padding:8px}.chat-bubble{max-width:90%}}
+  `;document.head.appendChild(st);
+}
+function renderChatPanelV56(){
+  const host=document.getElementById('finopsChatHost');if(!host)return;
+  const messages=chatMessagesForChannelV56(CHAT_CHANNEL),me=chatIdentityV56();
+  const activePeers=activePresenceRows(PRESENCE_ROWS).map(r=>String(r.Email||'')).filter(x=>x&&x!==me);
+  host.innerHTML=`<div class="finops-chat-layer ${CHAT_OPEN?'open':''}" id="finopsChatLayer">
+    <div class="chat-shade" id="chatShade"></div>
+    <aside class="chat-panel" role="dialog" aria-modal="true" aria-label="Chat FinOps">
+      <div class="chat-panel-head"><div><div class="chat-kicker">MESSAGERIE FINOPS</div><h3>${esc(chatChannelLabelV56(CHAT_CHANNEL))}</h3></div><button id="chatClose" class="chat-close" type="button" aria-label="Fermer">×</button></div>
+      <div class="chat-tabs"><button class="chat-tab ${CHAT_CHANNEL==='GENERAL'?'active':''}" data-chat-general>Général</button>${activePeers.map(p=>`<button class="chat-tab ${CHAT_PEER===p?'active':''}" data-chat-peer="${esc(p)}">${esc(p)}</button>`).join('')}</div>
+      <div class="chat-body" id="chatBody">${messages.length?messages.map(m=>{const mine=String(m.Expediteur||'').toLowerCase()===me.toLowerCase();return `<div class="chat-message ${mine?'mine':''}"><div class="chat-bubble">${mine?'':`<div class="chat-author">${esc(m.Expediteur||'')}</div>`}<div class="chat-text">${esc(m.Texte||'')}</div><div class="chat-time">${esc(formatChatTimeV56(m.Envoye_MS))}</div></div></div>`}).join(''):'<div class="chat-empty">Aucun message dans cette conversation.</div>'}</div>
+      <div class="chat-compose"><textarea id="chatText" maxlength="2000" placeholder="Écrire un message…"></textarea><div class="chat-compose-actions"><span class="chat-compose-hint">Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne</span><button id="chatSend" class="chat-send" type="button">Envoyer</button></div></div>
+    </aside>
+  </div>`;
+  document.getElementById('chatClose')?.addEventListener('click',closeChatV56);
+  document.getElementById('chatShade')?.addEventListener('click',closeChatV56);
+  host.querySelector('[data-chat-general]')?.addEventListener('click',()=>openGeneralChatV56());
+  host.querySelectorAll('[data-chat-peer]').forEach(b=>b.addEventListener('click',()=>openDirectChatV56(b.dataset.chatPeer||'')));
+  const textarea=document.getElementById('chatText');
+  document.getElementById('chatSend')?.addEventListener('click',sendChatV56);
+  textarea?.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChatV56()}});
+  if(CHAT_OPEN){setTimeout(()=>{const body=document.getElementById('chatBody');if(body)body.scrollTop=body.scrollHeight;textarea?.focus()},30);markChatReadV56(CHAT_CHANNEL)}
+}
+async function markChatReadV56(channel){
+  if(!channel)return;const me=chatIdentityV56(),now=Date.now();
+  try{
+    const own=CHAT_READS.find(r=>String(r.Email||'').toLowerCase()===me.toLowerCase()&&String(r.Canal||'')===channel);
+    const fields={Email:me,Canal:channel,Derniere_Lecture_MS:now};
+    await grist.docApi.applyUserActions([own?["UpdateRecord",T.chatReads,own.id,fields]:["AddRecord",T.chatReads,null,fields]]);
+    await refreshChatV56(false);
+  }catch(e){console.warn('Chat read marker failed',e)}
+}
+async function sendChatV56(){
+  const input=document.getElementById('chatText');const text=String(input?.value||'').trim();if(!text)return;
+  const me=chatIdentityV56();
+  const fields={Canal:CHAT_CHANNEL,Type:CHAT_CHANNEL==='GENERAL'?'GENERAL':'DIRECT',Expediteur:me,Destinataire:CHAT_CHANNEL==='GENERAL'?'':CHAT_PEER,Texte:text,Envoye_MS:Date.now()};
+  try{await grist.docApi.applyUserActions([["AddRecord",T.chatMessages,null,fields]]);if(input)input.value='';await refreshChatV56(true);await markChatReadV56(CHAT_CHANNEL)}catch(e){toast('Message non envoyé : '+(e.message||String(e)),true)}
+}
+function openGeneralChatV56(){CHAT_CHANNEL='GENERAL';CHAT_PEER='';CHAT_OPEN=true;renderChatPanelV56()}
+function openDirectChatV56(peer){if(!peer)return;CHAT_PEER=peer;CHAT_CHANNEL=chatChannelV56(chatIdentityV56(),peer);CHAT_OPEN=true;renderChatPanelV56()}
+function closeChatV56(){CHAT_OPEN=false;renderChatPanelV56()}
+async function refreshChatV56(rerender=true){await fetchChatV56();updateChatBadgeV56();if(rerender&&CHAT_OPEN)renderChatPanelV56()}
+function startChatV56(){
+  ensureChatStylesV56();if(CHAT_INTERVAL)clearInterval(CHAT_INTERVAL);refreshChatV56(false);CHAT_INTERVAL=setInterval(()=>refreshChatV56(true),CHAT_REFRESH_MS);
+  if(!window.__finopsChatKeyBound){window.addEventListener('keydown',e=>{if(e.key==='Escape'&&CHAT_OPEN)closeChatV56()});window.__finopsChatKeyBound=true}
+}
+
 function renderShell(){
   if(ACCESS.role===APP_ROLES.DENIED){
     document.getElementById("root").innerHTML=`<div class="denied"><div class="deniedcard"><div class="lock">🔒</div><h1>Accès non autorisé</h1><p>Votre compte n’est pas inscrit comme utilisateur actif dans la table <b>Droits_Utilisateurs</b>.</p><div class="deniednote">Aucun menu FinOps n’est disponible. Demandez à un administrateur de vous ajouter dans la gestion des droits.</div></div></div>`;
@@ -454,6 +587,7 @@ function renderShell(){
             <div class="session-ident"><span class="session-label">Moi</span><b id="sessionUser">${esc(currentUserLabel())}</b></div>
             <div class="session-ident"><span class="session-label">Rôle</span><b id="sessionRole">${esc(roleLabel())}</b></div>
             <div class="session-ident"><span class="session-label">Page</span><b id="sessionPage">${esc(menuLabel('dashboard'))}</b></div>
+            <button id="chatHeaderBtn" type="button" class="chat-header-btn" title="Ouvrir la messagerie FinOps"><span>💬</span><span class="chat-header-label">Messages</span><span id="chatUnreadCount" class="chat-unread hidden">0</span></button>
             <div id="presenceWidget" class="presence-widget">
               <button id="presenceToggle" type="button" class="presence-toggle" aria-expanded="false">
                 <span class="session-dot"></span><b><span id="presenceCount">1</span> en ligne</b><span aria-hidden="true">▾</span>
@@ -467,7 +601,7 @@ function renderShell(){
       <div id="status" class="status">Données synchronisées avec Grist.</div>
       <section id="v-dashboard" class="view active"></section><section id="v-simulation" class="view"></section><section id="v-compare" class="view"></section><section id="v-roi" class="view"></section><section id="v-presim" class="view"></section><section id="v-claudeenterprise" class="view"></section><section id="v-scenarios" class="view"></section><section id="v-offers" class="view"></section>${advancedSections}
     </main>
-  </div><div id="toast" class="toast"></div>`;
+  </div><div id="finopsChatHost"></div><div id="toast" class="toast"></div>`;
 
   ensureNavGroupStyles();
   bindNavGroups();
@@ -482,6 +616,7 @@ function renderShell(){
     renderAll();
   };
 
+  document.getElementById('chatHeaderBtn')?.addEventListener('click',()=>{if(CHAT_OPEN)closeChatV56();else openGeneralChatV56()});
   const presenceToggle=document.getElementById('presenceToggle');
   const presenceMenu=document.getElementById('presenceMenu');
   presenceToggle?.addEventListener('click',()=>{
@@ -2126,6 +2261,8 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Domaines",colIds:"*",kind:"domains",mode:"domains"},
   {tableId:"Droits_Utilisateurs",colIds:"*",kind:"rights",mode:"rights"},
   {tableId:"Presence_Utilisateurs",colIds:"*",kind:"presence",mode:"presence"},
+  {tableId:"FinOps_Messages",colIds:"*",kind:"chatmessages",mode:"chatmessages"},
+  {tableId:"FinOps_Chat_Lectures",colIds:"*",kind:"chatreads",mode:"chatreads"},
   {tableId:"FinOps_Identites",colIds:"*",kind:"selfidentity",mode:"selfidentity"},
   {tableId:"FinOps_Owner_Sentinel",colIds:"*",kind:"ownersentinel",mode:"owneronly"},
   {tableId:"FinOps_Identite_Session",colIds:"*",kind:"legacyidentity",mode:"owneronly"},
@@ -2153,7 +2290,7 @@ function aclRoleFormula(roles){
 }
 function aclFormulaFor(kind,roles){
   const base=aclRoleFormula(roles);
-  if(kind==="global"||kind==="scenario"||kind==="presence"||kind==="selfidentity"||kind==="ownersentinel"||kind==="legacyidentity")return base;
+  if(kind==="global"||kind==="scenario"||kind==="presence"||kind==="selfidentity"||kind==="ownersentinel"||kind==="legacyidentity"||kind==="chatmessages"||kind==="chatreads")return base;
   if(kind==="domain")return `${base} and rec.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="presimdomain")return `${base} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="domains")return `${base} and rec.id in user.Droits.Domaines_Autorises`;
@@ -2192,6 +2329,17 @@ function aclRulesForSpec(spec){
     return [
       {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"ADMIN_SYNC_IDENTITIES",formula:aclRoleFormula(["ADMINISTRATEUR"])},
       {roles:["LECTEUR","CONTRIBUTEUR","OBSERVATEUR","CONTRIBUTEUR_AVANCE"],perm:"+R",tag:"READ_SELF_IDENTITY",formula:`${aclRoleFormula(["LECTEUR","CONTRIBUTEUR","OBSERVATEUR","CONTRIBUTEUR_AVANCE"])} and rec.Email == user.Email`}
+    ];
+  }
+  if(spec.mode==="chatmessages"){
+    return [
+      {roles:reader,perm:"+C",tag:"CREATE_MESSAGE",formula:`${aclRoleFormula(reader)} and rec.Expediteur == user.Email`},
+      {roles:reader,perm:"+R",tag:"READ_ALLOWED_MESSAGES",formula:`${aclRoleFormula(reader)} and (rec.Canal == "GENERAL" or rec.Expediteur == user.Email or rec.Destinataire == user.Email)`}
+    ];
+  }
+  if(spec.mode==="chatreads"){
+    return [
+      {roles:reader,perm:"+CRUD",tag:"OWN_READ_MARKERS",formula:`${aclRoleFormula(reader)} and rec.Email == user.Email`}
     ];
   }
   if(spec.mode==="owneronly"){
