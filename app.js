@@ -2535,8 +2535,29 @@ async function applyFinopsAcl(){
     const defaultRes=p2.defaultRes;
     if(!defaultRes)throw new Error("Impossible de créer ou retrouver la ressource ACL globale *:*.");
 
-    // Remove only FinOps-tagged rules; unrelated ACLs are preserved.
-    const remove=p2.existingTagged.map(r=>["RemoveRecord","_grist_ACLRules",r.id]);
+    // Grist requires the default rule (empty aclFormula) to be the LAST rule
+    // for a resource. A pre-existing default on a FinOps-managed resource would
+    // therefore make any newly appended FinOps rule invalid ("listed after default rule").
+    //
+    // Keep unrelated conditional rules, but remove:
+    //   1) all previously FinOps-tagged rules;
+    //   2) every existing DEFAULT rule on a resource managed by FinOps.
+    // We recreate one explicit "none" default at the very end of each managed resource.
+    const managedResourceIds=new Set(
+      FINOPS_ACL_RESOURCES
+        .map(x=>p2.byKey[`${x.tableId}|${x.colIds}`]?.id)
+        .filter(Boolean)
+    );
+    const schemaRes=p2.resources?.find?.(r=>r.tableId==="*SPECIAL"&&r.colIds==="SchemaEdit");
+    if(schemaRes?.id)managedResourceIds.add(schemaRes.id);
+
+    const removeIds=new Set(p2.existingTagged.map(r=>+r.id));
+    (meta2.rules||[]).forEach(r=>{
+      const isDefault=String(r.aclFormula||"").trim()==="" &&
+                      !String(r.userAttributes||"").trim();
+      if(isDefault && managedResourceIds.has(+r.resource))removeIds.add(+r.id);
+    });
+    const remove=[...removeIds].filter(Boolean).map(id=>["RemoveRecord","_grist_ACLRules",id]);
     if(remove.length)await grist.docApi.applyUserActions(remove);
 
     const meta3=await readAclMeta(),p3=aclPlan(meta3);
@@ -2595,8 +2616,12 @@ async function applyFinopsAcl(){
     box.innerHTML='<span class="badge ok">Réconciliation appliquée</span><p>Le document peut se recharger automatiquement. Relance ensuite un audit.</p>';
     toast("ACL FinOps appliquées.");
   }catch(e){
-    box.innerHTML=`<span class="badge warn">Échec de la réconciliation</span><p>${esc(e.message||String(e))}</p>`;
-    toast(e.message||String(e),true);
+    const msg=e.message||String(e);
+    const hint=/listed after default rule/i.test(msg)
+      ? '<p><b>Cause :</b> une règle par défaut existait déjà avant les règles FinOps. V59 corrige automatiquement cet ordre ; recharge l’application puis relance la réconciliation.</p>'
+      : '';
+    box.innerHTML=`<span class="badge warn">Échec de la réconciliation</span><p>${esc(msg)}</p>${hint}`;
+    toast(msg,true);
   }
 }
 
