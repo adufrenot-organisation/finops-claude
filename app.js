@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures",appConfig:"FinOps_Configuration"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",preTeams:"Pre_Simulation_Equipes",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures",appConfig:"FinOps_Configuration"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 let PRESENCE_INTERVAL=null;
@@ -919,8 +919,16 @@ function renderCharts(m){
   const ds=Object.values(m.bd).sort((a,b)=>b.total-a.total),mx=Math.max(1,...ds.map(x=>x.total));
   document.getElementById('domainBars').innerHTML=ds.map(x=>`<div class="barrow"><span>${esc(x.d.Nom)}</span><div class="bartrack"><div class="barfill" style="width:${x.total/mx*100}%"></div></div><span class="num">${money(x.total)}</span></div>`).join('');
 }
-function renderSimulation(){const el=document.getElementById('v-simulation'),m=CURRENT;const activeScenario=selectedScenario();el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Allocations du scénario</h3><p>Scénario actif : <b>${esc(activeScenario?.Nom||'—')}</b> · ${m.alloc.length} allocation(s) liée(s). Une ligne = un domaine + une offre.</p></div><div class="table-actions"><button id="saveAllAlloc" class="btn primary">Enregistrer les modifications</button><button id="addAlloc" class="btn secondary">+ Ajouter une allocation</button></div></div><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Mois facturés</th><th>Engagement</th><th>Tarif négocié mensuel</th><th>Tarif négocié annuel</th><th>Overage prévu /mois/lic.</th><th>Plafond overage</th><th>Total</th><th></th></tr></thead><tbody>${m.alloc.map(a=>allocRow(a)).join('')}</tbody></table></div></article><article id="newAllocCard" class="card hidden"></article>`;document.getElementById('addAlloc').onclick=showNewAlloc;document.getElementById('saveAllAlloc').onclick=saveAllAllocations;document.querySelectorAll('.delAlloc').forEach(b=>b.onclick=()=>delRecord(T.alloc,+b.dataset.id))}
-function allocRow(a){const o=D.offerById[a.Offre],p=D.providerById[o?.Fournisseur],d=D.domainById[a.Domaine];return`<tr data-id="${a.id}" class="${a.Tarif_A_Confirmer?'unresolved':''}"><td><b>${esc(d?.Nom)}</b></td><td>${esc(p?.Nom)}</td><td>${esc(o?.Nom)}</td><td><input class="editor" data-f="Nb_Licences" type="number" min="0" value="${+a.Nb_Licences||0}"></td><td><input class="editor" data-f="Mois_Factures" type="number" min="0" value="${+a.Mois_Factures||0}"></td><td><input class="editor" data-f="Engagement_Mois" type="number" min="0" value="${+a.Engagement_Mois||0}"></td><td><input class="editor" data-f="Tarif_Negocie_Mensuel" type="number" min="0" step="0.01" value="${+a.Tarif_Negocie_Mensuel||0}"></td><td><input class="editor" data-f="Tarif_Negocie_Annuel" type="number" min="0" step="0.01" value="${+a.Tarif_Negocie_Annuel||0}"></td><td><input class="editor" data-f="Usage_Supplementaire_Prevu_Mois_Licence" type="number" min="0" step="1" value="${+a.Usage_Supplementaire_Prevu_Mois_Licence||0}"></td><td><input class="editor" data-f="Plafond_Overage_Mois_Licence" type="number" step="1" value="${Number(a.Plafond_Overage_Mois_Licence??-1)}" title="-1 = sans plafond, 0 = aucun overage"></td><td class="num"><b>${a.Tarif_A_Confirmer?'À chiffrer':money(a.Budget_Total_USD)}</b></td><td><button class="btn small danger delAlloc" data-id="${a.id}" title="Supprimer cette allocation">×</button></td></tr>`}
+function renderSimulation(){const el=document.getElementById('v-simulation'),m=CURRENT;const activeScenario=selectedScenario();el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Allocations du scénario</h3><p>Scénario actif : <b>${esc(activeScenario?.Nom||'—')}</b> · ${m.alloc.length} allocation(s) liée(s). Une ligne = un domaine + une offre.</p></div><div class="table-actions"><button id="saveAllAlloc" class="btn primary">Enregistrer les modifications</button><button id="addAlloc" class="btn secondary">+ Ajouter une allocation</button></div></div><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Mois facturés</th><th>Engagement</th><th>Tarif négocié mensuel</th><th>Tarif négocié annuel</th><th>Overage prévu /mois/lic.</th><th>Plafond overage</th><th>Total</th><th></th></tr></thead><tbody>${m.alloc.map(a=>allocRow(a)).join('')}</tbody></table></div></article><article id="newAllocCard" class="card hidden"></article>`;document.getElementById('addAlloc').onclick=showNewAlloc;document.getElementById('saveAllAlloc').onclick=saveAllAllocations;document.querySelectorAll('.delAlloc').forEach(b=>b.onclick=()=>delRecord(T.alloc,+b.dataset.id));document.querySelectorAll('.openPreSimLink').forEach(b=>b.onclick=()=>openPreSimulationForScenarioDomainV60(+b.dataset.scenario,+b.dataset.domain))}
+
+function allocRow(a){
+  const o=D.offerById[a.Offre],p=D.providerById[o?.Fournisseur],d=D.domainById[a.Domaine];
+  const sid=+CURRENT?.s?.id||+a.Scenario||0;
+  const linked=preSimMatchesForScenarioDomain(sid,+a.Domaine);
+  const preLink=linked.length?`<button type="button" class="presim-link-btn openPreSimLink" data-scenario="${sid}" data-domain="${+a.Domaine}" title="Ouvrir la pré-simulation nominative de ${esc(d?.Nom||'ce domaine')}">👥${linked.length>1?`<span class="presim-link-count">${linked.length}</span>`:''}</button>`:'';
+  return`<tr data-id="${a.id}" class="${a.Tarif_A_Confirmer?'unresolved':''}"><td><b>${esc(d?.Nom)}</b>${preLink}</td><td>${esc(p?.Nom)}</td><td>${esc(o?.Nom)}</td><td><input class="editor" data-f="Nb_Licences" type="number" min="0" value="${+a.Nb_Licences||0}"></td><td><input class="editor" data-f="Mois_Factures" type="number" min="0" value="${+a.Mois_Factures||0}"></td><td><input class="editor" data-f="Engagement_Mois" type="number" min="0" value="${+a.Engagement_Mois||0}"></td><td><input class="editor" data-f="Tarif_Negocie_Mensuel" type="number" min="0" step="0.01" value="${+a.Tarif_Negocie_Mensuel||0}"></td><td><input class="editor" data-f="Tarif_Negocie_Annuel" type="number" min="0" step="0.01" value="${+a.Tarif_Negocie_Annuel||0}"></td><td><input class="editor" data-f="Usage_Supplementaire_Prevu_Mois_Licence" type="number" min="0" step="1" value="${+a.Usage_Supplementaire_Prevu_Mois_Licence||0}"></td><td><input class="editor" data-f="Plafond_Overage_Mois_Licence" type="number" step="1" value="${Number(a.Plafond_Overage_Mois_Licence??-1)}" title="-1 = sans plafond, 0 = aucun overage"></td><td class="num"><b>${a.Tarif_A_Confirmer?'À chiffrer':money(a.Budget_Total_USD)}</b></td><td><button class="btn small danger delAlloc" data-id="${a.id}" title="Supprimer cette allocation">×</button></td></tr>`;
+}
+
 function showNewAlloc(){const c=document.getElementById('newAllocCard');c.classList.remove('hidden');c.innerHTML=`<h3>Nouvelle allocation</h3><div class="toolbar"><label class="field">Domaine<select id="naDomain">${scopedDomains().map(d=>`<option value="${d.id}">${esc(d.Nom)}</option>`).join('')}</select></label><label class="field">Offre<select id="naOffer">${D[T.offers].filter(o=>o.Actif!==false).map(o=>{const p=D.providerById[o.Fournisseur];return`<option value="${o.id}">${esc(p?.Nom)} — ${esc(o.Nom)}</option>`}).join('')}</select></label><label class="field">Licences<input id="naLic" type="number" min="0" value="20"></label><label class="field">Mois facturés<input id="naMonths" type="number" min="0" value="${+CURRENT.s.Nb_Mois||12}"></label><button id="createAlloc" class="btn primary">Créer</button></div><p>Pour une offre Enterprise sans prix, laisse le tarif négocié à 0 : elle restera marquée « devis à confirmer ».</p>`;document.getElementById('createAlloc').onclick=createAlloc}
 async function createAlloc(){const oid=+document.getElementById('naOffer').value,o=D.offerById[oid];const fields={Scenario:CURRENT.s.id,Domaine:+document.getElementById('naDomain').value,Offre:oid,Nb_Licences:+document.getElementById('naLic').value||0,Mois_Factures:+document.getElementById('naMonths').value||0,Engagement_Mois:+o.Engagement_Defaut_Mois||0,Tarif_Negocie_Mensuel:0,Tarif_Negocie_Annuel:0,Usage_Supplementaire_Prevu_Mois_Licence:0,Overage_Autorise:o.Overage_Disponible!==false,Plafond_Overage_Mois_Licence:o.Overage_Disponible===false?0:-1};await apply([["AddRecord",T.alloc,null,fields]]);toast('Allocation créée.');await reload()}
 async function saveAllAllocations(){const actions=[...document.querySelectorAll('#v-simulation tr[data-id]')].map(tr=>["UpdateRecord",T.alloc,+tr.dataset.id,readFields(tr)]);if(!actions.length){toast('Aucune allocation à enregistrer.');return}await apply(actions);toast(`${actions.length} allocation(s) enregistrée(s).`);await reload()}
@@ -1309,9 +1317,13 @@ let PRESIM_SELECTED_ID=0;
 let PRESIM_DRAFT=null;
 let PRESIM_DRAFT_RESOURCES=[];
 let PRESIM_REMOVED_RESOURCE_IDS=[];
+let PRESIM_DRAFT_TEAMS=[];
+let PRESIM_REMOVED_TEAM_IDS=[];
+
 
 function preSimulationRows(){ return D[T.preSim]||[]; }
 function preResourceRows(){ return D[T.preRes]||[]; }
+function preTeamRows(){ return D[T.preTeams]||[]; }
 
 function scopedPreSimulations(){
   return preSimulationRows().filter(r=>ACCESS.role==='OWNER'||ACCESS.domainIds.includes(+r.Domaine));
@@ -1340,20 +1352,30 @@ function newPreSimulationDraft(){
     Commentaire:''
   };
 }
-
 function newPreResourceDraft(){
   return {
     __draft:true,
     __key:`pres-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     Nom_Ressource:'',
     Profil:'',
+    Equipe:0,
     Offre:0,
     Commentaire:'',
     Actif:true
   };
 }
-
-function preSimOfferOptions(selected=0){
+function newPreTeamDraft(){
+  return {
+    __draft:true,
+    __key:`pteam-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    Nom:'Nouvelle équipe',
+    Offre_Defaut:0,
+    Ordre:10,
+    Actif:true,
+    Commentaire:''
+  };
+}
+function preSimOfferOptions(selected=0,inheritLabel='— Choisir une offre —'){
   const offers=(D[T.offers]||[])
     .filter(o=>o.Actif!==false)
     .slice()
@@ -1362,75 +1384,149 @@ function preSimOfferOptions(selected=0){
       const pb=D.providerById[+b.Fournisseur]?.Nom||'';
       return pa.localeCompare(pb,'fr') || String(a.Nom||'').localeCompare(String(b.Nom||''),'fr');
     });
-  return `<option value="">— Choisir une offre —</option>`+
+  return `<option value="">${esc(inheritLabel)}</option>`+
     offers.map(o=>{
       const provider=D.providerById[+o.Fournisseur];
       return `<option value="${o.id}" ${+selected===+o.id?'selected':''}>${esc(provider?.Nom||'')} — ${esc(o.Nom||'')}</option>`;
     }).join('');
 }
-
+function preSimCurrentTeams(fiche){
+  if(!fiche)return [];
+  const existing=fiche.__draft?[]:preTeamRows()
+    .filter(r=>+r.Pre_Simulation===+fiche.id && !PRESIM_REMOVED_TEAM_IDS.includes(+r.id));
+  return [...existing,...PRESIM_DRAFT_TEAMS];
+}
 function preSimCurrentResources(fiche){
   if(!fiche) return [];
   const existing=fiche.__draft ? [] : preResourceRows()
     .filter(r=>+r.Pre_Simulation===+fiche.id && !PRESIM_REMOVED_RESOURCE_IDS.includes(+r.id));
   return [...existing,...PRESIM_DRAFT_RESOURCES];
 }
-
-function preSimSummary(resources){
+function preSimTeamById(fiche){
+  return Object.fromEntries(preSimCurrentTeams(fiche).filter(t=>!t.__draft).map(t=>[+t.id,t]));
+}
+function effectivePreSimOfferId(resource,teamById){
+  if(+resource.Offre)return +resource.Offre;
+  const team=teamById[+resource.Equipe];
+  return +team?.Offre_Defaut||0;
+}
+function offerDisplayName(offerId){
+  const o=D.offerById[+offerId];if(!o)return '—';
+  const p=D.providerById[+o.Fournisseur];
+  return `${p?.Nom||''} — ${o.Nom||''}`;
+}
+function preSimSummary(resources,teamById){
   const map=new Map();
-  resources.filter(r=>r.Actif!==false && +r.Offre).forEach(r=>{
-    const offer=D.offerById[+r.Offre];
-    if(!offer) return;
+  resources.filter(r=>r.Actif!==false).forEach(r=>{
+    const oid=effectivePreSimOfferId(r,teamById);
+    const offer=D.offerById[oid];if(!offer)return;
     const provider=D.providerById[+offer.Fournisseur];
     const key=String(offer.id);
     const item=map.get(key)||{provider:provider?.Nom||'',offer:offer.Nom||'',count:0};
-    item.count++;
-    map.set(key,item);
+    item.count++;map.set(key,item);
   });
   return [...map.values()].sort((a,b)=>a.provider.localeCompare(b.provider,'fr')||a.offer.localeCompare(b.offer,'fr'));
 }
+function preSimTeamSummary(resources,teams){
+  const teamById=Object.fromEntries(teams.filter(t=>!t.__draft).map(t=>[+t.id,t]));
+  const map=new Map();
+  resources.filter(r=>r.Actif!==false).forEach(r=>{
+    const tid=+r.Equipe||0;
+    const team=teamById[tid];
+    const oid=effectivePreSimOfferId(r,teamById);
+    const o=D.offerById[oid],p=D.providerById[+o?.Fournisseur];
+    const key=`${tid}|${oid}`;
+    const item=map.get(key)||{
+      team:team?.Nom||'Sans équipe',
+      provider:p?.Nom||'—',
+      offer:o?.Nom||'Non affectée',
+      count:0,
+      teamOrder:+team?.Ordre||9999
+    };
+    item.count++;map.set(key,item);
+  });
+  return [...map.values()].sort((a,b)=>a.teamOrder-b.teamOrder||a.team.localeCompare(b.team,'fr')||a.offer.localeCompare(b.offer,'fr'));
+}
+function preSimMatchesForScenarioDomain(scenarioId,domainId){
+  return scopedPreSimulations()
+    .filter(p=>+p.Scenario_Reference===+scenarioId && +p.Domaine===+domainId)
+    .sort((a,b)=>+b.id-+a.id);
+}
+function openPreSimulationForScenarioDomainV60(scenarioId,domainId){
+  const matches=preSimMatchesForScenarioDomain(scenarioId,domainId);
+  if(!matches.length){toast('Aucune pré-simulation nominative liée à ce scénario et ce domaine.',true);return}
+  PRESIM_DRAFT=null;PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];
+  PRESIM_SELECTED_ID=+matches[0].id;
+  switchView('presim');
+  renderPreSimulation();
+  if(matches.length>1)toast(`${matches.length} fiches trouvées : ouverture de la plus récente.`);
+}
+function ensurePreSimTeamStylesV60(){
+  if(document.getElementById('presim-team-v60-style'))return;
+  const st=document.createElement('style');st.id='presim-team-v60-style';st.textContent=`
+    .presim-link-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;margin-left:7px;border:1px solid #cbc8ff;background:#f4f3ff;color:#5146d8;border-radius:8px;min-width:30px;height:28px;padding:0 7px;cursor:pointer;font-weight:800}
+    .presim-link-btn:hover{background:#eae8ff}.presim-link-count{font-size:.65rem;background:#635bdb;color:white;border-radius:99px;min-width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center}
+    .team-management-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.team-plan-badge{display:inline-block;padding:4px 7px;border-radius:8px;background:#f2f1ff;color:#5146d8;font-size:.72rem;font-weight:700}
+    .effective-plan{font-size:.78rem;font-weight:700;color:#344054;min-width:170px}.effective-plan.inherited:before{content:"↳ ";color:#635bdb}
+    .team-summary-name{display:flex;align-items:center;gap:7px}.team-dot{width:8px;height:8px;border-radius:50%;background:#635bdb;display:inline-block}
+    @media(max-width:900px){.presim-link-btn{margin-left:4px}.effective-plan{min-width:140px}}
+  `;document.head.appendChild(st);
+}
+
 
 function renderPreSimulation(){
-  const el=document.getElementById('v-presim');
-  if(!el) return;
-
-  const fiches=scopedPreSimulations();
-  const fiche=selectedPreSimulation();
+  const el=document.getElementById('v-presim');if(!el)return;
+  ensurePreSimTeamStylesV60();
+  const fiches=scopedPreSimulations(),fiche=selectedPreSimulation();
 
   if(!fiche){
     el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Pré-simulation nominative</h3>
-      <p>Crée une fiche rattachée à un domaine, puis affecte une offre IA à chaque ressource nominative, une personne à la fois.</p>
+      <p>Crée une fiche pour un domaine, organise les ressources en équipes puis définis le plan IA hérité par chaque équipe.</p>
       </div><button id="newPreSim" class="btn primary">+ Nouvelle pré-simulation</button></div></article>`;
     document.getElementById('newPreSim').onclick=()=>{
-      PRESIM_DRAFT=newPreSimulationDraft();
-      PRESIM_DRAFT_RESOURCES=[];
-      PRESIM_REMOVED_RESOURCE_IDS=[];
-      renderPreSimulation();
-    };
-    return;
+      PRESIM_DRAFT=newPreSimulationDraft();PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];renderPreSimulation();
+    };return;
   }
 
+  const teams=preSimCurrentTeams(fiche);
   const resources=preSimCurrentResources(fiche);
-  const summary=preSimSummary(resources);
+  const teamById=preSimTeamById(fiche);
+  const summary=preSimSummary(resources,teamById);
+  const teamSummary=preSimTeamSummary(resources,teams);
 
-  const ficheOptions=fiches.map(x=>
-    `<option value="${x.id}" ${!PRESIM_DRAFT&&+x.id===+fiche.id?'selected':''}>${esc(x.Nom||'Sans nom')} — ${esc(D.domainById[+x.Domaine]?.Nom||'')}</option>`
-  ).join('');
-
-  const domainOptions=scopedDomains().map(d=>
-    `<option value="${d.id}" ${+fiche.Domaine===+d.id?'selected':''}>${esc(d.Nom||'')}</option>`
-  ).join('');
-
+  const ficheOptions=fiches.map(x=>`<option value="${x.id}" ${!PRESIM_DRAFT&&+x.id===+fiche.id?'selected':''}>${esc(x.Nom||'Sans nom')} — ${esc(D.domainById[+x.Domaine]?.Nom||'')}</option>`).join('');
+  const domainOptions=scopedDomains().map(d=>`<option value="${d.id}" ${+fiche.Domaine===+d.id?'selected':''}>${esc(d.Nom||'')}</option>`).join('');
   const scenarioOptions=`<option value="">— Aucun / information facultative —</option>`+
     (D[T.scenarios]||[]).slice().sort((a,b)=>(+a.Annee||0)-(+b.Annee||0)||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'))
       .map(s=>`<option value="${s.id}" ${+fiche.Scenario_Reference===+s.id?'selected':''}>${esc(s.Nom||'')}</option>`).join('');
 
+  const teamRows=teams.map((t,idx)=>{
+    const key=t.__draft?`data-pt-key="${esc(t.__key)}"`:`data-pt-id="${t.id}"`;
+    return `<tr ${key}>
+      <td><input class="admin-input" data-f="Nom" value="${esc(t.Nom||'')}" placeholder="Nom de l'équipe"></td>
+      <td><select class="admin-input" data-f="Offre_Defaut">${preSimOfferOptions(t.Offre_Defaut,'— Plan par défaut —')}</select></td>
+      <td><input class="admin-input" data-f="Ordre" type="number" min="0" value="${+t.Ordre||((idx+1)*10)}"></td>
+      <td><input class="admin-input" data-f="Commentaire" value="${esc(t.Commentaire||'')}"></td>
+      <td><input type="checkbox" data-f="Actif" ${t.Actif===false?'':'checked'}></td>
+      <td><button class="btn ghost removePreTeam">${t.__draft?'Annuler':'Supprimer'}</button></td>
+    </tr>`;
+  }).join('');
+
+  const savedTeams=teams.filter(t=>!t.__draft&&t.Actif!==false);
+  const teamOptions=(selected=0)=>`<option value="">— Sans équipe —</option>`+savedTeams
+    .slice().sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'))
+    .map(t=>`<option value="${t.id}" ${+selected===+t.id?'selected':''}>${esc(t.Nom||'')}</option>`).join('');
+
   const resourceRows=resources.map(r=>{
-    const rowKey=r.__draft ? `data-pr-key="${esc(r.__key)}"` : `data-pr-id="${r.id}"`;
+    const rowKey=r.__draft?`data-pr-key="${esc(r.__key)}"`:`data-pr-id="${r.id}"`;
+    const effective=effectivePreSimOfferId(r,teamById);
+    const inherited=!+r.Offre&&!!effective;
     return `<tr ${rowKey}>
       <td><input class="admin-input" data-f="Nom_Ressource" value="${esc(r.Nom_Ressource||'')}" placeholder="Nom ou identifiant"></td>
       <td><input class="admin-input" data-f="Profil" value="${esc(r.Profil||'')}" placeholder="Dev, PO, métier…"></td>
-      <td><select class="admin-input" data-f="Offre">${preSimOfferOptions(r.Offre)}</select></td>
+      <td><select class="admin-input pre-resource-team" data-f="Equipe">${teamOptions(r.Equipe)}</select></td>
+      <td><select class="admin-input pre-resource-offer" data-f="Offre">${preSimOfferOptions(r.Offre,"— Hériter du plan de l'équipe —")}</select></td>
+      <td><span class="effective-plan ${inherited?'inherited':''}" data-effective-plan>${esc(offerDisplayName(effective))}</span></td>
       <td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td>
       <td><input type="checkbox" data-f="Actif" ${r.Actif===false?'':'checked'}></td>
       <td><button class="btn ghost removePreResource">Supprimer</button></td>
@@ -1439,21 +1535,14 @@ function renderPreSimulation(){
 
   el.innerHTML=`
   <article class="card">
-    <div class="cardhead">
-      <div><h3>Pré-simulation nominative</h3>
-      <p>Le domaine est obligatoire. Le scénario de référence est uniquement informatif : il ne crée ni ne modifie aucune allocation.</p></div>
-      <div class="table-actions">
-        <select id="preSimSelect" class="admin-input">
-          <option value="">Choisir une fiche</option>${ficheOptions}
-        </select>
-        <button id="newPreSim" class="btn secondary">+ Nouvelle fiche</button>
-        <button id="savePreSim" class="btn primary">Enregistrer la fiche</button>
-      </div>
-    </div>
+    <div class="cardhead"><div><h3>Pré-simulation nominative</h3>
+      <p>Le domaine est obligatoire. Le scénario de référence reste informatif pour le budget, mais permet depuis Simulation d'ouvrir directement cette fiche pour le domaine concerné.</p></div>
+      <div class="table-actions"><select id="preSimSelect" class="admin-input"><option value="">Choisir une fiche</option>${ficheOptions}</select>
+        <button id="newPreSim" class="btn secondary">+ Nouvelle fiche</button><button id="savePreSim" class="btn primary">Enregistrer la fiche</button></div></div>
     <div class="presim-meta">
       <label class="field">Nom de la fiche<input id="psNom" class="admin-input" value="${esc(fiche.Nom||'')}"></label>
       <label class="field">Domaine obligatoire<select id="psDomain" class="admin-input">${domainOptions}</select></label>
-      <label class="field">Scénario de référence <small>informatif</small><select id="psScenario" class="admin-input">${scenarioOptions}</select></label>
+      <label class="field">Scénario de référence <small>navigation informative</small><select id="psScenario" class="admin-input">${scenarioOptions}</select></label>
       <label class="field">Statut<input id="psStatus" class="admin-input" value="${esc(fiche.Statut||'Travail')}"></label>
       <label class="field">Responsable<input id="psOwner" class="admin-input" value="${esc(fiche.Responsable||'')}"></label>
     </div>
@@ -1461,64 +1550,84 @@ function renderPreSimulation(){
   </article>
 
   <article class="card">
-    <div class="cardhead">
-      <div><h3>Ressources nominatives</h3><p>Une ligne = une personne = une décision d'affectation d'offre IA.</p></div>
-      <button id="addPreResource" class="btn secondary">+ Ajouter une ressource</button>
-    </div>
+    <div class="cardhead"><div><h3>Équipes du domaine</h3><p>Chaque équipe peut définir un plan IA par défaut. Les ressources de l'équipe l'héritent sauf dérogation nominative.</p></div>
+      <div class="table-actions"><button id="addPreTeam" class="btn secondary">+ Ajouter une équipe</button><button id="savePreTeams" class="btn primary">Enregistrer les équipes</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Équipe</th><th>Plan IA par défaut</th><th>Ordre</th><th>Commentaire</th><th>Actif</th><th></th></tr></thead>
+      <tbody>${teamRows||'<tr><td colspan="6">Aucune équipe. Ajoute une équipe pour organiser les ressources.</td></tr>'}</tbody></table></div>
+  </article>
+
+  <article class="card">
+    <div class="cardhead"><div><h3>Ressources nominatives</h3><p>Une ressource appartient à une équipe. Laisse Plan individuel vide pour hériter automatiquement du plan de l'équipe.</p></div>
+      <button id="addPreResource" class="btn secondary">+ Ajouter une ressource</button></div>
     <div class="tablewrap"><table>
-      <thead><tr><th>Ressource</th><th>Profil</th><th>Offre IA</th><th>Commentaire</th><th>Actif</th><th></th></tr></thead>
-      <tbody>${resourceRows||'<tr><td colspan="6">Aucune ressource pour le moment.</td></tr>'}</tbody>
+      <thead><tr><th>Ressource</th><th>Profil</th><th>Équipe</th><th>Plan individuel</th><th>Plan effectif</th><th>Commentaire</th><th>Actif</th><th></th></tr></thead>
+      <tbody>${resourceRows||'<tr><td colspan="8">Aucune ressource pour le moment.</td></tr>'}</tbody>
     </table></div>
     <div class="table-actions presim-save"><button id="savePreResources" class="btn primary">Enregistrer les ressources</button></div>
   </article>
 
   <article class="card">
-    <div class="cardhead"><div><h3>Synthèse des licences nominatives</h3>
-      <p>Comptage automatique des ressources actives par fournisseur et offre pour cette fiche.</p></div></div>
-    <div class="tablewrap"><table>
-      <thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Licences nominatives</th></tr></thead>
-      <tbody>${summary.length?summary.map(x=>`<tr>
-        <td>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td>
-      </tr>`).join(''):'<tr><td colspan="4">Aucune offre affectée pour le moment.</td></tr>'}</tbody>
+    <div class="cardhead"><div><h3>Synthèse par équipe</h3><p>Récapitulatif des ressources actives et de leur plan effectif au sein du domaine.</p></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Équipe</th><th>Fournisseur</th><th>Plan / offre effective</th><th>Ressources</th></tr></thead>
+      <tbody>${teamSummary.length?teamSummary.map(x=>`<tr><td><span class="team-summary-name"><span class="team-dot"></span><b>${esc(x.team)}</b></span></td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join(''):'<tr><td colspan="4">Aucune ressource active pour le moment.</td></tr>'}</tbody>
+    </table></div>
+  </article>
+
+  <article class="card">
+    <div class="cardhead"><div><h3>Synthèse des licences nominatives</h3><p>Comptage consolidé des plans effectifs de la fiche, toutes équipes confondues.</p></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Licences nominatives</th></tr></thead>
+      <tbody>${summary.length?summary.map(x=>`<tr><td>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join(''):'<tr><td colspan="4">Aucun plan effectif pour le moment.</td></tr>'}</tbody>
     </table></div>
   </article>`;
 
   document.getElementById('preSimSelect').onchange=e=>{
-    PRESIM_DRAFT=null;
-    PRESIM_DRAFT_RESOURCES=[];
-    PRESIM_REMOVED_RESOURCE_IDS=[];
-    PRESIM_SELECTED_ID=+e.target.value||0;
-    renderPreSimulation();
+    PRESIM_DRAFT=null;PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];
+    PRESIM_SELECTED_ID=+e.target.value||0;renderPreSimulation();
   };
   document.getElementById('newPreSim').onclick=()=>{
-    PRESIM_DRAFT=newPreSimulationDraft();
-    PRESIM_DRAFT_RESOURCES=[];
-    PRESIM_REMOVED_RESOURCE_IDS=[];
-    renderPreSimulation();
+    PRESIM_DRAFT=newPreSimulationDraft();PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];renderPreSimulation();
+  };
+  document.getElementById('addPreTeam').onclick=()=>{
+    if(fiche.__draft){toast("Enregistre d'abord la fiche avant d'ajouter les équipes.",true);return}
+    PRESIM_DRAFT_TEAMS.push(newPreTeamDraft());renderPreSimulation();
   };
   document.getElementById('addPreResource').onclick=()=>{
-    if(fiche.__draft){
-      toast("Enregistre d'abord la fiche avant d'ajouter les ressources.",true);
-      return;
-    }
-    PRESIM_DRAFT_RESOURCES.push(newPreResourceDraft());
-    renderPreSimulation();
-    const last=el.querySelector('tr[data-pr-key]:last-of-type input[data-f="Nom_Ressource"]');
-    last?.focus();
+    if(fiche.__draft){toast("Enregistre d'abord la fiche avant d'ajouter les ressources.",true);return}
+    PRESIM_DRAFT_RESOURCES.push(newPreResourceDraft());renderPreSimulation();
+    el.querySelector('tr[data-pr-key]:last-of-type input[data-f="Nom_Ressource"]')?.focus();
   };
   document.getElementById('savePreSim').onclick=savePreSimulationV28;
-  document.getElementById('savePreResources').onclick=savePreResourcesV28;
+  document.getElementById('savePreTeams').onclick=savePreTeamsV60;
+  document.getElementById('savePreResources').onclick=savePreResourcesV60;
 
-  el.querySelectorAll('.removePreResource').forEach(btn=>btn.onclick=()=>{
-    const tr=btn.closest('tr');
-    const id=+tr.dataset.prId||0;
-    const key=tr.dataset.prKey||'';
-    if(key) PRESIM_DRAFT_RESOURCES=PRESIM_DRAFT_RESOURCES.filter(r=>r.__key!==key);
-    if(id) PRESIM_REMOVED_RESOURCE_IDS.push(id);
+  el.querySelectorAll('.removePreTeam').forEach(btn=>btn.onclick=()=>{
+    const tr=btn.closest('tr'),id=+tr.dataset.ptId||0,key=tr.dataset.ptKey||'';
+    if(key)PRESIM_DRAFT_TEAMS=PRESIM_DRAFT_TEAMS.filter(t=>t.__key!==key);
+    if(id){
+      const used=resources.some(r=>+r.Equipe===id&&!PRESIM_REMOVED_RESOURCE_IDS.includes(+r.id));
+      if(used&&!confirm("Cette équipe contient des ressources. Sa suppression retirera l'équipe de ces ressources. Continuer ?"))return;
+      PRESIM_REMOVED_TEAM_IDS.push(id);
+    }
     renderPreSimulation();
   });
+  el.querySelectorAll('.removePreResource').forEach(btn=>btn.onclick=()=>{
+    const tr=btn.closest('tr'),id=+tr.dataset.prId||0,key=tr.dataset.prKey||'';
+    if(key)PRESIM_DRAFT_RESOURCES=PRESIM_DRAFT_RESOURCES.filter(r=>r.__key!==key);
+    if(id)PRESIM_REMOVED_RESOURCE_IDS.push(id);
+    renderPreSimulation();
+  });
+  const updateEffective=tr=>{
+    const teamId=+tr.querySelector('[data-f="Equipe"]')?.value||0;
+    const explicit=+tr.querySelector('[data-f="Offre"]')?.value||0;
+    const oid=explicit||(+teamById[teamId]?.Offre_Defaut||0);
+    const target=tr.querySelector('[data-effective-plan]');
+    if(target){target.textContent=offerDisplayName(oid);target.classList.toggle('inherited',!explicit&&!!oid)}
+  };
+  el.querySelectorAll('tr[data-pr-id],tr[data-pr-key]').forEach(tr=>{
+    tr.querySelector('[data-f="Equipe"]')?.addEventListener('change',()=>updateEffective(tr));
+    tr.querySelector('[data-f="Offre"]')?.addEventListener('change',()=>updateEffective(tr));
+  });
 }
-
 function readPreSimulationFields(){
   return {
     Nom:document.getElementById('psNom')?.value.trim()||'',
@@ -1529,59 +1638,76 @@ function readPreSimulationFields(){
     Commentaire:document.getElementById('psComment')?.value.trim()||''
   };
 }
-
 async function savePreSimulationV28(){
-  const fiche=selectedPreSimulation();
-  const fields=readPreSimulationFields();
+  const fiche=selectedPreSimulation(),fields=readPreSimulationFields();
   if(!fields.Nom){toast('Le nom de la pré-simulation est obligatoire.',true);return}
   if(!fields.Domaine){toast('Le domaine est obligatoire.',true);return}
-  if(!ACCESS.domainIds.includes(fields.Domaine) && ACCESS.role!=='OWNER'){toast("Ce domaine n'est pas autorisé.",true);return}
+  if(!ACCESS.domainIds.includes(fields.Domaine)&&ACCESS.role!=='OWNER'){toast("Ce domaine n'est pas autorisé.",true);return}
+  if(fields.Scenario_Reference){
+    const duplicate=scopedPreSimulations().find(x=>+x.Scenario_Reference===fields.Scenario_Reference&&+x.Domaine===fields.Domaine&&+x.id!==+fiche.id);
+    if(duplicate){toast(`Une pré-simulation est déjà liée à ce scénario pour ce domaine : ${duplicate.Nom}.`,true);return}
+  }
   try{
     if(fiche.__draft){
-      await apply([["AddRecord",T.preSim,null,fields]]);
-      PRESIM_DRAFT=null;
-      await reload();
+      await apply([["AddRecord",T.preSim,null,fields]]);PRESIM_DRAFT=null;await reload();
       const matches=scopedPreSimulations().filter(x=>x.Nom===fields.Nom&&+x.Domaine===fields.Domaine);
       PRESIM_SELECTED_ID=+(matches.sort((a,b)=>+b.id-+a.id)[0]?.id||0);
-    }else{
-      await apply([["UpdateRecord",T.preSim,+fiche.id,fields]]);
-      await reload();
-    }
+    }else{await apply([["UpdateRecord",T.preSim,+fiche.id,fields]]);await reload()}
     toast('Pré-simulation enregistrée.');
   }catch(e){toast(e.message||String(e),true)}
 }
-
-async function savePreResourcesV28(){
+async function savePreTeamsV60(){
   const fiche=selectedPreSimulation();
-  if(!fiche || fiche.__draft){toast("Enregistre d'abord la fiche de pré-simulation.",true);return}
-  const root=document.getElementById('v-presim');
-  const actions=[];
-  const seenIds=new Set();
-
+  if(!fiche||fiche.__draft){toast("Enregistre d'abord la fiche de pré-simulation.",true);return}
+  const root=document.getElementById('v-presim'),actions=[];
+  for(const tr of root.querySelectorAll('tbody tr[data-pt-id],tbody tr[data-pt-key]')){
+    const id=+tr.dataset.ptId||0;
+    const fields={
+      Pre_Simulation:+fiche.id,
+      Nom:tr.querySelector('[data-f="Nom"]')?.value.trim()||'',
+      Offre_Defaut:+tr.querySelector('[data-f="Offre_Defaut"]')?.value||0,
+      Ordre:+tr.querySelector('[data-f="Ordre"]')?.value||0,
+      Commentaire:tr.querySelector('[data-f="Commentaire"]')?.value.trim()||'',
+      Actif:!!tr.querySelector('[data-f="Actif"]')?.checked
+    };
+    if(!fields.Nom){toast("Chaque équipe doit avoir un nom.",true);return}
+    if(!fields.Offre_Defaut){toast(`Choisis un plan IA par défaut pour l'équipe ${fields.Nom}.`,true);return}
+    actions.push(id?["UpdateRecord",T.preTeams,id,fields]:["AddRecord",T.preTeams,null,fields]);
+  }
+  for(const id of [...new Set(PRESIM_REMOVED_TEAM_IDS)]){
+    preResourceRows().filter(r=>+r.Pre_Simulation===+fiche.id&&+r.Equipe===id).forEach(r=>actions.push(["UpdateRecord",T.preRes,+r.id,{Equipe:0}]));
+    actions.push(["RemoveRecord",T.preTeams,id]);
+  }
+  try{
+    if(actions.length)await apply(actions);
+    PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];await reload();toast(`${actions.length} modification(s) d'équipes enregistrée(s).`);
+  }catch(e){toast(e.message||String(e),true)}
+}
+async function savePreResourcesV60(){
+  const fiche=selectedPreSimulation();
+  if(!fiche||fiche.__draft){toast("Enregistre d'abord la fiche de pré-simulation.",true);return}
+  const root=document.getElementById('v-presim'),actions=[];
+  const teamById=preSimTeamById(fiche);
   for(const tr of root.querySelectorAll('tbody tr[data-pr-id],tbody tr[data-pr-key]')){
     const id=+tr.dataset.prId||0;
     const fields={
       Pre_Simulation:+fiche.id,
       Nom_Ressource:tr.querySelector('[data-f="Nom_Ressource"]')?.value.trim()||'',
       Profil:tr.querySelector('[data-f="Profil"]')?.value.trim()||'',
+      Equipe:+tr.querySelector('[data-f="Equipe"]')?.value||0,
       Offre:+tr.querySelector('[data-f="Offre"]')?.value||0,
       Commentaire:tr.querySelector('[data-f="Commentaire"]')?.value.trim()||'',
       Actif:!!tr.querySelector('[data-f="Actif"]')?.checked
     };
     if(!fields.Nom_Ressource){toast('Chaque ressource doit avoir un nom ou un identifiant.',true);return}
-    if(!fields.Offre){toast(`Choisis une offre IA pour ${fields.Nom_Ressource}.`,true);return}
-    if(id){actions.push(["UpdateRecord",T.preRes,id,fields]);seenIds.add(id)}
-    else actions.push(["AddRecord",T.preRes,null,fields]);
+    const effective=fields.Offre||(+teamById[fields.Equipe]?.Offre_Defaut||0);
+    if(!effective){toast(`Aucun plan effectif pour ${fields.Nom_Ressource} : choisis une équipe avec un plan ou un plan individuel.`,true);return}
+    actions.push(id?["UpdateRecord",T.preRes,id,fields]:["AddRecord",T.preRes,null,fields]);
   }
-
-  for(const id of [...new Set(PRESIM_REMOVED_RESOURCE_IDS)]) actions.push(["RemoveRecord",T.preRes,id]);
-
+  for(const id of [...new Set(PRESIM_REMOVED_RESOURCE_IDS)])actions.push(["RemoveRecord",T.preRes,id]);
   try{
-    if(actions.length) await apply(actions);
-    PRESIM_DRAFT_RESOURCES=[];
-    PRESIM_REMOVED_RESOURCE_IDS=[];
-    await reload();
-    toast(`${actions.length} modification(s) de ressources enregistrée(s).`);
+    if(actions.length)await apply(actions);
+    PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];await reload();toast(`${actions.length} modification(s) de ressources enregistrée(s).`);
   }catch(e){toast(e.message||String(e),true)}
 }
 
@@ -2370,6 +2496,7 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Baseline_N_1_Details",colIds:"*",kind:"domain",mode:"userEdit"},
   {tableId:"Pre_Simulations",colIds:"*",kind:"domain",mode:"userEdit"},
   {tableId:"Pre_Simulation_Ressources",colIds:"*",kind:"presimdomain",mode:"userEdit"},
+  {tableId:"Pre_Simulation_Equipes",colIds:"*",kind:"presimdomain",mode:"userEdit"},
   {tableId:"Enterprise",colIds:"*",kind:"domain",mode:"read"},
   {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",mode:"read"},
   {tableId:"Domaines",colIds:"*",kind:"domains",mode:"domains"},
