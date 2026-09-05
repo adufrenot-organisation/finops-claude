@@ -1024,3 +1024,13 @@ textarea{
 .scenario-team-total-card small{color:#667085;margin-top:2px}
 .scenario-team-total-card b{margin-top:5px}
 .scenario-team-total-card b small{display:inline;color:#667085;font-weight:600}
+
+/* V78 — synthèse annuelle par domaine / équipe */
+.scenario-team-annual{margin-top:14px;padding-top:12px;border-top:1px solid #dfe5ec}
+.scenario-team-annual-head{margin-bottom:8px}
+.scenario-team-annual-head h4{margin:0 0 4px;font-size:14px}
+.scenario-team-annual-head p{margin:0;color:#667085;font-size:12px;line-height:1.45}
+.scenario-team-annual-table .negative{color:#b42318}
+
+/* V79 — ROI domaine/service + aides */
+.roi-info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:11px;font-weight:800;border:1px solid currentColor;cursor:help;vertical-align:middle;margin-left:3px;opacity:.75}.roi-service-flag{display:block;margin-top:3px;color:#635bdb}.roi-service-row>td{background:#f8fafc;padding:10px!important}.roi-service-box{border:1px solid #dfe5ec;border-radius:10px;background:#fff;padding:10px}.roi-service-box h4{margin:0 0 8px}.roi-service-box table{margin:0}
