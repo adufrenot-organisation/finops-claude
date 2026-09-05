@@ -884,7 +884,7 @@ function renderDashboard(){
   const m=model(selectedScenario()?.id,DASH_FILTER);
   const el=document.getElementById('v-dashboard');
   const offers=Object.values(m.bo),domains=Object.values(m.bd).sort((a,b)=>b.total-a.total);
-  const unresolved=m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:'<span class="badge ok">Tous les tarifs chiffrés</span>';
+  const unresolved=m.unresolved?`<span class="badge warn">${m.unresolved} ${compareLabelV71("tarif(s) à confirmer")}</span>`:'<span class="badge ok">Tous les tarifs chiffrés</span>';
   const selectedDomainSet=new Set((DASH_FILTER.domainIds||[]).map(Number));
   const activeDomains=opts.domains.filter(d=>selectedDomainSet.has(+d.id));
   const activeProvider=opts.providers.find(p=>+p.id===+DASH_FILTER.providerId);
@@ -1183,28 +1183,29 @@ function scenarioBudgetViewsV67(m){
   return `<div class="detail-budget-grid">${domainHtml}${offerHtml}</div>`;
 }
 
+function compareLabelV71(def){return esc(uiLabelValue("compare",def))}
 function scenarioDetailHtmlV36(m,printMode=false){
   const groups=scenarioDomainGroups(m);
   const offerCount=Object.keys(m.bo).length;
   return `<div class="scenario-detail-document ${printMode?'print-document':''}">
     <div class="detail-hero">
-      <div><span class="scenario-eyebrow">SYNTHÈSE FINOPS IA</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} ${esc(uiLabelValue("compare","licences"))}</span><span>${groups.length} ${esc(uiLabelValue("compare","domaines"))}</span><span>${offerCount} ${esc(uiLabelValue("compare","offres"))}</span>${m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</div></div>
+      <div><span class="scenario-eyebrow">${compareLabelV71("SYNTHÈSE FINOPS IA")}</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} ${esc(uiLabelValue("compare","licences"))}</span><span>${groups.length} ${esc(uiLabelValue("compare","domaines"))}</span><span>${offerCount} ${esc(uiLabelValue("compare","offres"))}</span>${m.unresolved?`<span class="badge warn">${m.unresolved} ${compareLabelV71("tarif(s) à confirmer")}</span>`:`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</div></div>
       <div class="detail-total"><small>${esc(uiLabelValue("compare","Budget total"))}</small><strong>${money(m.total)}</strong><span>${money(m.total*m.rate,'EUR')}</span></div>
     </div>
     <div class="detail-kpis">
       <div><span>${esc(uiLabelValue("compare","Coûts fixes"))}</span>${synthesisMoneyV64(m.fixed,m.rate,{strong:true})}</div>
       <div><span>${esc(uiLabelValue("compare","Coûts variables"))}</span>${synthesisMoneyV64(m.over,m.rate,{strong:true})}</div>
       <div><span>${esc(uiLabelValue("compare","Budget EUR"))}</span><b>${money(m.total*m.rate,'EUR')}</b></div>
-      <div><span>Économie annuelle</span><b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></div>
+      <div><span>${compareLabelV71("Économie annuelle")}</span><b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></div>
     </div>
-    <div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>Lecture du coût fixe</b><p>Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.</p></div></div>
+    <div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>${compareLabelV71("Lecture du coût fixe")}</b><p>${compareLabelV71("Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.")}</p></div></div>
     ${scenarioBudgetViewsV67(m)}
     <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${esc(uiLabelValue("compare","Offres, licences, prix du forfait, engagements et structure des coûts."))}</p></div></div>
     <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
       <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}</div></div>
-      <div class="tablewrap"><table class="detail-table"><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Prix forfait</th><th>Base calcul fixe</th><th>Engagement</th><th>Mois facturés</th><th>Fixe</th><th>Variable</th><th>Total</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?' <span class="badge warn">À confirmer</span>':''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' mois':'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">Sous-total ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
+      <div class="tablewrap"><table class="detail-table"><thead><tr><th>${compareLabelV71("Fournisseur")}</th><th>${compareLabelV71("Offre")}</th><th>${compareLabelV71("Licences")}</th><th>${compareLabelV71("Prix forfait")}</th><th>${compareLabelV71("Base calcul fixe")}</th><th>${compareLabelV71("Engagement")}</th><th>${compareLabelV71("Mois facturés")}</th><th>${compareLabelV71("Fixe")}</th><th>${compareLabelV71("Variable")}</th><th>${compareLabelV71("Total")}</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?` <span class="badge warn">${compareLabelV71("À confirmer")}</span>`:''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' '+uiLabelValue("compare","mois"):'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">${compareLabelV71("Sous-total")} ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
     </section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
-    <div class="detail-grand-total"><div><span>${esc(uiLabelValue("compare","Total scénario"))}</span><small>${num(m.licenses)} licences · ${groups.length} domaines</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
+    <div class="detail-grand-total"><div><span>${esc(uiLabelValue("compare","Total scénario"))}</span><small>${num(m.licenses)} ${compareLabelV71("licences")} · ${groups.length} ${compareLabelV71("domaines")}</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
   </div>`;
 }
 function openScenarioDetailV36(sid){
@@ -1230,13 +1231,13 @@ function scenarioHtmlDocumentV41(m){
   const reportTitle=`FinOps - ${m.s.Nom}`;
   const filename=`FinOps_${safeFilenameV41(m.s.Nom)}_${new Date().toISOString().slice(0,10)}.html`;
   const body=`<div class="html-report-toolbar no-print">
-      <div><b>${esc(uiLabelValue("compare","Synthèse FinOps IA"))}</b><span>Rapport HTML autonome · ${esc(m.s.Nom)}</span></div>
+      <div><b>${compareLabelV71("Synthèse FinOps IA")}</b><span>${compareLabelV71("Rapport HTML autonome")} · ${esc(m.s.Nom)}</span></div>
       <div class="html-report-actions"><button id="htmlPrint">🖨 ${esc(uiLabelValue("compare","Imprimer / PDF"))}</button><button id="htmlSave">💾 ${esc(uiLabelValue("compare","Enregistrer le fichier HTML"))}</button></div>
     </div>
     <main class="html-report-page">
-      <div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>Détail du scénario · ${esc(m.s.Nom)}</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+      <div class="print-cover"><div><h1>${compareLabelV71("Synthèse FinOps IA")}</h1><p>${compareLabelV71("Détail du scénario")} · ${esc(m.s.Nom)}</p></div><div>${compareLabelV71("Édité le")} ${new Date().toLocaleDateString('fr-FR')}</div></div>
       ${scenarioDetailHtmlV36(m,true)}
-    </main>`;
+    <footer class="report-publisher">${esc(uiLabelValue("compare","Éditeur de l’outil"))} : <b>Alex Dufrenot</b></footer></main>`;
   const screenCss=`
     body{background:#eef2f7;padding:0 0 36px;font-size:12px}
     .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
@@ -1268,17 +1269,39 @@ function openScenarioHtmlV41(sid){
   w.document.close();
 }
 function synthesisHtmlDocumentV42(ms){
-  const reportTitle='FinOps - Synthèse des scénarios';
+  const L=def=>compareLabelV71(def);
+  const reportTitle=`FinOps - ${uiLabelValue("compare","Synthèse des scénarios")}`;
   const filename=`FinOps_Synthese_${new Date().toISOString().slice(0,10)}.html`;
-  const summary=`<div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>${ms.length} scénario(s) sélectionné(s)</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
-    <h2 class="print-section-title">01 · Synthèse</h2>
-    <table class="summary-table"><thead><tr><th>Scénario</th><th>Licences</th><th>Fixe</th><th>Variable</th><th>Budget USD</th><th>Budget EUR</th><th>Économie annuelle</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${num(m.licenses)}</td><td class="num">${synthesisMoneyV64(m.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(m.over,m.rate)}</td><td class="num">${synthesisMoneyV64(m.total,m.rate,{strong:true})}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td></tr>`).join('')}</tbody></table>
-    <div class="page-break"></div><h2 class="print-section-title">02 · Détails des scénarios</h2>${ms.map((m,i)=>`${i?'<div class="page-break"></div>':''}${scenarioDetailHtmlV36(m,true)}`).join('')}`;
+  const summary=`<div class="print-cover"><div><h1>${L("Synthèse FinOps IA")}</h1><p>${ms.length} ${L("scénario(s) sélectionné(s)")}</p></div><div>${L("Édité le")} ${new Date().toLocaleDateString('fr-FR')}</div></div>
+    <h2 class="print-section-title">01 · ${L("Synthèse")}</h2>
+    <table class="summary-table"><thead><tr>
+      <th>${L("Scénario")}</th>
+      <th>${L("Licences")}</th>
+      <th>${L("Fixe")}</th>
+      <th>${L("Variable")}</th>
+      <th>${L("Budget USD")}</th>
+      <th>${L("Budget EUR")}</th>
+      <th>${L("Économie annuelle")}</th>
+    </tr></thead><tbody>${ms.map(m=>`<tr>
+      <td><b>${esc(m.s.Nom)}</b></td>
+      <td class="num">${num(m.licenses)}</td>
+      <td class="num">${synthesisMoneyV64(m.fixed,m.rate)}</td>
+      <td class="num">${synthesisMoneyV64(m.over,m.rate)}</td>
+      <td class="num">${synthesisMoneyV64(m.total,m.rate,{strong:true})}</td>
+      <td class="num">${money(m.total*m.rate,'EUR')}</td>
+      <td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td>
+    </tr>`).join('')}</tbody></table>
+    <div class="page-break"></div>
+    <h2 class="print-section-title">02 · ${L("Détails des scénarios")}</h2>
+    ${ms.map((m,i)=>`${i?'<div class="page-break"></div>':''}${scenarioDetailHtmlV36(m,true)}`).join('')}
+    <footer class="report-publisher">${L("Éditeur de l’outil")} : <b>Alex Dufrenot</b></footer>`;
+
   const body=`<div class="html-report-toolbar no-print">
-      <div><b>${esc(uiLabelValue("compare","Synthèse FinOps IA"))}</b><span>Rapport HTML autonome · ${ms.length} scénario(s)</span></div>
-      <div class="html-report-actions"><button id="htmlPrint">🖨 ${esc(uiLabelValue("compare","Imprimer / PDF"))}</button><button id="htmlSave">💾 ${esc(uiLabelValue("compare","Enregistrer le fichier HTML"))}</button></div>
+      <div><b>${L("Synthèse FinOps IA")}</b><span>${L("Rapport HTML autonome")} · ${ms.length} ${L("scénario(s)")}</span></div>
+      <div class="html-report-actions"><button id="htmlPrint">🖨 ${L("Imprimer / PDF")}</button><button id="htmlSave">💾 ${L("Enregistrer le fichier HTML")}</button></div>
     </div>
     <main class="html-report-page">${summary}</main>`;
+
   const screenCss=`
     body{background:#eef2f7;padding:0 0 36px;font-size:12px}
     .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
@@ -1301,6 +1324,7 @@ function synthesisHtmlDocumentV42(ms){
   `;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(reportTitle)}</title><style>${PRINT_CSS_V36}${screenCss}</style></head><body>${body}<script>${js}<\/script></body></html>`;
 }
+
 function openSynthesisHtmlV42(){
   const ids=compareSelectedIds(),ms=ids.map(model).filter(m=>m?.s);
   if(!ms.length){toast('Sélectionne au moins un scénario.',true);return}
@@ -1321,7 +1345,7 @@ function printWindowV36(title,body){
 const PRINT_CSS_V36=`
 @page{size:A4 landscape;margin:12mm}
 *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10213e;margin:0;background:#fff;font-size:10px}
-.synth-money{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}.synth-eur{display:block;margin-top:2px;font-size:8px;font-weight:600;color:#64748b;white-space:nowrap}
+.synth-money{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}.synth-eur{display:block;margin-top:2px;font-size:8px;font-weight:600;color:#64748b;white-space:nowrap}.report-publisher{margin-top:22px;padding-top:10px;border-top:1px solid #dbe3ef;color:#64748b;font-size:9px;text-align:right}
 h1,h2,h3,p{margin-top:0}.print-cover{display:flex;justify-content:space-between;align-items:end;border-bottom:3px solid #5b4df5;padding-bottom:12px;margin-bottom:18px}.print-cover h1{font-size:26px;margin-bottom:4px}.print-cover p{color:#64748b;margin:0}
 .scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}
 .detail-budget-grid{display:grid;grid-template-columns:38% 62%;gap:8px;margin:12px 0}.detail-budget-card{border:1px solid #dbe3ef;border-radius:10px;padding:9px}.detail-domain-budget{display:flex;flex-direction:column;gap:6px}.detail-domain-budget-row{display:grid;grid-template-columns:35% 40% 25%;align-items:center;gap:5px}.detail-domain-budget-label{display:flex;justify-content:space-between;gap:4px}.detail-domain-budget-label span{color:#64748b}.detail-domain-budget-track{height:7px;background:#edf1f6;border-radius:99px;overflow:hidden}.detail-domain-budget-track>span{display:block;height:100%;background:#635bdb}.detail-domain-budget-values{text-align:right}.detail-budget-offer-table tfoot td{font-weight:700;background:#f8fafc}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}.pricing-explainer{display:flex;gap:8px;padding:9px;border:1px solid #dedcff;border-radius:9px;margin-bottom:12px;background:#f8f7ff}.pricing-icon{width:25px;height:25px;border-radius:7px;background:#635bdb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}.pricing-explainer p{margin:2px 0 0;color:#64748b}.price-period,.price-source{display:block;font-size:7px;color:#64748b}.price-source{color:#635bdb}.fixed-basis{font-size:8px;line-height:1.3}
@@ -1682,10 +1706,9 @@ async function savePreSimRightsV62(){
     actions.push(id?["UpdateRecord",T.preSimRights,id,fields]:["AddRecord",T.preSimRights,null,fields]);
   }
   for(const id of [...new Set(PRESIM_REMOVED_RIGHT_IDS)])actions.push(["RemoveRecord",T.preSimRights,id]);
-  const responsible=+document.getElementById('psResponsible')?.value||+fiche.Responsable_User||0;
-  const tokens=buildPreSimAccessTokens(responsible,virtual);
+  const authorId=+fiche.Responsable_User||0;
+  const tokens=buildPreSimAccessTokens(authorId,virtual);
   actions.push(["UpdateRecord",T.preSim,+fiche.id,{
-    Responsable_User:responsible,Responsable_Email:tokens.resp,
     Acces_Lecture_Emails:tokens.read,Acces_Modification_Emails:tokens.modify
   }]);
   try{
@@ -1707,7 +1730,7 @@ function presimHtmlDocumentV62(fiche){
   const filename=`FinOps_PreSimulation_${safeFilenameV41(fiche.Nom)}_${new Date().toISOString().slice(0,10)}.html`;
   const css=`*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef2f7;color:#10213e}.bar{position:sticky;top:0;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 18px;background:#10213e;color:white}.bar button{border:0;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer}.page{width:min(1400px,calc(100% - 30px));margin:22px auto;background:white;padding:26px;border-radius:16px}.hero{display:flex;justify-content:space-between;gap:20px;padding-bottom:16px;border-bottom:3px solid #635bdb}.hero h1{margin:3px 0}.meta{display:flex;gap:7px;flex-wrap:wrap}.meta span{background:#f3f4f8;padding:5px 8px;border-radius:99px;font-size:12px}.section{margin-top:24px}.section h2{font-size:18px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #e4e9f0;text-align:left;font-size:12px}th{background:#f8fafc}.num{text-align:right}.sig{margin-top:25px;color:#667085;font-size:11px}@media(max-width:720px){.bar{align-items:flex-start;flex-direction:column}.page{width:calc(100% - 10px);margin:5px auto;padding:12px;overflow:auto}.hero{flex-direction:column}table{min-width:760px}}@media print{.bar{display:none}.page{width:auto;margin:0;padding:0;border-radius:0}body{background:white}@page{size:A4 landscape;margin:12mm}}`;
   const body=`<div class="bar"><div><b>Pré-simulation nominative</b><div>${esc(fiche.Nom)}</div></div><div><button id="print">🖨 ${esc(uiLabelValue("compare","Imprimer / PDF"))}</button> <button id="save">💾 ${esc(uiLabelValue("compare","Enregistrer le fichier HTML"))}</button></div></div>
-  <main class="page"><div class="hero"><div><small>FINOPS IA · PRÉ-SIMULATION NOMINATIVE</small><h1>${esc(fiche.Nom)}</h1><div class="meta"><span>Domaine : ${esc(domain)}</span><span>Scénario : ${esc(scenario)}</span><span>Responsable : ${esc(resp)}</span><span>Statut : ${esc(fiche.Statut||'')}</span></div></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+  <main class="page"><div class="hero"><div><small>FINOPS IA · PRÉ-SIMULATION NOMINATIVE</small><h1>${esc(fiche.Nom)}</h1><div class="meta"><span>Domaine : ${esc(domain)}</span><span>Scénario : ${esc(scenario)}</span><span>${esc(uiLabelValue("presim","Auteur"))} : ${esc(resp)}</span><span>Statut : ${esc(fiche.Statut||'')}</span></div></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
   <section class="section"><h2>${esc(uiLabelValue("presim","Équipes"))}</h2><table><thead><tr><th>Équipe</th><th>Plan par défaut</th><th>Ressources actives</th></tr></thead><tbody>${teams.filter(t=>t.Actif!==false).map(t=>`<tr><td><b>${esc(t.Nom||'')}</b></td><td>${esc(offerDisplayName(t.Offre_Defaut))}</td><td class="num">${resources.filter(r=>r.Actif!==false&&+r.Equipe===+t.id).length}</td></tr>`).join('')||'<tr><td colspan="3">Aucune équipe</td></tr>'}</tbody></table></section>
   <section class="section"><h2>${esc(uiLabelValue("presim","Ressources nominatives"))}</h2><table><thead><tr><th>Ressource</th><th>Profil</th><th>Équipe</th><th>Plan individuel</th><th>Plan effectif</th><th>Commentaire</th></tr></thead><tbody>${resourceRows||'<tr><td colspan="6">Aucune ressource active</td></tr>'}</tbody></table></section>
   <section class="section"><h2>${esc(uiLabelValue("presim","Synthèse par équipe"))}</h2><table><thead><tr><th>Équipe</th><th>Fournisseur</th><th>Plan</th><th>Ressources</th></tr></thead><tbody>${teamSummary.map(x=>`<tr><td>${esc(x.team)}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join('')||'<tr><td colspan="4">Aucune donnée</td></tr>'}</tbody></table></section>
@@ -1793,16 +1816,16 @@ function renderPreSimulation(){
       <label class="field">Domaine obligatoire<select id="psDomain" class="admin-input">${domainOptions}</select></label>
       <label class="field">Scénario de référence <small>navigation informative</small><select id="psScenario" class="admin-input">${scenarioOptions}</select></label>
       <label class="field">Statut<input id="psStatus" class="admin-input" value="${esc(fiche.Statut||'Travail')}"></label>
-      <label class="field">Responsable <small>utilisateur FinOps</small><select id="psResponsible" class="admin-input" ${preSimCanManageRights(fiche)?'':'disabled'}>${preSimResponsibleOptions(fiche)}</select></label>
+      <label class="field">Auteur <small>utilisateur connecté</small><input id="psAuthor" class="admin-input" value="${esc(fiche.__draft?preSimEmail():(fiche.Responsable_Email||rightUserEmail(+fiche.Responsable_User)||''))}" readonly></label>
     </div>
     <label class="field presim-comment">Commentaire<textarea id="psComment" class="admin-input" rows="2">${esc(fiche.Commentaire||'')}</textarea></label>
   </article>
 
   ${preSimCanManageRights(fiche)&&!fiche.__draft?`<article class="card presim-access-card">
-    <div class="cardhead"><div><h3>Accès à la fiche</h3><p>Le responsable a toujours accès. Les droits supplémentaires ne sont valides que si l'utilisateur a aussi accès au domaine <b>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</b>.</p></div>
+    <div class="cardhead"><div><h3>Accès à la fiche</h3><p>L’auteur a toujours accès. Les droits supplémentaires ne sont valides que si l'utilisateur a aussi accès au domaine <b>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</b>.</p></div>
       <div class="table-actions"><button id="addPreSimRight" class="btn secondary">+ Ajouter un accès</button><button id="savePreSimRights" class="btn primary">Enregistrer les droits</button></div></div>
     <div class="tablewrap"><table><thead><tr><th>Utilisateur</th><th>Niveau</th><th>Actif</th><th>Commentaire</th><th></th></tr></thead><tbody>
-      ${currentPreSimRights(fiche).map(r=>{const k=r.__draft?`data-par-key="${esc(r.__key)}"`:`data-par-id="${r.id}"`;const eligible=eligiblePreSimUsers(+fiche.Domaine);return `<tr ${k}><td><select class="admin-input" data-f="Utilisateur"><option value="">— Utilisateur —</option>${eligible.map(u=>`<option value="${u.id}" ${+u.id===+r.Utilisateur?'selected':''}>${esc(u.Email||'')}</option>`).join('')}</select></td><td><select class="admin-input" data-f="Niveau_Acces"><option value="LECTURE" ${String(r.Niveau_Acces||'LECTURE')==='LECTURE'?'selected':''}>Lecture</option><option value="MODIFICATION" ${String(r.Niveau_Acces||'')==='MODIFICATION'?'selected':''}>Modification</option></select></td><td><input type="checkbox" data-f="Actif" ${r.Actif===false?'':'checked'}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td><td><button class="btn ghost removePreSimRight">${r.__draft?'Annuler':'Supprimer'}</button></td></tr>`}).join('')||'<tr><td colspan="5">Aucun accès supplémentaire. Seuls le responsable et l’Owner peuvent accéder à la fiche.</td></tr>'}
+      ${currentPreSimRights(fiche).map(r=>{const k=r.__draft?`data-par-key="${esc(r.__key)}"`:`data-par-id="${r.id}"`;const eligible=eligiblePreSimUsers(+fiche.Domaine);return `<tr ${k}><td><select class="admin-input" data-f="Utilisateur"><option value="">— Utilisateur —</option>${eligible.map(u=>`<option value="${u.id}" ${+u.id===+r.Utilisateur?'selected':''}>${esc(u.Email||'')}</option>`).join('')}</select></td><td><select class="admin-input" data-f="Niveau_Acces"><option value="LECTURE" ${String(r.Niveau_Acces||'LECTURE')==='LECTURE'?'selected':''}>Lecture</option><option value="MODIFICATION" ${String(r.Niveau_Acces||'')==='MODIFICATION'?'selected':''}>Modification</option></select></td><td><input type="checkbox" data-f="Actif" ${r.Actif===false?'':'checked'}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td><td><button class="btn ghost removePreSimRight">${r.__draft?'Annuler':'Supprimer'}</button></td></tr>`}).join('')||'<tr><td colspan="5">Aucun accès supplémentaire. Seuls l’auteur et l’Owner peuvent accéder à la fiche.</td></tr>'}
     </tbody></table></div>
   </article>`:''}
 
@@ -1896,14 +1919,16 @@ function renderPreSimulation(){
 }
 
 function readPreSimulationFields(){
-  const responsible=+document.getElementById('psResponsible')?.value||0;
+  const fiche=selectedPreSimulation();
+  const authorId=fiche?.__draft?(+currentRightRow()?.id||0):(+fiche?.Responsable_User||0);
+  const authorEmail=fiche?.__draft?preSimEmail():(String(fiche?.Responsable_Email||rightUserEmail(authorId)||'').trim().toLowerCase());
   return {
     Nom:document.getElementById('psNom')?.value.trim()||'',
     Domaine:+document.getElementById('psDomain')?.value||0,
     Scenario_Reference:+document.getElementById('psScenario')?.value||0,
     Statut:document.getElementById('psStatus')?.value.trim()||'Travail',
-    Responsable_User:responsible,
-    Responsable_Email:rightUserEmail(responsible),
+    Responsable_User:authorId,
+    Responsable_Email:authorEmail,
     Commentaire:document.getElementById('psComment')?.value.trim()||''
   };
 }
@@ -2680,12 +2705,12 @@ const UI_LABEL_CATALOG_V65=[
   ['compare','Base calcul fixe'],['compare','Engagement'],['compare','Mois facturés'],['compare','Total'],
   ['compare','Sous-total'],['compare','Total scénario'],['compare','Aucune allocation sur ce scénario.'],
   ['compare','Synthèse FinOps IA'],['compare','Rapport HTML autonome'],['compare','Imprimer / PDF'],
-  ['compare','Enregistrer le fichier HTML'],['compare','Synthèse'],['compare','Détails des scénarios'],
-  ['compare','Scénario'],['compare','Budget USD'],['compare','Économie annuelle'],['compare','Vue budgétaire par domaine'],['compare','Répartition du budget du scénario par domaine.'],['compare','Vue budgétaire par offre'],['compare','Abonnement fixe, variable et poids de chaque offre dans le scénario.'],['compare','Total USD'],['compare','Total EUR'],['compare','Part'],['compare','TOTAL CONNU'],['compare','Aucun budget par domaine.'],['compare','Aucune offre budgétée.'],
+  ['compare','Enregistrer le fichier HTML'],['compare','Éditeur de l’outil'],['compare','Synthèse'],['compare','Détails des scénarios'],
+  ['compare','Scénario'],['compare','Budget USD'],['compare','Économie annuelle'],['compare','Vue budgétaire par domaine'],['compare','Répartition du budget du scénario par domaine.'],['compare','Vue budgétaire par offre'],['compare','Abonnement fixe, variable et poids de chaque offre dans le scénario.'],['compare','Total USD'],['compare','Total EUR'],['compare','Part'],['compare','TOTAL CONNU'],['compare','Aucun budget par domaine.'],['compare','Aucune offre budgétée.'],['compare','Synthèse des scénarios'],['compare','scénario(s) sélectionné(s)'],['compare','scénario(s)'],['compare','Édité le'],['compare','tarif(s) à confirmer'],['compare','Lecture du coût fixe'],['compare','Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.'],['compare','À confirmer'],['compare','mois'],
   // Pré-simulation HTML / sécurité
   ['presim','Pré-simulation nominative'],['presim','Ouvrir en HTML'],['presim','Imprimer / PDF'],
   ['presim','Enregistrer le fichier HTML'],['presim','Équipes'],['presim','Ressources nominatives'],
-  ['presim','Synthèse par équipe'],['presim','Synthèse consolidée des licences'],['presim','Responsable'],
+  ['presim','Synthèse par équipe'],['presim','Synthèse consolidée des licences'],['presim','Responsable'],['presim','Auteur'],['presim','utilisateur connecté'],
   ['presim','Domaine'],['presim','Scénario'],['presim','Statut'],['presim','Plan par défaut'],['presim','Ressources actives'],
   ['presim','Ressource'],['presim','Profil'],['presim','Équipe'],['presim','Plan individuel'],['presim','Plan effectif'],
   ['presim','Commentaire'],['presim','Fournisseur'],['presim','Plan'],['presim','Ressources'],['presim','Licences'],
