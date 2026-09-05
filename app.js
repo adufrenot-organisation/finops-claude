@@ -921,8 +921,6 @@ function domainTeamBudgetBreakdown(m,domainId){
   const allocs=(m.alloc||[]).filter(a=>+a.Domaine===+domainId);
   if(!allocs.length)return null;
 
-  // Budget complet par offre du scénario : Budget_Total_USD inclut les composantes
-  // calculées par FinOps (fixe + usage/variable selon les formules Grist).
   const allocByOffer=new Map();
   for(const a of allocs){
     const oid=+a.Offre||0;if(!oid)continue;
@@ -932,7 +930,7 @@ function domainTeamBudgetBreakdown(m,domainId){
     allocByOffer.set(oid,cur);
   }
 
-  // Nombre de personnes/licences pré-simulées par équipe et par offre effective.
+  // Licences nominatives de la pré-simulation par équipe + offre effective.
   const counts=new Map(), preByOffer=new Map();
   for(const r of resources){
     const tid=preSimRefId(r.Equipe), oid=effectivePreSimOfferId(r,teamById);
@@ -942,15 +940,35 @@ function domainTeamBudgetBreakdown(m,domainId){
     preByOffer.set(oid,(preByOffer.get(oid)||0)+1);
   }
 
+  const offerRows=[];
   const byTeam=new Map();
   let allocatedBudget=0;
+
   for(const [oid,a] of allocByOffer){
     const totalNamed=preByOffer.get(oid)||0;
-    if(!totalNamed)continue; // offre du scénario sans équivalent dans la pré-simulation
+    if(!totalNamed)continue;
+
+    const offer=D.offerById[oid]||{};
+    const provider=D.providerById[+offer.Fournisseur]||{};
+
     for(const t of teams){
       const n=counts.get(`${+t.id}|${oid}`)||0;
       if(!n)continue;
+
       const share=a.budget*(n/totalNamed);
+      allocatedBudget+=share;
+
+      offerRows.push({
+        teamId:+t.id,
+        team:t.Nom||`Équipe #${t.id}`,
+        teamOrder:+t.Ordre||9999,
+        offerId:oid,
+        offer:offer.Nom||`Offre #${oid}`,
+        provider:provider.Nom||"",
+        licenses:n,
+        budget:share
+      });
+
       const row=byTeam.get(+t.id)||{
         teamId:+t.id,
         team:t.Nom||`Équipe #${t.id}`,
@@ -960,10 +978,11 @@ function domainTeamBudgetBreakdown(m,domainId){
       };
       row.licenses+=n;
       row.budget+=share;
-      allocatedBudget+=share;
       byTeam.set(+t.id,row);
     }
   }
+
+  offerRows.sort((a,b)=>a.teamOrder-b.teamOrder||String(a.team).localeCompare(String(b.team),'fr')||String(a.provider).localeCompare(String(b.provider),'fr')||String(a.offer).localeCompare(String(b.offer),'fr'));
 
   const domainBudget=allocs.reduce((s,a)=>s+(+a.Budget_Total_USD||0),0);
   const scenarioLicenses=allocs.reduce((s,a)=>s+(+a.Nb_Licences||0),0);
@@ -974,6 +993,7 @@ function domainTeamBudgetBreakdown(m,domainId){
   return{
     fiche,
     rows:[...byTeam.values()].sort((a,b)=>a.order-b.order||String(a.team).localeCompare(String(b.team),'fr')),
+    offerRows,
     domainBudget,
     allocatedBudget,
     unallocatedBudget:Math.max(0,domainBudget-allocatedBudget),
@@ -985,29 +1005,61 @@ function domainTeamBudgetBreakdown(m,domainId){
 }
 function scenarioDomainTeamBudgetHtml(m,domainId){
   const x=domainTeamBudgetBreakdown(m,+domainId);
-  if(!x||!x.rows.length)return "";
+  if(!x||!x.offerRows.length)return "";
   const coverage=x.scenarioLicenses?Math.min(1,x.matchedNamed/x.scenarioLicenses):1;
   const coveragePct=Math.round(coverage*100);
+
   return `<div class="scenario-team-budget">
     <div class="scenario-team-budget-head">
       <div>
         <span class="domain-label">PRÉ-SIMULATION</span>
-        <h4>Répartition budgétaire par équipe</h4>
+        <h4>Répartition budgétaire par équipe et par offre</h4>
         <p>${esc(x.fiche.Nom||`Pré-simulation #${x.fiche.id}`)} · ${x.preSimLicenses} ressource(s) nominative(s)${x.exactScenario?" · liée à ce scénario":" · dernière pré-simulation disponible pour ce domaine"}</p>
       </div>
       <span class="badge ${coveragePct>=100?'ok':'warn'}">Couverture : ${coveragePct}%</span>
     </div>
+
     <div class="tablewrap"><table class="scenario-team-budget-table">
-      <thead><tr><th>Équipe</th><th>Licences</th><th>Budget USD</th><th>Budget EUR</th><th>Part du domaine</th></tr></thead>
+      <thead><tr>
+        <th>Équipe</th>
+        <th>Fournisseur</th>
+        <th>Type d'offre</th>
+        <th>Licences</th>
+        <th>Budget USD</th>
+        <th>Budget EUR</th>
+        <th>Part du domaine</th>
+      </tr></thead>
       <tbody>
-        ${x.rows.map(r=>`<tr><td><b>${esc(r.team)}</b></td><td class="num">${num(r.licenses)}</td><td class="num"><b>${money(r.budget)}</b></td><td class="num">${money(r.budget*(+m.rate||0),'EUR')}</td><td class="num">${pct(x.domainBudget?r.budget/x.domainBudget:0)}</td></tr>`).join("")}
-        <tr class="total"><td>TOTAL RÉPARTI</td><td class="num">${num(x.rows.reduce((s,r)=>s+r.licenses,0))}</td><td class="num">${money(x.allocatedBudget)}</td><td class="num">${money(x.allocatedBudget*(+m.rate||0),'EUR')}</td><td class="num">${pct(x.domainBudget?x.allocatedBudget/x.domainBudget:0)}</td></tr>
+        ${x.offerRows.map(r=>`<tr>
+          <td><b>${esc(r.team)}</b></td>
+          <td>${esc(r.provider)}</td>
+          <td>${esc(r.offer)}</td>
+          <td class="num"><b>${num(r.licenses)}</b></td>
+          <td class="num"><b>${money(r.budget)}</b></td>
+          <td class="num">${money(r.budget*(+m.rate||0),'EUR')}</td>
+          <td class="num">${pct(x.domainBudget?r.budget/x.domainBudget:0)}</td>
+        </tr>`).join("")}
+        <tr class="total">
+          <td colspan="3">TOTAL RÉPARTI</td>
+          <td class="num">${num(x.offerRows.reduce((s,r)=>s+r.licenses,0))}</td>
+          <td class="num">${money(x.allocatedBudget)}</td>
+          <td class="num">${money(x.allocatedBudget*(+m.rate||0),'EUR')}</td>
+          <td class="num">${pct(x.domainBudget?x.allocatedBudget/x.domainBudget:0)}</td>
+        </tr>
       </tbody>
     </table></div>
-    <p class="scenario-team-budget-note">Répartition analytique : pour chaque offre du domaine, le budget complet du scénario est ventilé entre les équipes au prorata des licences nominatives de cette offre dans la pré-simulation.${x.unallocatedBudget>0.01?` <b>${money(x.unallocatedBudget)}</b> restent non répartis (offres ou licences non couvertes par la pré-simulation).`:""}</p>
+
+    <div class="scenario-team-totals">
+      ${x.rows.map(r=>`<div class="scenario-team-total-card">
+        <span>${esc(r.team)}</span>
+        <small>${num(r.licenses)} licence(s) toutes offres</small>
+        <b>${money(r.budget)} <small>≈ ${money(r.budget*(+m.rate||0),'EUR')}</small></b>
+      </div>`).join("")}
+    </div>
+
+    <p class="scenario-team-budget-note">La ventilation affiche maintenant le nombre de licences <b>par équipe et par type d'offre</b>, puis le total de chaque équipe toutes offres confondues.${x.unallocatedBudget>0.01?` <b>${money(x.unallocatedBudget)}</b> restent non répartis (offres ou licences non couvertes par la pré-simulation).`:""}</p>
   </div>`;
 }
-
 function renderDashboard(){
   const opts=dashboardFilterOptions();
   const m=model(selectedScenario()?.id,DASH_FILTER);

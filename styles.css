@@ -1016,3 +1016,11 @@ textarea{
 .scenario-team-budget-table{background:#fff}
 .scenario-team-budget-note{margin:10px 0 0;color:#667085;font-size:12px;line-height:1.45}
 @media(max-width:760px){.scenario-team-budget-head{flex-direction:column}}
+
+/* V76 — synthèse : licences par équipe ET par offre */
+.scenario-team-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px}
+.scenario-team-total-card{border:1px solid #dfe5ec;border-radius:10px;background:#fff;padding:10px}
+.scenario-team-total-card span,.scenario-team-total-card small,.scenario-team-total-card b{display:block}
+.scenario-team-total-card small{color:#667085;margin-top:2px}
+.scenario-team-total-card b{margin-top:5px}
+.scenario-team-total-card b small{display:inline;color:#667085;font-weight:600}
