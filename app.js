@@ -1471,8 +1471,12 @@ function scenarioDetailHtmlV36(m,printMode=false){
     ${scenarioBudgetViewsV67(m,printMode)}
     <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${printMode?"Chaque domaine est compact par défaut. Ouvre le détail pour voir les offres, les licences, le ROI et, lorsqu'elle existe, la répartition par équipe.":esc(uiLabelValue("compare","Offres, licences, coûts annuels et ROI."))}</p></div></div>
     <div class="domain-detail-list">${groups.length?groups.map(g=>`<section id="domain-detail-${g.domainId}" class="domain-detail-card ${printMode?'is-collapsed':''}">
-      <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}<span class="domain-annual-kpi"><span>Coût équivalent annuel</span><b>${money(g.annualEquivalentEUR,'EUR')}</b></span>${printMode?`<button type="button" class="domain-toggle no-print" data-target="domain-detail-${g.domainId}" aria-expanded="false">Voir le détail</button>`:''}</div></div><div class="domain-detail-body">
-      ${(()=>{const dr=roiRhDomainAggregateV85(m,g.domainId);return `<div class="domain-roi-strip">
+      <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div>${printMode?`<div class="domain-totals domain-totals-html"><button type="button" class="domain-toggle no-print" data-target="domain-detail-${g.domainId}" aria-expanded="false">Voir le détail</button></div>`:`<div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}<span class="domain-annual-kpi"><span>Coût équivalent annuel</span><b>${money(g.annualEquivalentEUR,'EUR')}</b></span></div>`}</div><div class="domain-detail-body">
+      ${(()=>{const dr=roiRhDomainAggregateV85(m,g.domainId);return `<div class="domain-roi-heading">
+        <span class="scenario-eyebrow">ROI ANNUEL</span>
+        <h4>Lecture économique du domaine</h4>
+      </div>
+      <div class="domain-roi-strip">
         <div><span>RH N-1</span><b>${money(dr.n1,'EUR')}</b></div>
         <div><span>RH N</span><b>${money(dr.n,'EUR')}</b></div>
         <div><span>Économie RH</span><b>${money(dr.hrSaving,'EUR')}</b></div>
@@ -1629,6 +1633,20 @@ function scenarioHtmlDocumentV41(m){
     @media(max-width:760px){.scenario-roi-grid,.domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.detail-domain-budget-row{grid-template-columns:1fr}.detail-domain-budget-values{align-items:flex-start}.domain-annual-equivalent{justify-content:flex-start}.domain-totals{grid-template-columns:1fr;text-align:left}}
     @media print{.domain-detail-card.is-collapsed .domain-detail-body{display:block!important}.domain-toggle,.domain-summary-link{display:none!important}.pricing-details:not([open]) .pricing-details-content{display:block!important}}
 
+
+
+    .domain-roi-heading{padding:14px 14px 0;margin-top:2px}
+    .domain-roi-heading .scenario-eyebrow{display:block;margin-bottom:3px}
+    .domain-roi-heading h4{margin:0;font-size:13px;color:var(--navy);line-height:1.25}
+
+
+    /* V91 — HTML : supprimer les résumés redondants offre/service du détail */
+    .html-report-page .domain-detail-body>.detail-offer-summary,
+    .html-report-page .domain-detail-body>.domain-offer-summary,
+    .html-report-page .domain-detail-body>.detail-domain-summary{
+      display:none!important;
+    }
+    .domain-totals-html{grid-template-columns:auto!important}
 
     /* V89 — ROI domaine horizontal */
     .domain-roi-strip{
@@ -1855,6 +1873,20 @@ function synthesisHtmlDocumentV42(ms){
     @media(max-width:760px){.scenario-roi-grid,.domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.detail-domain-budget-row{grid-template-columns:1fr}.detail-domain-budget-values{align-items:flex-start}.domain-annual-equivalent{justify-content:flex-start}.domain-totals{grid-template-columns:1fr;text-align:left}}
     @media print{.domain-detail-card.is-collapsed .domain-detail-body{display:block!important}.domain-toggle,.domain-summary-link{display:none!important}.pricing-details:not([open]) .pricing-details-content{display:block!important}}
 
+
+
+    .domain-roi-heading{padding:14px 14px 0;margin-top:2px}
+    .domain-roi-heading .scenario-eyebrow{display:block;margin-bottom:3px}
+    .domain-roi-heading h4{margin:0;font-size:13px;color:var(--navy);line-height:1.25}
+
+
+    /* V91 — HTML : supprimer les résumés redondants offre/service du détail */
+    .html-report-page .domain-detail-body>.detail-offer-summary,
+    .html-report-page .domain-detail-body>.domain-offer-summary,
+    .html-report-page .domain-detail-body>.detail-domain-summary{
+      display:none!important;
+    }
+    .domain-totals-html{grid-template-columns:auto!important}
 
     /* V89 — ROI domaine horizontal */
     .domain-roi-strip{

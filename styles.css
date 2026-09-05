@@ -1157,3 +1157,19 @@ textarea{
   .domain-roi-strip>div:nth-child(odd){border-left:0}
   .domain-roi-strip>div:nth-child(4){border-left:1px solid #e4e7ec}
 }
+
+/* V90 — titre de lecture économique dans chaque détail Domaine */
+.domain-roi-heading{
+  padding:14px 14px 0;
+  margin-top:2px;
+}
+.domain-roi-heading .scenario-eyebrow{
+  display:block;
+  margin-bottom:3px;
+}
+.domain-roi-heading h4{
+  margin:0;
+  font-size:14px;
+  color:#10213e;
+  line-height:1.25;
+}
