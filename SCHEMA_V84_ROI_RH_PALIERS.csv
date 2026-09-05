@@ -1,0 +1,10 @@
+Table,Colonne,Type,Obligatoire,Description
+ROI_RH_Paliers,Scenario,Ref:Scenarios,Oui,Scénario concerné
+ROI_RH_Paliers,Domaine,Ref:Domaines,Oui,Domaine concerné
+ROI_RH_Paliers,Equipe,Ref:Pre_Simulation_Equipes,Non,Équipe si le ROI est ventilé par équipe
+ROI_RH_Paliers,Periode,Choice ou Text,Oui,Valeurs N-1 ou N
+ROI_RH_Paliers,Nb_Ressources,Numeric,Oui,Nombre de ressources partageant ce TJM
+ROI_RH_Paliers,TJM_EUR,Numeric,Oui,TJM du palier
+ROI_RH_Paliers,Jours_Annuels,Numeric,Non,Surcharge du nombre de jours annuels
+ROI_RH_Paliers,Actif,Bool,Oui,Ligne active
+ROI_RH_Paliers,Commentaire,Text,Non,Commentaire libre
