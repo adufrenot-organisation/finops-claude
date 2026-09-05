@@ -1034,3 +1034,26 @@ textarea{
 
 /* V79 — ROI domaine/service + aides */
 .roi-info{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:50%;font-size:11px;font-weight:800;border:1px solid currentColor;cursor:help;vertical-align:middle;margin-left:3px;opacity:.75}.roi-service-flag{display:block;margin-top:3px;color:#635bdb}.roi-service-row>td{background:#f8fafc;padding:10px!important}.roi-service-box{border:1px solid #dfe5ec;border-radius:10px;background:#fff;padding:10px}.roi-service-box h4{margin:0 0 8px}.roi-service-box table{margin:0}
+
+/* V80 — coût équivalent annuel visible par défaut dans toutes les synthèses domaine */
+.domain-annual-equivalent{display:block;margin-top:4px;color:#475467;font-size:11px;white-space:nowrap}
+.domain-annual-kpi{display:flex;align-items:center;gap:5px;margin-top:5px;font-size:12px;color:#475467}
+.domain-annual-kpi b{font-size:13px;color:#101828}
+
+/* V81 — ROI dans le détail de scénario */
+.scenario-roi-summary{margin:14px 0 16px;padding:14px;border:1px solid #dfe5ec;border-radius:14px;background:#f8fafc}
+.scenario-roi-summary-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.scenario-roi-summary-head h3{margin:2px 0 0;font-size:16px}
+.scenario-roi-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.scenario-roi-kpi{background:#fff;border:1px solid #e4e7ec;border-radius:10px;padding:10px}
+.scenario-roi-kpi span,.scenario-roi-kpi b{display:block}
+.scenario-roi-kpi span{font-size:11px;color:#667085;margin-bottom:4px}
+.scenario-roi-kpi b{font-size:15px;color:#101828}
+.scenario-roi-kpi.negative b,.domain-roi-strip .negative b{color:#b42318}
+.domain-roi-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:10px 0 12px}
+.domain-roi-strip>div{border:1px solid #e4e7ec;border-radius:9px;padding:8px;background:#f8fafc}
+.domain-roi-strip span,.domain-roi-strip b{display:block}
+.domain-roi-strip span{font-size:10px;color:#667085;margin-bottom:3px}
+.domain-roi-strip b{font-size:12px}
+@media(max-width:900px){.scenario-roi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.scenario-roi-grid,.domain-roi-strip{grid-template-columns:1fr}}

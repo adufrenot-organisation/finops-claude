@@ -1081,7 +1081,7 @@ function scenarioDomainTeamBudgetHtml(m,domainId){
 
     <div class="scenario-team-annual"><div class="scenario-team-annual-head"><h4>Coût équivalent annuel par équipe</h4><p>Coût d’achat des licences ramené sur 12 mois. Le ROI N-1 est calculé au niveau Domaine / Service dans l’onglet ROI.</p></div><div class="tablewrap"><table class="scenario-team-annual-table"><thead><tr><th>Équipe</th><th>Licences</th><th>Coût équivalent annuel</th></tr></thead><tbody>${x.rows.map(r=>`<tr><td><b>${esc(r.team)}</b></td><td class="num">${num(r.licenses)}</td><td class="num"><b>${money(r.annualEquivalentEUR,'EUR')}</b></td></tr>`).join("")}</tbody></table></div></div>
 
-    <p class="scenario-team-budget-note">La ventilation affiche le nombre de licences <b>par équipe et par type d'offre</b>, le budget réparti, puis le <b>coût équivalent annuel</b> et l'économie annuelle par rapport à la période N-1.${x.unallocatedBudget>0.01?` <b>${money(x.unallocatedBudget)}</b> restent non répartis (offres ou licences non couvertes par la pré-simulation).`:""}</p>
+    <p class="scenario-team-budget-note">Le détail par équipe n'apparaît que lorsqu'une pré-simulation enregistrée du domaine contient effectivement des équipes et des ressources. Il affiche les licences par équipe et par offre, ainsi que le coût équivalent annuel des licences par équipe.${x.unallocatedBudget>0.01?` <b>${money(x.unallocatedBudget)}</b> restent non répartis (offres ou licences non couvertes par la pré-simulation).`:""}</p>
   </div>`;
 }
 function renderDashboard(){
@@ -1269,15 +1269,25 @@ function scenarioDomainGroups(m){
     if(Math.abs(r.fixed)<0.000001 && Math.abs(r.variable)<0.000001 && Math.abs(r.total)<0.000001)continue;
     (groups[r.domain]??=[]).push(r);
   }
-  return Object.entries(groups).map(([domain,rows])=>({
-    domain,
-    domainId:+rows[0]?.domainId||0,
-    rows,
-    licenses:rows.reduce((s,r)=>s+r.licenses,0),
-    fixed:rows.reduce((s,r)=>s+r.fixed,0),
-    variable:rows.reduce((s,r)=>s+r.variable,0),
-    total:rows.reduce((s,r)=>s+r.total,0)
-  })).filter(g=>Math.abs(g.fixed)>0.000001||Math.abs(g.variable)>0.000001||Math.abs(g.total)>0.000001);
+  return Object.entries(groups).map(([domain,rows])=>{
+    const domainId=+rows[0]?.domainId||0;
+    const dm=m.bd?.[domainId]||{};
+    return {
+      domain,
+      domainId,
+      rows,
+      licenses:rows.reduce((s,r)=>s+r.licenses,0),
+      fixed:rows.reduce((s,r)=>s+r.fixed,0),
+      variable:rows.reduce((s,r)=>s+r.variable,0),
+      total:rows.reduce((s,r)=>s+r.total,0),
+      annualEquivalentEUR:+dm.budgetAnnualized||0,
+      baselineAnnualEUR:+dm.baselineAnnual||0,
+      removedAnnualEUR:+dm.removedAnnual||0,
+      newAnnualCostEUR:+dm.newAnnualCost||0,
+      savingAnnualEUR:+dm.savingAnnual||0,
+      savingPct:+dm.savingPct||0
+    };
+  }).filter(g=>Math.abs(g.fixed)>0.000001||Math.abs(g.variable)>0.000001||Math.abs(g.total)>0.000001);
 }
 function renderCompare(){
   ensureSynthesisCurrencyStylesV64();
@@ -1342,7 +1352,10 @@ function scenarioBudgetViewsV67(m){
         return `<div class="detail-domain-budget-row">
           <div class="detail-domain-budget-label"><b>${esc(x.d?.Nom||'')}</b><span>${pct(share)}</span></div>
           <div class="detail-domain-budget-track"><span style="width:${Math.max(1,total/domainMax*100)}%"></span></div>
-          <div class="detail-domain-budget-values">${synthesisMoneyV64(total,m.rate,{strong:true})}</div>
+          <div class="detail-domain-budget-values">
+            ${synthesisMoneyV64(total,m.rate,{strong:true})}
+            <small class="domain-annual-equivalent">Coût équiv. annuel : <b>${money(+x.budgetAnnualized||0,'EUR')}</b> ${roiTip("Coût d'achat des licences ramené sur 12 mois.")}</small>
+          </div>
         </div>`;
       }).join(''):`<div class="empty-state">${esc(uiLabelValue("compare","Aucun budget par domaine."))}</div>`}
     </div>
@@ -1400,6 +1413,22 @@ function scenarioDetailHtmlV36(m,printMode=false){
       <div><span class="scenario-eyebrow">${compareLabelV71("SYNTHÈSE FINOPS IA")}</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} ${esc(uiLabelValue("compare","licences"))}</span><span>${groups.length} ${esc(uiLabelValue("compare","domaines"))}</span><span>${offerCount} ${esc(uiLabelValue("compare","offres"))}</span>${m.unresolved?`<span class="badge warn">${m.unresolved} ${compareLabelV71("tarif(s) à confirmer")}</span>`:`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</div></div>
       <div class="detail-total"><small>${esc(uiLabelValue("compare","Budget total"))}</small><strong>${money(m.total)}</strong><span>${money(m.total*m.rate,'EUR')}</span></div>
     </div>
+    <div class="scenario-roi-summary">
+      <div class="scenario-roi-summary-head">
+        <div>
+          <span class="scenario-eyebrow">ROI ANNUEL</span>
+          <h3>Lecture économique du scénario</h3>
+        </div>
+      </div>
+      <div class="scenario-roi-grid">
+        <div class="scenario-roi-kpi"><span>Coût N-1 ${roiTip("Coût annuel de référence avant transformation.")}</span><b>${money(m.baselineAnnual,'EUR')}</b></div>
+        <div class="scenario-roi-kpi"><span>Coût équivalent annuel ${roiTip("Coût d'achat des licences ramené sur 12 mois.")}</span><b>${money(m.budgetAnnualizedEUR,'EUR')}</b></div>
+        <div class="scenario-roi-kpi"><span>Coûts supprimés ${roiTip("Coûts annuels de collaborateurs ou prestations supprimés grâce au scénario.")}</span><b>${money(Object.values(m.bd||{}).reduce((s,d)=>s+(+d.removedAnnual||0),0),'EUR')}</b></div>
+        <div class="scenario-roi-kpi"><span>Nouveau coût annuel ${roiTip("Nouveau coût annuel = coût N-1 − coûts supprimés + coût annuel des licences.")}</span><b>${money(Object.values(m.bd||{}).reduce((s,d)=>s+(+d.newAnnualCost||0),0),'EUR')}</b></div>
+        <div class="scenario-roi-kpi ${m.savingAnnual<0?'negative':''}"><span>Économie annuelle ${roiTip("Économie annuelle = coûts supprimés − coût annuel des licences.")}</span><b>${money(m.savingAnnual,'EUR')}</b></div>
+        <div class="scenario-roi-kpi ${m.savingPct<0?'negative':''}"><span>Taux d'économie ${roiTip("Taux d'économie = économie annuelle / coût N-1.")}</span><b>${pct(m.savingPct)}</b></div>
+      </div>
+    </div>
     <div class="detail-kpis">
       <div><span>${esc(uiLabelValue("compare","Coûts fixes"))}</span>${synthesisMoneyV64(m.fixed,m.rate,{strong:true})}</div>
       <div><span>${esc(uiLabelValue("compare","Coûts variables"))}</span>${synthesisMoneyV64(m.over,m.rate,{strong:true})}</div>
@@ -1408,9 +1437,16 @@ function scenarioDetailHtmlV36(m,printMode=false){
     </div>
     <div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>${compareLabelV71("Lecture du coût fixe")}</b><p>${compareLabelV71("Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.")}</p></div></div>
     ${scenarioBudgetViewsV67(m)}
-    <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${esc(uiLabelValue("compare","Offres, licences, prix du forfait, engagements et structure des coûts."))}</p></div></div>
+    <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${esc(uiLabelValue("compare","Offres, licences, coûts annuels et ROI. Le détail par équipe n'apparaît que lorsqu'une pré-simulation du domaine contient effectivement des équipes ; le niveau Service reste conditionné à la présence de services dans cette pré-simulation."))}</p></div></div>
     <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
-      <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}</div></div>
+      <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}<span class="domain-annual-kpi">Coût équivalent annuel ${roiTip("Coût d'achat des licences ramené sur 12 mois.")} <b>${money(g.annualEquivalentEUR,'EUR')}</b></span></div></div>
+      <div class="domain-roi-strip">
+        <div><span>Coût N-1</span><b>${money(g.baselineAnnualEUR,'EUR')}</b></div>
+        <div><span>Coûts supprimés</span><b>${money(g.removedAnnualEUR,'EUR')}</b></div>
+        <div><span>Nouveau coût annuel</span><b>${money(g.newAnnualCostEUR,'EUR')}</b></div>
+        <div class="${g.savingAnnualEUR<0?'negative':''}"><span>Économie annuelle</span><b>${money(g.savingAnnualEUR,'EUR')}</b></div>
+        <div class="${g.savingPct<0?'negative':''}"><span>Économie %</span><b>${pct(g.savingPct)}</b></div>
+      </div>
       <div class="tablewrap"><table class="detail-table"><thead><tr><th>${compareLabelV71("Fournisseur")}</th><th>${compareLabelV71("Offre")}</th><th>${compareLabelV71("Licences")}</th><th>${compareLabelV71("Prix forfait")}</th><th>${compareLabelV71("Base calcul fixe")}</th><th>${compareLabelV71("Engagement")}</th><th>${compareLabelV71("Mois facturés")}</th><th>${compareLabelV71("Fixe")}</th><th>${compareLabelV71("Variable")}</th><th>${compareLabelV71("Total")}</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?` <span class="badge warn">${compareLabelV71("À confirmer")}</span>`:''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' '+uiLabelValue("compare","mois"):'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">${compareLabelV71("Sous-total")} ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
       ${g.domainId?scenarioDomainTeamBudgetHtml(m,g.domainId):""}
     </section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
