@@ -1474,7 +1474,6 @@ function scenarioDetailHtmlV36(m,printMode=false){
       <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div>${printMode?`<div class="domain-totals domain-totals-html"><button type="button" class="domain-toggle no-print" data-target="domain-detail-${g.domainId}" aria-expanded="false">Voir le détail</button></div>`:`<div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}<span class="domain-annual-kpi"><span>Coût équivalent annuel</span><b>${money(g.annualEquivalentEUR,'EUR')}</b></span></div>`}</div><div class="domain-detail-body">
       ${(()=>{const dr=roiRhDomainAggregateV85(m,g.domainId);return `<div class="domain-roi-heading">
         <span class="scenario-eyebrow">ROI ANNUEL</span>
-        <h4>Lecture économique du domaine</h4>
       </div>
       <div class="domain-roi-strip">
         <div><span>RH N-1</span><b>${money(dr.n1,'EUR')}</b></div>
