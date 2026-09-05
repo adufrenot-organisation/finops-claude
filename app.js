@@ -1,6 +1,17 @@
 const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",roiServices:"ROI_Services",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",preTeams:"Pre_Simulation_Equipes",preSimRights:"Pre_Simulation_Droits",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures",appConfig:"FinOps_Configuration",roiRh:"ROI_RH_Paliers"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
+/* V86 — état local de la pré-simulation.
+   Ces variables existaient dans les versions précédentes mais leur déclaration
+   avait été perdue lors de la refonte ROI. */
+let PRESIM_SELECTED_ID=0;
+let PRESIM_DRAFT=null;
+let PRESIM_DRAFT_RESOURCES=[];
+let PRESIM_REMOVED_RESOURCE_IDS=[];
+let PRESIM_DRAFT_TEAMS=[];
+let PRESIM_REMOVED_TEAM_IDS=[];
+let PRESIM_DRAFT_RIGHTS=[];
+let PRESIM_REMOVED_RIGHT_IDS=[];
 let PRESENCE_INTERVAL=null;
 let PRESENCE_RECORD_ID=0;
 let PRESENCE_CURRENT_VIEW='dashboard';
@@ -2042,7 +2053,7 @@ function preSimMatchesForScenarioDomain(scenarioId,domainId){
 function openPreSimulationForScenarioDomainV60(scenarioId,domainId){
   const matches=preSimMatchesForScenarioDomain(scenarioId,domainId);
   if(!matches.length){toast('Aucune pré-simulation nominative liée à ce scénario et ce domaine.',true);return}
-  PRESIM_DRAFT=null;PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];
+  resetPreSimDraftStateV62();
   PRESIM_SELECTED_ID=+matches[0].id;
   switchView('presim');
   renderPreSimulation();
@@ -2290,7 +2301,9 @@ function renderPreSimulation(){
     PRESIM_SELECTED_ID=+e.target.value||0;renderPreSimulation();
   };
   document.getElementById('newPreSim').onclick=()=>{
-    PRESIM_DRAFT=newPreSimulationDraft();PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];renderPreSimulation();
+    resetPreSimDraftStateV62();
+    PRESIM_DRAFT=newPreSimulationDraft();
+    renderPreSimulation();
   };
   document.getElementById('addPreTeam').onclick=()=>{
     if(fiche.__draft){toast("Enregistre d'abord la fiche avant d'ajouter les équipes.",true);return}
