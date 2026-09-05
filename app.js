@@ -1,4 +1,4 @@
-const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",preTeams:"Pre_Simulation_Equipes",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures",appConfig:"FinOps_Configuration"};
+const T={domains:"Domaines",scenarios:"Scenarios",providers:"Fournisseurs",offers:"Offres",alloc:"Allocations",baseline:"Baseline_N_1",baselineDetails:"Baseline_N_1_Details",rights:"Droits_Utilisateurs",menu:"Configuration_Menu",offerCols:"Configuration_Colonnes_Offres",uiLabels:"Configuration_Libelles_UI",preSim:"Pre_Simulations",preRes:"Pre_Simulation_Ressources",preTeams:"Pre_Simulation_Equipes",preSimRights:"Pre_Simulation_Droits",presence:"Presence_Utilisateurs",claudeScenarios:"Claude_Scenarios",claudeOrgs:"Claude_Organisations",claudeGroups:"Claude_Groupes",claudeResources:"Claude_Ressources",claudeConfig:"Claude_Configuration",selfIdentity:"FinOps_Identites",ownerSentinel:"FinOps_Owner_Sentinel",chatMessages:"FinOps_Messages",chatReads:"FinOps_Chat_Lectures",appConfig:"FinOps_Configuration"};
 const COLORS=["#2f6fed","#24b89a","#7c4de8","#e7a62c","#dc4c5a","#5a6b85","#42a5f5","#8bc34a"];
 let D=null, ACCESS={role:"DENIED",domainIds:[]}, CURRENT=null, DASH_FILTER={domainIds:[],providerId:0};
 let PRESENCE_INTERVAL=null;
@@ -890,7 +890,7 @@ function renderDashboard(){
   const activeProvider=opts.providers.find(p=>+p.id===+DASH_FILTER.providerId);
   const domainSummary=activeDomains.length?activeDomains.map(d=>d.Nom).join(', '):'Tous les domaines';
   const filterSummary=[`Domaines : ${esc(domainSummary)}`,activeProvider?`Fournisseur : ${esc(activeProvider.Nom)}`:'Tous les fournisseurs'].join(' · ');
-  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><div class="field dash-domain-field"><span class="field-label">Domaines</span><div class="dash-domain-picker"><button id="dashDomainPickerBtn" class="btn secondary dash-domain-btn">${activeDomains.length?`${activeDomains.length} domaine(s) sélectionné(s)`:'Tous les domaines'} ▾</button><div id="dashDomainMenu" class="dash-domain-menu hidden"><div class="dash-domain-actions"><button id="dashAllDomains" class="mini-btn">Tous</button><button id="dashNoDomains" class="mini-btn">Aucun</button></div>${opts.domains.map(d=>`<label class="dash-domain-option"><input type="checkbox" data-dash-domain="${d.id}" ${selectedDomainSet.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></div></div><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':'<span class="badge ok">Chiffré</span>'}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;
+  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><div class="field dash-domain-field"><span class="field-label">Domaines</span><div class="dash-domain-picker"><button id="dashDomainPickerBtn" class="btn secondary dash-domain-btn">${activeDomains.length?`${activeDomains.length} domaine(s) sélectionné(s)`:'Tous les domaines'} ▾</button><div id="dashDomainMenu" class="dash-domain-menu hidden"><div class="dash-domain-actions"><button id="dashAllDomains" class="mini-btn">Tous</button><button id="dashNoDomains" class="mini-btn">Aucun</button></div>${opts.domains.map(d=>`<label class="dash-domain-option"><input type="checkbox" data-dash-domain="${d.id}" ${selectedDomainSet.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></div></div><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':'<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>'}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;
   const pf=document.getElementById('dashProviderFilter'),reset=document.getElementById('dashResetFilters');
   const pickerBtn=document.getElementById('dashDomainPickerBtn'),menu=document.getElementById('dashDomainMenu');
   pickerBtn.onclick=e=>{e.stopPropagation();menu.classList.toggle('hidden')};
@@ -954,6 +954,25 @@ async function reload(){
 }
 
 let COMPARE_SELECTED_IDS=[];
+function synthesisMoneyV64(usd,rate,{strong=false}={}){
+  const u=Number(usd||0),r=Number(rate||0);
+  const usdHtml=strong?`<b>${money(u)}</b>`:money(u);
+  const eur=r?`<small class="synth-eur">≈ ${money(u*r,'EUR')}</small>`:'';
+  return `<span class="synth-money">${usdHtml}${eur}</span>`;
+}
+function ensureSynthesisCurrencyStylesV64(){
+  if(document.getElementById('synthesis-currency-v64-style'))return;
+  const st=document.createElement('style');st.id='synthesis-currency-v64-style';st.textContent=`
+    .synth-money{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.18}
+    .synth-eur{display:block;margin-top:2px;font-size:.7em;font-weight:600;color:#667085;white-space:nowrap}
+    .scenario-budget .synth-money{align-items:flex-start}
+    .cost-split-labels .synth-money{display:inline-flex;align-items:flex-start}
+    .detail-kpis .synth-money{align-items:flex-start}
+    .domain-totals .synth-money,.detail-grand-total .synth-money{align-items:flex-end}
+    @media(max-width:720px){.synth-eur{font-size:.68em}}
+  `;document.head.appendChild(st);
+}
+
 function compareSelectedIds(){
   const checked=[...document.querySelectorAll('.cmp:checked')].slice(0,6).map(x=>+x.value);
   if(checked.length)COMPARE_SELECTED_IDS=checked;
@@ -1044,13 +1063,14 @@ function scenarioDomainGroups(m){
   })).filter(g=>Math.abs(g.fixed)>0.000001||Math.abs(g.variable)>0.000001||Math.abs(g.total)>0.000001);
 }
 function renderCompare(){
+  ensureSynthesisCurrencyStylesV64();
   const el=document.getElementById('v-compare');
   const scenarios=D[T.scenarios]||[];
   if(!COMPARE_SELECTED_IDS.length)COMPARE_SELECTED_IDS=scenarios.slice(0,Math.min(3,scenarios.length)).map(s=>+s.id);
   const selected=new Set(COMPARE_SELECTED_IDS);
   el.innerHTML=`<article class="card synthesis-card">
-    <div class="cardhead synthesis-head"><div><h3>Comparer les scénarios</h3><p>Sélectionne jusqu’à 6 scénarios. Clique sur une carte pour ouvrir le détail financier par domaine.</p></div>
-      <button id="openSynthesisHtml" class="btn primary">🌐 Ouvrir en HTML</button>
+    <div class="cardhead synthesis-head"><div><h3>${esc(uiLabelValue("compare","Comparer les scénarios"))}</h3><p>${esc(uiLabelValue("compare","Sélectionne jusqu’à 6 scénarios. Clique sur une carte pour ouvrir le détail financier par domaine."))}</p></div>
+      <button id="openSynthesisHtml" class="btn primary">🌐 ${esc(uiLabelValue("compare","Ouvrir en HTML"))}</button>
     </div>
     <div class="checklist">${scenarios.map(s=>`<label class="checkpill"><input type="checkbox" class="cmp" value="${s.id}" ${selected.has(+s.id)?'checked':''}>${esc(s.Nom)}</label>`).join('')}</div>
     <div id="cmpOut" style="margin-top:14px"></div>
@@ -1072,12 +1092,12 @@ function drawCompare(){
     const domainCount=Object.values(m.bd).filter(x=>x.total>0).length;
     const offerCount=Object.keys(m.bo).length;
     return `<button type="button" class="comparecard synthesis-scenario-card tone-${idx%5}" data-open-scenario="${m.s.id}">
-      <div class="scenario-card-top"><div><span class="scenario-eyebrow">SCÉNARIO</span><h4>${esc(m.s.Nom)}</h4></div>${m.unresolved?`<span class="badge warn">${m.unresolved} à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div>
+      <div class="scenario-card-top"><div><span class="scenario-eyebrow">${esc(uiLabelValue("compare","SCÉNARIO"))}</span><h4>${esc(m.s.Nom)}</h4></div>${m.unresolved?`<span class="badge warn">${m.unresolved} à confirmer</span>`:'<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>'}</div>
       <div class="scenario-budget">${money(m.total)}</div>
       <div class="scenario-eur">${money(m.total*m.rate,'EUR')}</div>
-      <div class="scenario-metrics"><span><b>${num(m.licenses)}</b> licences</span><span><b>${domainCount}</b> domaines</span><span><b>${offerCount}</b> offres</span></div>
-      <div class="cost-split"><div class="cost-split-bar"><span class="fixed" style="width:${fixedPct}%"></span><span class="variable" style="width:${100-fixedPct}%"></span></div><div class="cost-split-labels"><span>Fixe ${money(m.fixed)}</span><span>Variable ${money(m.over)}</span></div></div>
-      <div class="scenario-card-footer"><span>Économie annuelle <b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></span><strong>Voir le détail →</strong></div>
+      <div class="scenario-metrics"><span><b>${num(m.licenses)}</b> ${esc(uiLabelValue("compare","licences"))}</span><span><b>${domainCount}</b> ${esc(uiLabelValue("compare","domaines"))}</span><span><b>${offerCount}</b> ${esc(uiLabelValue("compare","offres"))}</span></div>
+      <div class="cost-split"><div class="cost-split-bar"><span class="fixed" style="width:${fixedPct}%"></span><span class="variable" style="width:${100-fixedPct}%"></span></div><div class="cost-split-labels"><span>Fixe ${synthesisMoneyV64(m.fixed,m.rate)}</span><span>Variable ${synthesisMoneyV64(m.over,m.rate)}</span></div></div>
+      <div class="scenario-card-footer"><span>${esc(uiLabelValue("compare","Économie annuelle"))} <b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></span><strong>${esc(uiLabelValue("compare","Voir le détail →"))}</strong></div>
     </button>`;
   }).join('')}</div>
   `;
@@ -1088,29 +1108,29 @@ function scenarioDetailHtmlV36(m,printMode=false){
   const offerCount=Object.keys(m.bo).length;
   return `<div class="scenario-detail-document ${printMode?'print-document':''}">
     <div class="detail-hero">
-      <div><span class="scenario-eyebrow">SYNTHÈSE FINOPS IA</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} licences</span><span>${groups.length} domaines</span><span>${offerCount} offres</span>${m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:'<span class="badge ok">Chiffré</span>'}</div></div>
-      <div class="detail-total"><small>Budget total</small><strong>${money(m.total)}</strong><span>${money(m.total*m.rate,'EUR')}</span></div>
+      <div><span class="scenario-eyebrow">SYNTHÈSE FINOPS IA</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} ${esc(uiLabelValue("compare","licences"))}</span><span>${groups.length} ${esc(uiLabelValue("compare","domaines"))}</span><span>${offerCount} ${esc(uiLabelValue("compare","offres"))}</span>${m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:'<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>'}</div></div>
+      <div class="detail-total"><small>${esc(uiLabelValue("compare","Budget total"))}</small><strong>${money(m.total)}</strong><span>${money(m.total*m.rate,'EUR')}</span></div>
     </div>
     <div class="detail-kpis">
-      <div><span>Coûts fixes</span><b>${money(m.fixed)}</b></div>
-      <div><span>Coûts variables</span><b>${money(m.over)}</b></div>
-      <div><span>Budget EUR</span><b>${money(m.total*m.rate,'EUR')}</b></div>
+      <div><span>${esc(uiLabelValue("compare","Coûts fixes"))}</span>${synthesisMoneyV64(m.fixed,m.rate,{strong:true})}</div>
+      <div><span>${esc(uiLabelValue("compare","Coûts variables"))}</span>${synthesisMoneyV64(m.over,m.rate,{strong:true})}</div>
+      <div><span>${esc(uiLabelValue("compare","Budget EUR"))}</span><b>${money(m.total*m.rate,'EUR')}</b></div>
       <div><span>Économie annuelle</span><b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></div>
     </div>
     <div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>Lecture du coût fixe</b><p>Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.</p></div></div>
-    <div class="detail-section-title"><span>02</span><div><h3>Détail par domaine</h3><p>Offres, licences, prix du forfait, engagements et structure des coûts.</p></div></div>
+    <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${esc(uiLabelValue("compare","Offres, licences, prix du forfait, engagements et structure des coûts."))}</p></div></div>
     <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
-      <div class="domain-detail-head"><div><span class="domain-label">DOMAINE</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} licences</span><b>${money(g.total)}</b></div></div>
-      <div class="tablewrap"><table class="detail-table"><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Prix forfait</th><th>Base calcul fixe</th><th>Engagement</th><th>Mois facturés</th><th>Fixe</th><th>Variable</th><th>Total</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?' <span class="badge warn">À confirmer</span>':''}</td><td class="num">${num(r.licenses)}</td><td class="num"><b>${r.unitPrice?money(r.unitPrice):'—'}</b>${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' mois':'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${money(r.fixed)}</td><td class="num">${money(r.variable)}</td><td class="num"><b>${money(r.total)}</b></td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">Sous-total ${esc(g.domain)}</td><td class="num">${money(g.fixed)}</td><td class="num">${money(g.variable)}</td><td class="num"><b>${money(g.total)}</b></td></tr></tfoot></table></div>
-    </section>`).join(''):'<div class="empty-state">Aucune allocation sur ce scénario.</div>'}</div>
-    <div class="detail-grand-total"><div><span>Total scénario</span><small>${num(m.licenses)} licences · ${groups.length} domaines</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
+      <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}</div></div>
+      <div class="tablewrap"><table class="detail-table"><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Prix forfait</th><th>Base calcul fixe</th><th>Engagement</th><th>Mois facturés</th><th>Fixe</th><th>Variable</th><th>Total</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?' <span class="badge warn">À confirmer</span>':''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' mois':'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">Sous-total ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
+    </section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
+    <div class="detail-grand-total"><div><span>${esc(uiLabelValue("compare","Total scénario"))}</span><small>${num(m.licenses)} licences · ${groups.length} domaines</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
   </div>`;
 }
 function openScenarioDetailV36(sid){
   const m=model(sid),host=document.getElementById('scenarioDetailModal');if(!m?.s||!host)return;
   host.innerHTML=`<div class="modal-backdrop scenario-detail-backdrop">
     <div class="scenario-detail-modal" role="dialog" aria-modal="true" aria-label="Détail du scénario">
-      <div class="detail-modal-toolbar"><div><b>Détail du scénario</b><span>Vue détaillée</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">Fermer</button><button id="openScenarioHtml" class="btn secondary">🌐 Ouvrir en HTML</button></div></div>
+      <div class="detail-modal-toolbar"><div><b>${esc(uiLabelValue("compare","Détail du scénario"))}</b><span>${esc(uiLabelValue("compare","Vue détaillée"))}</span></div><div class="detail-modal-actions"><button id="closeScenarioDetail" class="btn secondary">${esc(uiLabelValue("compare","Fermer"))}</button><button id="openScenarioHtml" class="btn secondary">🌐 ${esc(uiLabelValue("compare","Ouvrir en HTML"))}</button></div></div>
       <div class="scenario-detail-scroll">${scenarioDetailHtmlV36(m)}</div>
     </div>
   </div>`;
@@ -1129,8 +1149,8 @@ function scenarioHtmlDocumentV41(m){
   const reportTitle=`FinOps - ${m.s.Nom}`;
   const filename=`FinOps_${safeFilenameV41(m.s.Nom)}_${new Date().toISOString().slice(0,10)}.html`;
   const body=`<div class="html-report-toolbar no-print">
-      <div><b>Synthèse FinOps IA</b><span>Rapport HTML autonome · ${esc(m.s.Nom)}</span></div>
-      <div class="html-report-actions"><button id="htmlPrint">🖨 Imprimer / PDF</button><button id="htmlSave">💾 Enregistrer le fichier HTML</button></div>
+      <div><b>${esc(uiLabelValue("compare","Synthèse FinOps IA"))}</b><span>Rapport HTML autonome · ${esc(m.s.Nom)}</span></div>
+      <div class="html-report-actions"><button id="htmlPrint">🖨 ${esc(uiLabelValue("compare","Imprimer / PDF"))}</button><button id="htmlSave">💾 ${esc(uiLabelValue("compare","Enregistrer le fichier HTML"))}</button></div>
     </div>
     <main class="html-report-page">
       <div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>Détail du scénario · ${esc(m.s.Nom)}</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
@@ -1171,11 +1191,11 @@ function synthesisHtmlDocumentV42(ms){
   const filename=`FinOps_Synthese_${new Date().toISOString().slice(0,10)}.html`;
   const summary=`<div class="print-cover"><div><h1>Synthèse FinOps IA</h1><p>${ms.length} scénario(s) sélectionné(s)</p></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
     <h2 class="print-section-title">01 · Synthèse</h2>
-    <table class="summary-table"><thead><tr><th>Scénario</th><th>Licences</th><th>Fixe</th><th>Variable</th><th>Budget USD</th><th>Budget EUR</th><th>Économie annuelle</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${num(m.licenses)}</td><td class="num">${money(m.fixed)}</td><td class="num">${money(m.over)}</td><td class="num"><b>${money(m.total)}</b></td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td></tr>`).join('')}</tbody></table>
+    <table class="summary-table"><thead><tr><th>Scénario</th><th>Licences</th><th>Fixe</th><th>Variable</th><th>Budget USD</th><th>Budget EUR</th><th>Économie annuelle</th></tr></thead><tbody>${ms.map(m=>`<tr><td><b>${esc(m.s.Nom)}</b></td><td class="num">${num(m.licenses)}</td><td class="num">${synthesisMoneyV64(m.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(m.over,m.rate)}</td><td class="num">${synthesisMoneyV64(m.total,m.rate,{strong:true})}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td class="num ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</td></tr>`).join('')}</tbody></table>
     <div class="page-break"></div><h2 class="print-section-title">02 · Détails des scénarios</h2>${ms.map((m,i)=>`${i?'<div class="page-break"></div>':''}${scenarioDetailHtmlV36(m,true)}`).join('')}`;
   const body=`<div class="html-report-toolbar no-print">
-      <div><b>Synthèse FinOps IA</b><span>Rapport HTML autonome · ${ms.length} scénario(s)</span></div>
-      <div class="html-report-actions"><button id="htmlPrint">🖨 Imprimer / PDF</button><button id="htmlSave">💾 Enregistrer le fichier HTML</button></div>
+      <div><b>${esc(uiLabelValue("compare","Synthèse FinOps IA"))}</b><span>Rapport HTML autonome · ${ms.length} scénario(s)</span></div>
+      <div class="html-report-actions"><button id="htmlPrint">🖨 ${esc(uiLabelValue("compare","Imprimer / PDF"))}</button><button id="htmlSave">💾 ${esc(uiLabelValue("compare","Enregistrer le fichier HTML"))}</button></div>
     </div>
     <main class="html-report-page">${summary}</main>`;
   const screenCss=`
@@ -1220,6 +1240,7 @@ function printWindowV36(title,body){
 const PRINT_CSS_V36=`
 @page{size:A4 landscape;margin:12mm}
 *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10213e;margin:0;background:#fff;font-size:10px}
+.synth-money{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}.synth-eur{display:block;margin-top:2px;font-size:8px;font-weight:600;color:#64748b;white-space:nowrap}
 h1,h2,h3,p{margin-top:0}.print-cover{display:flex;justify-content:space-between;align-items:end;border-bottom:3px solid #5b4df5;padding-bottom:12px;margin-bottom:18px}.print-cover h1{font-size:26px;margin-bottom:4px}.print-cover p{color:#64748b;margin:0}
 .scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}.pricing-explainer{display:flex;gap:8px;padding:9px;border:1px solid #dedcff;border-radius:9px;margin-bottom:12px;background:#f8f7ff}.pricing-icon{width:25px;height:25px;border-radius:7px;background:#635bdb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}.pricing-explainer p{margin:2px 0 0;color:#64748b}.price-period,.price-source{display:block;font-size:7px;color:#64748b}.price-source{color:#635bdb}.fixed-basis{font-size:8px;line-height:1.3}
 .domain-detail-card{border:1px solid #dbe3ef;border-radius:12px;margin:0 0 12px;overflow:hidden;break-inside:avoid}.domain-detail-head{display:flex;justify-content:space-between;padding:10px 12px;background:#f8fafc}.domain-detail-head h3{margin:2px 0 0}.domain-totals{text-align:right}.domain-totals span,.domain-totals b{display:block}
@@ -1319,23 +1340,56 @@ let PRESIM_DRAFT_RESOURCES=[];
 let PRESIM_REMOVED_RESOURCE_IDS=[];
 let PRESIM_DRAFT_TEAMS=[];
 let PRESIM_REMOVED_TEAM_IDS=[];
+let PRESIM_DRAFT_RIGHTS=[];
+let PRESIM_REMOVED_RIGHT_IDS=[];
 
 
 function preSimulationRows(){ return D[T.preSim]||[]; }
 function preResourceRows(){ return D[T.preRes]||[]; }
 function preTeamRows(){ return D[T.preTeams]||[]; }
 
+
+function preSimEmail(){return String(ACCESS.currentEmail||currentRightRow()?.Email||'').trim().toLowerCase()}
+function tokenHasEmail(token,email=preSimEmail()){
+  const e=String(email||'').trim().toLowerCase();if(!e)return false;
+  return String(token||'').toLowerCase().includes(`|${e}|`);
+}
+function preSimCanView(fiche){
+  if(!fiche)return false;
+  if(isOwner())return true;
+  if(!ACCESS.domainIds.includes(+fiche.Domaine))return false;
+  return tokenHasEmail(fiche.Acces_Lecture_Emails)||tokenHasEmail(fiche.Acces_Modification_Emails);
+}
+function preSimCanModify(fiche){
+  if(!fiche)return false;
+  if(isOwner())return true;
+  if(!roleCanEditUserMenus())return false;
+  if(!ACCESS.domainIds.includes(+fiche.Domaine))return false;
+  return tokenHasEmail(fiche.Acces_Modification_Emails);
+}
+function preSimCanManageRights(fiche){
+  return isOwner()||ACCESS.role===APP_ROLES.ADMINISTRATEUR;
+}
 function scopedPreSimulations(){
-  return preSimulationRows().filter(r=>ACCESS.role==='OWNER'||ACCESS.domainIds.includes(+r.Domaine));
+  // V63 : aucune fiche non autorisée ne doit apparaître dans la liste,
+  // même si elle est techniquement présente dans les données chargées par le widget.
+  return preSimulationRows().filter(fiche=>{
+    if(isOwner())return true;
+    if(!ACCESS.domainIds.includes(+fiche.Domaine))return false;
+    return preSimCanView(fiche);
+  });
 }
 
 function selectedPreSimulation(){
-  if(PRESIM_DRAFT) return PRESIM_DRAFT;
-  const rows=scopedPreSimulations();
-  let r=rows.find(x=>+x.id===+PRESIM_SELECTED_ID);
-  if(!r && rows.length){
-    r=rows[0];
-    PRESIM_SELECTED_ID=+r.id;
+  if(PRESIM_DRAFT)return PRESIM_DRAFT;
+  const visible=scopedPreSimulations();
+  let r=visible.find(x=>+x.id===+PRESIM_SELECTED_ID);
+  if(!r){
+    PRESIM_SELECTED_ID=0;
+    if(visible.length){
+      r=visible[0];
+      PRESIM_SELECTED_ID=+r.id;
+    }
   }
   return r||null;
 }
@@ -1349,6 +1403,10 @@ function newPreSimulationDraft(){
     Scenario_Reference:0,
     Statut:'Travail',
     Responsable:'',
+    Responsable_User:+currentRightRow()?.id||0,
+    Responsable_Email:preSimEmail(),
+    Acces_Lecture_Emails:preSimEmail()?`|${preSimEmail()}|`:'',
+    Acces_Modification_Emails:preSimEmail()?`|${preSimEmail()}|`:'',
     Commentaire:''
   };
 }
@@ -1469,10 +1527,119 @@ function ensurePreSimTeamStylesV60(){
     .team-management-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}.team-plan-badge{display:inline-block;padding:4px 7px;border-radius:8px;background:#f2f1ff;color:#5146d8;font-size:.72rem;font-weight:700}
     .effective-plan{font-size:.78rem;font-weight:700;color:#344054;min-width:170px}.effective-plan.inherited:before{content:"↳ ";color:#635bdb}
     .team-summary-name{display:flex;align-items:center;gap:7px}.team-dot{width:8px;height:8px;border-radius:50%;background:#635bdb;display:inline-block}
+    .presim-access-card{border-color:#dedcff}.presim-access-card .cardhead{background:linear-gradient(135deg,#faf9ff,#fff)}
     @media(max-width:900px){.presim-link-btn{margin-left:4px}.effective-plan{min-width:140px}}
   `;document.head.appendChild(st);
 }
 
+
+
+function preSimRightsRows(fiche){
+  if(!fiche||fiche.__draft)return [];
+  return (D[T.preSimRights]||[]).filter(r=>+r.Pre_Simulation===+fiche.id&&!PRESIM_REMOVED_RIGHT_IDS.includes(+r.id));
+}
+function currentPreSimRights(fiche){return [...preSimRightsRows(fiche),...PRESIM_DRAFT_RIGHTS]}
+function rightUserRow(id){return (D[T.rights]||[]).find(r=>+r.id===+id)}
+function rightUserEmail(id){return String(rightUserRow(id)?.Email||'').trim().toLowerCase()}
+function userHasDomain(right,domainId){
+  if(!right||right.Actif===false)return false;
+  const ids=refListIds(right.Domaines_Autorises);
+  return ids.includes(+domainId)||(+right.Domaine===+domainId);
+}
+function eligiblePreSimUsers(domainId){
+  return (D[T.rights]||[]).filter(r=>userHasDomain(r,domainId)).sort((a,b)=>String(a.Email||'').localeCompare(String(b.Email||''),'fr'));
+}
+function preSimResponsibleOptions(fiche){
+  const eligible=eligiblePreSimUsers(+fiche.Domaine);
+  const current=+fiche.Responsable_User||0;
+  const rows=[...eligible];
+  if(current&&!rows.some(r=>+r.id===current)){
+    const r=rightUserRow(current);if(r)rows.unshift(r);
+  }
+  return `<option value="">— Responsable obligatoire —</option>`+rows.map(r=>`<option value="${r.id}" ${+r.id===current?'selected':''}>${esc(r.Email||'')}</option>`).join('');
+}
+function buildPreSimAccessTokens(responsibleId,rights){
+  const resp=rightUserEmail(responsibleId);
+  const read=new Set(),modify=new Set();
+  if(resp){read.add(resp);modify.add(resp)}
+  (rights||[]).filter(r=>r.Actif!==false).forEach(r=>{
+    const email=rightUserEmail(r.Utilisateur);if(!email)return;
+    read.add(email);
+    if(String(r.Niveau_Acces||'LECTURE').toUpperCase()==='MODIFICATION')modify.add(email);
+  });
+  const token=set=>[...set].sort().map(e=>`|${e}|`).join('');
+  return {read:token(read),modify:token(modify),resp};
+}
+function resetPreSimDraftStateV62(){
+  PRESIM_DRAFT=null;PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];
+  PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];PRESIM_DRAFT_RIGHTS=[];PRESIM_REMOVED_RIGHT_IDS=[];
+}
+function addPreSimRightDraftV62(){
+  const fiche=selectedPreSimulation();if(!fiche||fiche.__draft)return;
+  PRESIM_DRAFT_RIGHTS.push({__draft:true,__key:`pright-${Date.now()}-${Math.random().toString(36).slice(2)}`,Utilisateur:0,Niveau_Acces:'LECTURE',Actif:true,Commentaire:''});
+  renderPreSimulation();
+}
+async function savePreSimRightsV62(){
+  const fiche=selectedPreSimulation();
+  if(!fiche||fiche.__draft){toast("Enregistre d'abord la fiche.",true);return}
+  if(!preSimCanManageRights(fiche)){toast("La gestion des accès est réservée à l’Owner ou à un Administrateur.",true);return}
+  const root=document.getElementById('v-presim'),actions=[],virtual=[];
+  for(const tr of root.querySelectorAll('tr[data-par-id],tr[data-par-key]')){
+    const id=+tr.dataset.parId||0;
+    const fields={
+      Pre_Simulation:+fiche.id,
+      Utilisateur:+tr.querySelector('[data-f="Utilisateur"]')?.value||0,
+      Niveau_Acces:String(tr.querySelector('[data-f="Niveau_Acces"]')?.value||'LECTURE'),
+      Actif:!!tr.querySelector('[data-f="Actif"]')?.checked,
+      Commentaire:String(tr.querySelector('[data-f="Commentaire"]')?.value||'').trim()
+    };
+    if(!fields.Utilisateur){toast("Choisis un utilisateur pour chaque droit d'accès.",true);return}
+    const u=rightUserRow(fields.Utilisateur);
+    if(!userHasDomain(u,+fiche.Domaine)){toast(`${u?.Email||'Cet utilisateur'} n'a pas accès au domaine de la fiche.`,true);return}
+    virtual.push(fields);
+    actions.push(id?["UpdateRecord",T.preSimRights,id,fields]:["AddRecord",T.preSimRights,null,fields]);
+  }
+  for(const id of [...new Set(PRESIM_REMOVED_RIGHT_IDS)])actions.push(["RemoveRecord",T.preSimRights,id]);
+  const responsible=+document.getElementById('psResponsible')?.value||+fiche.Responsable_User||0;
+  const tokens=buildPreSimAccessTokens(responsible,virtual);
+  actions.push(["UpdateRecord",T.preSim,+fiche.id,{
+    Responsable_User:responsible,Responsable_Email:tokens.resp,
+    Acces_Lecture_Emails:tokens.read,Acces_Modification_Emails:tokens.modify
+  }]);
+  try{
+    await apply(actions);PRESIM_DRAFT_RIGHTS=[];PRESIM_REMOVED_RIGHT_IDS=[];await reload();
+    toast("Droits de la pré-simulation enregistrés.");
+  }catch(e){toast(e.message||String(e),true)}
+}
+function presimHtmlDocumentV62(fiche){
+  if(!preSimCanView(fiche))return '';
+  const teams=preSimCurrentTeams(fiche),resources=preSimCurrentResources(fiche),teamById=preSimTeamById(fiche);
+  const teamSummary=preSimTeamSummary(resources,teams),summary=preSimSummary(resources,teamById);
+  const domain=D.domainById[+fiche.Domaine]?.Nom||'';
+  const scenario=D.scenarioById[+fiche.Scenario_Reference]?.Nom||'Aucun';
+  const resp=rightUserEmail(+fiche.Responsable_User)||fiche.Responsable_Email||'—';
+  const resourceRows=resources.filter(r=>r.Actif!==false).map(r=>{
+    const team=teamById[+r.Equipe],effective=effectivePreSimOfferId(r,teamById);
+    return `<tr><td>${esc(r.Nom_Ressource||'')}</td><td>${esc(r.Profil||'')}</td><td>${esc(team?.Nom||'Sans équipe')}</td><td>${esc(+r.Offre?offerDisplayName(r.Offre):'Hérité')}</td><td><b>${esc(offerDisplayName(effective))}</b></td><td>${esc(r.Commentaire||'')}</td></tr>`;
+  }).join('');
+  const filename=`FinOps_PreSimulation_${safeFilenameV41(fiche.Nom)}_${new Date().toISOString().slice(0,10)}.html`;
+  const css=`*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;background:#eef2f7;color:#10213e}.bar{position:sticky;top:0;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 18px;background:#10213e;color:white}.bar button{border:0;border-radius:8px;padding:9px 12px;font-weight:700;cursor:pointer}.page{width:min(1400px,calc(100% - 30px));margin:22px auto;background:white;padding:26px;border-radius:16px}.hero{display:flex;justify-content:space-between;gap:20px;padding-bottom:16px;border-bottom:3px solid #635bdb}.hero h1{margin:3px 0}.meta{display:flex;gap:7px;flex-wrap:wrap}.meta span{background:#f3f4f8;padding:5px 8px;border-radius:99px;font-size:12px}.section{margin-top:24px}.section h2{font-size:18px}table{width:100%;border-collapse:collapse}th,td{padding:8px;border-bottom:1px solid #e4e9f0;text-align:left;font-size:12px}th{background:#f8fafc}.num{text-align:right}.sig{margin-top:25px;color:#667085;font-size:11px}@media(max-width:720px){.bar{align-items:flex-start;flex-direction:column}.page{width:calc(100% - 10px);margin:5px auto;padding:12px;overflow:auto}.hero{flex-direction:column}table{min-width:760px}}@media print{.bar{display:none}.page{width:auto;margin:0;padding:0;border-radius:0}body{background:white}@page{size:A4 landscape;margin:12mm}}`;
+  const body=`<div class="bar"><div><b>Pré-simulation nominative</b><div>${esc(fiche.Nom)}</div></div><div><button id="print">🖨 ${esc(uiLabelValue("compare","Imprimer / PDF"))}</button> <button id="save">💾 ${esc(uiLabelValue("compare","Enregistrer le fichier HTML"))}</button></div></div>
+  <main class="page"><div class="hero"><div><small>FINOPS IA · PRÉ-SIMULATION NOMINATIVE</small><h1>${esc(fiche.Nom)}</h1><div class="meta"><span>Domaine : ${esc(domain)}</span><span>Scénario : ${esc(scenario)}</span><span>Responsable : ${esc(resp)}</span><span>Statut : ${esc(fiche.Statut||'')}</span></div></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
+  <section class="section"><h2>${esc(uiLabelValue("presim","Équipes"))}</h2><table><thead><tr><th>Équipe</th><th>Plan par défaut</th><th>Ressources actives</th></tr></thead><tbody>${teams.filter(t=>t.Actif!==false).map(t=>`<tr><td><b>${esc(t.Nom||'')}</b></td><td>${esc(offerDisplayName(t.Offre_Defaut))}</td><td class="num">${resources.filter(r=>r.Actif!==false&&+r.Equipe===+t.id).length}</td></tr>`).join('')||'<tr><td colspan="3">Aucune équipe</td></tr>'}</tbody></table></section>
+  <section class="section"><h2>${esc(uiLabelValue("presim","Ressources nominatives"))}</h2><table><thead><tr><th>Ressource</th><th>Profil</th><th>Équipe</th><th>Plan individuel</th><th>Plan effectif</th><th>Commentaire</th></tr></thead><tbody>${resourceRows||'<tr><td colspan="6">Aucune ressource active</td></tr>'}</tbody></table></section>
+  <section class="section"><h2>${esc(uiLabelValue("presim","Synthèse par équipe"))}</h2><table><thead><tr><th>Équipe</th><th>Fournisseur</th><th>Plan</th><th>Ressources</th></tr></thead><tbody>${teamSummary.map(x=>`<tr><td>${esc(x.team)}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join('')||'<tr><td colspan="4">Aucune donnée</td></tr>'}</tbody></table></section>
+  <section class="section"><h2>${esc(uiLabelValue("presim","Synthèse consolidée des licences"))}</h2><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th></tr></thead><tbody>${summary.map(x=>`<tr><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join('')||'<tr><td colspan="3">Aucune donnée</td></tr>'}</tbody></table></section>
+  <div class="sig">FinOps IA — Réalisé par Alex Dufrenot</div></main>`;
+  const js=`const F=${JSON.stringify(filename)};document.getElementById('print').onclick=()=>window.print();document.getElementById('save').onclick=()=>{const b=new Blob(['<!doctype html>\\n'+document.documentElement.outerHTML],{type:'text/html;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=F;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};`;
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(fiche.Nom)}</title><style>${css}</style></head><body>${body}<script>${js}<\/script></body></html>`;
+}
+function openPreSimHtmlV62(){
+  const fiche=selectedPreSimulation();if(!fiche||fiche.__draft||!preSimCanView(fiche)){toast("Cette fiche n'est pas accessible.",true);return}
+  const doc=presimHtmlDocumentV62(fiche),w=window.open('','_blank');
+  if(!w){toast("Le navigateur a bloqué l’ouverture HTML.",true);return}
+  w.document.open();w.document.write(doc);w.document.close();
+}
 
 function renderPreSimulation(){
   const el=document.getElementById('v-presim');if(!el)return;
@@ -1481,10 +1648,10 @@ function renderPreSimulation(){
 
   if(!fiche){
     el.innerHTML=`<article class="card"><div class="cardhead"><div><h3>Pré-simulation nominative</h3>
-      <p>Crée une fiche pour un domaine, organise les ressources en équipes puis définis le plan IA hérité par chaque équipe.</p>
+      <p>Crée une fiche pour un domaine, organise les ressources en équipes puis définis le plan IA hérité par chaque équipe. La liste n’affiche que les fiches auxquelles l’utilisateur courant est autorisé.</p>
       </div><button id="newPreSim" class="btn primary">+ Nouvelle pré-simulation</button></div></article>`;
     document.getElementById('newPreSim').onclick=()=>{
-      PRESIM_DRAFT=newPreSimulationDraft();PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];renderPreSimulation();
+      PRESIM_DRAFT=newPreSimulationDraft();PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];PRESIM_DRAFT_RIGHTS=[];PRESIM_REMOVED_RIGHT_IDS=[];renderPreSimulation();
     };return;
   }
 
@@ -1538,16 +1705,24 @@ function renderPreSimulation(){
     <div class="cardhead"><div><h3>Pré-simulation nominative</h3>
       <p>Le domaine est obligatoire. Le scénario de référence reste informatif pour le budget, mais permet depuis Simulation d'ouvrir directement cette fiche pour le domaine concerné.</p></div>
       <div class="table-actions"><select id="preSimSelect" class="admin-input"><option value="">Choisir une fiche</option>${ficheOptions}</select>
-        <button id="newPreSim" class="btn secondary">+ Nouvelle fiche</button><button id="savePreSim" class="btn primary">Enregistrer la fiche</button></div></div>
+        <button id="newPreSim" class="btn secondary">+ Nouvelle fiche</button>${fiche.__draft?'':`<button id="openPreSimHtml" class="btn secondary">🌐 ${esc(uiLabelValue("compare","Ouvrir en HTML"))}</button>`}<button id="savePreSim" class="btn primary">Enregistrer la fiche</button></div></div>
     <div class="presim-meta">
       <label class="field">Nom de la fiche<input id="psNom" class="admin-input" value="${esc(fiche.Nom||'')}"></label>
       <label class="field">Domaine obligatoire<select id="psDomain" class="admin-input">${domainOptions}</select></label>
       <label class="field">Scénario de référence <small>navigation informative</small><select id="psScenario" class="admin-input">${scenarioOptions}</select></label>
       <label class="field">Statut<input id="psStatus" class="admin-input" value="${esc(fiche.Statut||'Travail')}"></label>
-      <label class="field">Responsable<input id="psOwner" class="admin-input" value="${esc(fiche.Responsable||'')}"></label>
+      <label class="field">Responsable <small>utilisateur FinOps</small><select id="psResponsible" class="admin-input" ${preSimCanManageRights(fiche)?'':'disabled'}>${preSimResponsibleOptions(fiche)}</select></label>
     </div>
     <label class="field presim-comment">Commentaire<textarea id="psComment" class="admin-input" rows="2">${esc(fiche.Commentaire||'')}</textarea></label>
   </article>
+
+  ${preSimCanManageRights(fiche)&&!fiche.__draft?`<article class="card presim-access-card">
+    <div class="cardhead"><div><h3>Accès à la fiche</h3><p>Le responsable a toujours accès. Les droits supplémentaires ne sont valides que si l'utilisateur a aussi accès au domaine <b>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</b>.</p></div>
+      <div class="table-actions"><button id="addPreSimRight" class="btn secondary">+ Ajouter un accès</button><button id="savePreSimRights" class="btn primary">Enregistrer les droits</button></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Utilisateur</th><th>Niveau</th><th>Actif</th><th>Commentaire</th><th></th></tr></thead><tbody>
+      ${currentPreSimRights(fiche).map(r=>{const k=r.__draft?`data-par-key="${esc(r.__key)}"`:`data-par-id="${r.id}"`;const eligible=eligiblePreSimUsers(+fiche.Domaine);return `<tr ${k}><td><select class="admin-input" data-f="Utilisateur"><option value="">— Utilisateur —</option>${eligible.map(u=>`<option value="${u.id}" ${+u.id===+r.Utilisateur?'selected':''}>${esc(u.Email||'')}</option>`).join('')}</select></td><td><select class="admin-input" data-f="Niveau_Acces"><option value="LECTURE" ${String(r.Niveau_Acces||'LECTURE')==='LECTURE'?'selected':''}>Lecture</option><option value="MODIFICATION" ${String(r.Niveau_Acces||'')==='MODIFICATION'?'selected':''}>Modification</option></select></td><td><input type="checkbox" data-f="Actif" ${r.Actif===false?'':'checked'}></td><td><input class="admin-input" data-f="Commentaire" value="${esc(r.Commentaire||'')}"></td><td><button class="btn ghost removePreSimRight">${r.__draft?'Annuler':'Supprimer'}</button></td></tr>`}).join('')||'<tr><td colspan="5">Aucun accès supplémentaire. Seuls le responsable et l’Owner peuvent accéder à la fiche.</td></tr>'}
+    </tbody></table></div>
+  </article>`:''}
 
   <article class="card">
     <div class="cardhead"><div><h3>Équipes du domaine</h3><p>Chaque équipe peut définir un plan IA par défaut. Les ressources de l'équipe l'héritent sauf dérogation nominative.</p></div>
@@ -1581,7 +1756,7 @@ function renderPreSimulation(){
   </article>`;
 
   document.getElementById('preSimSelect').onchange=e=>{
-    PRESIM_DRAFT=null;PRESIM_DRAFT_RESOURCES=[];PRESIM_REMOVED_RESOURCE_IDS=[];PRESIM_DRAFT_TEAMS=[];PRESIM_REMOVED_TEAM_IDS=[];
+    resetPreSimDraftStateV62();
     PRESIM_SELECTED_ID=+e.target.value||0;renderPreSimulation();
   };
   document.getElementById('newPreSim').onclick=()=>{
@@ -1597,6 +1772,15 @@ function renderPreSimulation(){
     el.querySelector('tr[data-pr-key]:last-of-type input[data-f="Nom_Ressource"]')?.focus();
   };
   document.getElementById('savePreSim').onclick=savePreSimulationV28;
+  document.getElementById('openPreSimHtml')?.addEventListener('click',openPreSimHtmlV62);
+  document.getElementById('addPreSimRight')?.addEventListener('click',addPreSimRightDraftV62);
+  document.getElementById('savePreSimRights')?.addEventListener('click',savePreSimRightsV62);
+  el.querySelectorAll('.removePreSimRight').forEach(btn=>btn.onclick=()=>{
+    const tr=btn.closest('tr'),id=+tr.dataset.parId||0,key=tr.dataset.parKey||'';
+    if(key)PRESIM_DRAFT_RIGHTS=PRESIM_DRAFT_RIGHTS.filter(r=>r.__key!==key);
+    if(id)PRESIM_REMOVED_RIGHT_IDS.push(id);
+    renderPreSimulation();
+  });
   document.getElementById('savePreTeams').onclick=savePreTeamsV60;
   document.getElementById('savePreResources').onclick=savePreResourcesV60;
 
@@ -1628,34 +1812,51 @@ function renderPreSimulation(){
     tr.querySelector('[data-f="Offre"]')?.addEventListener('change',()=>updateEffective(tr));
   });
 }
+
 function readPreSimulationFields(){
+  const responsible=+document.getElementById('psResponsible')?.value||0;
   return {
     Nom:document.getElementById('psNom')?.value.trim()||'',
     Domaine:+document.getElementById('psDomain')?.value||0,
     Scenario_Reference:+document.getElementById('psScenario')?.value||0,
     Statut:document.getElementById('psStatus')?.value.trim()||'Travail',
-    Responsable:document.getElementById('psOwner')?.value.trim()||'',
+    Responsable_User:responsible,
+    Responsable_Email:rightUserEmail(responsible),
     Commentaire:document.getElementById('psComment')?.value.trim()||''
   };
 }
+
+
 async function savePreSimulationV28(){
   const fiche=selectedPreSimulation(),fields=readPreSimulationFields();
   if(!fields.Nom){toast('Le nom de la pré-simulation est obligatoire.',true);return}
   if(!fields.Domaine){toast('Le domaine est obligatoire.',true);return}
+  if(!fields.Responsable_User){toast('Le responsable de la fiche est obligatoire.',true);return}
+  const responsible=rightUserRow(fields.Responsable_User);
+  if(!userHasDomain(responsible,fields.Domaine)){toast("Le responsable doit être un utilisateur actif ayant accès au domaine de la fiche.",true);return}
   if(!ACCESS.domainIds.includes(fields.Domaine)&&ACCESS.role!=='OWNER'){toast("Ce domaine n'est pas autorisé.",true);return}
   if(fields.Scenario_Reference){
     const duplicate=scopedPreSimulations().find(x=>+x.Scenario_Reference===fields.Scenario_Reference&&+x.Domaine===fields.Domaine&&+x.id!==+fiche.id);
     if(duplicate){toast(`Une pré-simulation est déjà liée à ce scénario pour ce domaine : ${duplicate.Nom}.`,true);return}
   }
+  const rights=fiche.__draft?[]:preSimRightsRows(fiche);
+  const tokens=buildPreSimAccessTokens(fields.Responsable_User,rights);
+  fields.Responsable=fields.Responsable_Email; // compatibilité historique
+  fields.Acces_Lecture_Emails=tokens.read;
+  fields.Acces_Modification_Emails=tokens.modify;
   try{
     if(fiche.__draft){
       await apply([["AddRecord",T.preSim,null,fields]]);PRESIM_DRAFT=null;await reload();
-      const matches=scopedPreSimulations().filter(x=>x.Nom===fields.Nom&&+x.Domaine===fields.Domaine);
+      const matches=preSimulationRows().filter(x=>x.Nom===fields.Nom&&+x.Domaine===fields.Domaine);
       PRESIM_SELECTED_ID=+(matches.sort((a,b)=>+b.id-+a.id)[0]?.id||0);
-    }else{await apply([["UpdateRecord",T.preSim,+fiche.id,fields]]);await reload()}
+    }else{
+      if(!preSimCanModify(fiche)&&!isOwner()){toast("Vous n'avez pas le droit de modifier cette fiche.",true);return}
+      await apply([["UpdateRecord",T.preSim,+fiche.id,fields]]);await reload();
+    }
     toast('Pré-simulation enregistrée.');
   }catch(e){toast(e.message||String(e),true)}
 }
+
 async function savePreTeamsV60(){
   const fiche=selectedPreSimulation();
   if(!fiche||fiche.__draft){toast("Enregistre d'abord la fiche de pré-simulation.",true);return}
@@ -1728,40 +1929,47 @@ function scenarioUsage(scenarioId){
   const individual=(D.Forfaits_Individuels||D['Forfaits_Individuels']||[]).filter(r=>+r.Scenario===sid).length;
   const baseline=(D[T.baseline]||[]).filter(r=>+r.Scenario===sid).length;
   const baselineDetails=(D[T.baselineDetails]||[]).filter(r=>+r.Scenario===sid).length;
-  const simulation=allocations+enterprise+individual;
-  const other=baseline+baselineDetails;
-  return {
-    allocations,preSimulations,enterprise,individual,baseline,baselineDetails,
-    simulation,other,total:simulation+preSimulations+other
-  };
+  return {allocations,preSimulations,enterprise,individual,baseline,baselineDetails};
 }
 function scenarioUsageReason(scenarioId){
-  const u=scenarioUsage(scenarioId),parts=[];
-  if(u.allocations)parts.push(`${u.allocations} allocation(s)`);
-  if(u.enterprise)parts.push(`${u.enterprise} ligne(s) Enterprise historique`);
-  if(u.individual)parts.push(`${u.individual} forfait(s) individuel(s)`);
-  if(u.preSimulations)parts.push(`${u.preSimulations} pré-simulation(s) nominative(s)`);
-  if(u.baseline||u.baselineDetails)parts.push(`${u.baseline+u.baselineDetails} donnée(s) ROI / baseline`);
-  return parts.join(' · ');
+  const u=scenarioUsage(scenarioId);
+  return u.allocations?`${u.allocations} allocation(s)`:'';
 }
 function canDeleteScenario(scenarioId){
-  return scenarioUsage(scenarioId).total===0;
+  // V63 : seule l'existence d'une allocation budgétaire bloque la suppression.
+  return scenarioUsage(scenarioId).allocations===0;
 }
 async function deleteScenarioV35(scenarioId){
   const s=(D[T.scenarios]||[]).find(x=>+x.id===+scenarioId);
   if(!s)return;
   const usage=scenarioUsage(scenarioId);
-  if(usage.total){
-    toast(`Suppression impossible : ${scenarioUsageReason(scenarioId)}.`,true);
+  if(usage.allocations){
+    toast(`Suppression impossible : ce scénario contient ${usage.allocations} allocation(s).`,true);
     return;
   }
   if(!canEditView('scenarios')){
     toast(readOnlyMessage(),true);
     return;
   }
-  if(!confirm(`Supprimer définitivement le scénario "${s.Nom||scenarioId}" ?\n\nIl n'est rattaché à aucune simulation, pré-simulation nominative ni donnée ROI.`))return;
+
+  const info=[];
+  if(usage.preSimulations)info.push(`${usage.preSimulations} pré-simulation(s) seront simplement détachée(s) du scénario`);
+  if(usage.baseline||usage.baselineDetails)info.push(`les données ROI / baseline existantes ne bloquent pas la suppression`);
+  if(usage.enterprise||usage.individual)info.push(`les anciennes lignes historiques ne bloquent pas la suppression`);
+
+  const detail=info.length?`\n\n${info.join('. ')}.`:'';
+  if(!confirm(`Supprimer définitivement le scénario "${s.Nom||scenarioId}" ?${detail}`))return;
+
   try{
-    await apply([["RemoveRecord",T.scenarios,+scenarioId]]);
+    const actions=[];
+    // La liaison Pré-simulation -> Scénario est informative : on la remet à vide.
+    (D[T.preSim]||[])
+      .filter(r=>+r.Scenario_Reference===+scenarioId)
+      .forEach(r=>actions.push(["UpdateRecord",T.preSim,+r.id,{Scenario_Reference:0}]));
+
+    actions.push(["RemoveRecord",T.scenarios,+scenarioId]);
+    await apply(actions);
+
     if(+selectedScenario()?.id===+scenarioId)PRESIM_SELECTED_ID=0;
     SCENARIO_FILTER.scenarioId='';
     await reload();
@@ -1771,19 +1979,19 @@ async function deleteScenarioV35(scenarioId){
   }
 }
 
-
 function scenarioRowHtml(s){
   const draft=!!s.__draft;
   const attrs=draft?`data-draft="1" data-new-scenario="${esc(s.__key)}"`:`data-s="${s.id}"`;
   let action='';
   if(draft){
-    action=`<button class="btn ghost cancelScenarioDraft" data-key="${esc(s.__key)}">Annuler</button>`;
+    action=`<button type="button" class="btn ghost cancelScenarioDraft" data-key="${esc(s.__key)}">Annuler</button>`;
   }else{
     const usage=scenarioUsage(s.id);
-    if(usage.total){
-      action=`<button type="button" class="btn ghost small scenario-delete blocked" data-delete-scenario="${s.id}" disabled title="${esc('Suppression impossible : '+scenarioUsageReason(s.id))}">🔒 Utilisé</button>`;
+    if(!canDeleteScenario(s.id)){
+      action=`<button type="button" class="btn ghost small scenario-delete blocked" data-delete-scenario="${s.id}" disabled title="${esc('Suppression impossible : '+scenarioUsageReason(s.id))}">🔒 Allocations</button>`;
     }else{
-      action=`<button type="button" class="btn danger small scenario-delete" data-delete-scenario="${s.id}" title="Supprimer ce scénario non utilisé">Supprimer</button>`;
+      const extra=usage.preSimulations?' · les pré-simulations liées seront détachées':'';
+      action=`<button type="button" class="btn danger small scenario-delete" data-delete-scenario="${s.id}" title="Supprimer ce scénario sans allocation${esc(extra)}">Supprimer</button>`;
     }
   }
   return `<tr ${attrs}>
@@ -1825,7 +2033,7 @@ function renderScenarios(){
     <div class="cardhead">
       <div>
         <h3>Scénarios</h3>
-        <p>Modifie, ajoute ou supprime les scénarios non utilisés. Un scénario rattaché à une simulation, une pré-simulation nominative ou des données ROI est protégé.</p>
+        <p>Modifie, ajoute ou supprime les scénarios. Seule la présence d’au moins une allocation budgétaire bloque la suppression ; les pré-simulations liées sont simplement détachées.</p>
       </div>
       <div class="table-actions">
         <button id="saveScenarios" class="btn primary">Enregistrer les modifications</button>
@@ -1922,8 +2130,8 @@ function renderScenarios(){
     renderScenarios();
   });
 
-  el.querySelectorAll('[data-cancel-new-scenario]').forEach(btn=>btn.onclick=()=>{
-    const key=btn.dataset.cancelNewScenario;
+  el.querySelectorAll('.cancelScenarioDraft').forEach(btn=>btn.onclick=()=>{
+    const key=btn.dataset.key||'';
     NEW_SCENARIOS=NEW_SCENARIOS.filter(s=>String(s.__key)!==String(key));
     renderScenarios();
   });
@@ -2303,6 +2511,7 @@ function resetMenuConfigDraft(){
 
 
 
+
 function uiLabelRows(){return D?.[T.uiLabels]||[]}
 function uiLabelMap(){
   const m=new Map();
@@ -2312,22 +2521,34 @@ function uiLabelMap(){
   });
   return m;
 }
+function uiLabelValue(screen,def){
+  const d=String(def??'').trim();if(!d)return d;
+  const map=uiLabelMap();
+  return map.get(`${screen}||${d}`)??map.get(`*||${d}`)??d;
+}
 function uiTextScreen(el){
-  const view=el.closest?.('.view');
-  return view?.id?view.id.replace(/^v-/,''):'global';
+  const view=el?.closest?.('.view');
+  return view?.id?view.id.replace(/^v-/,''):(el?.closest?.('[data-ui-screen]')?.dataset?.uiScreen||'global');
 }
 function uiTextNodes(){
-  const selector='h1,h2,h3,h4,p,th,button,label.field,summary,small,.status,.menu-admin-note,.offer-schema-note,.deniednote,.kpi .l,.field-label,.filter-title b,.mini-btn,.badge';
+  const root=document.getElementById('root');if(!root)return [];
   const out=[];
-  document.querySelectorAll(selector).forEach(el=>{
-    if(el.closest('#v-labelsadmin'))return;
-    const screen=uiTextScreen(el);
-    [...el.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).forEach(n=>{
-      const def=String(n.nodeValue||'').trim();
-      if(def.length<2 || /^[-+]?\d+(?:[.,]\d+)?$/.test(def))return;
-      out.push({screen,def,node:n});
-    });
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{
+    acceptNode(node){
+      const parent=node.parentElement;if(!parent)return NodeFilter.FILTER_REJECT;
+      if(parent.closest('#v-labelsadmin'))return NodeFilter.FILTER_REJECT;
+      if(parent.closest('script,style,noscript,textarea,select,option,code,pre'))return NodeFilter.FILTER_REJECT;
+      const def=String(node.nodeValue||'').trim();
+      if(def.length<2)return NodeFilter.FILTER_REJECT;
+      if(/^[-+]?\d+(?:[.,]\d+)?(?:\s*[%€$])?$/.test(def))return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
   });
+  let node;
+  while((node=walker.nextNode())){
+    const def=String(node.nodeValue||'').trim(),parent=node.parentElement;
+    out.push({screen:uiTextScreen(parent),def,node});
+  }
   return out;
 }
 function applyUILabels(){
@@ -2363,10 +2584,45 @@ function ensureUILabelObserver(){
 }
 
 function slugLabel(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,70)}
+
+const UI_LABEL_CATALOG_V65=[
+  // Synthèse / comparaison + détail popup + rapport HTML (éléments transitoires)
+  ['compare','Comparer les scénarios'],['compare','Sélectionne jusqu’à 6 scénarios. Clique sur une carte pour ouvrir le détail financier par domaine.'],
+  ['compare','Ouvrir en HTML'],['compare','SCÉNARIO'],['compare','Chiffré'],['compare','à confirmer'],
+  ['compare','licences'],['compare','domaines'],['compare','offres'],['compare','Fixe'],['compare','Variable'],
+  ['compare','Économie annuelle'],['compare','Voir le détail →'],['compare','Détail du scénario'],['compare','Vue détaillée'],
+  ['compare','Fermer'],['compare','SYNTHÈSE FINOPS IA'],['compare','Budget total'],['compare','Coûts fixes'],
+  ['compare','Coûts variables'],['compare','Budget EUR'],['compare','01'],['compare','Structure du budget'],
+  ['compare','02'],['compare','Détail par domaine'],['compare','Offres, licences, prix du forfait, engagements et structure des coûts.'],
+  ['compare','DOMAINE'],['compare','Fournisseur'],['compare','Offre'],['compare','Licences'],['compare','Prix forfait'],
+  ['compare','Base calcul fixe'],['compare','Engagement'],['compare','Mois facturés'],['compare','Total'],
+  ['compare','Sous-total'],['compare','Total scénario'],['compare','Aucune allocation sur ce scénario.'],
+  ['compare','Synthèse FinOps IA'],['compare','Rapport HTML autonome'],['compare','Imprimer / PDF'],
+  ['compare','Enregistrer le fichier HTML'],['compare','Synthèse'],['compare','Détails des scénarios'],
+  ['compare','Scénario'],['compare','Budget USD'],['compare','Économie annuelle'],
+  // Pré-simulation HTML / sécurité
+  ['presim','Pré-simulation nominative'],['presim','Ouvrir en HTML'],['presim','Imprimer / PDF'],
+  ['presim','Enregistrer le fichier HTML'],['presim','Équipes'],['presim','Ressources nominatives'],
+  ['presim','Synthèse par équipe'],['presim','Synthèse consolidée des licences'],['presim','Responsable'],
+  ['presim','Domaine'],['presim','Scénario'],['presim','Statut'],['presim','Plan par défaut'],['presim','Ressources actives'],
+  ['presim','Ressource'],['presim','Profil'],['presim','Équipe'],['presim','Plan individuel'],['presim','Plan effectif'],
+  ['presim','Commentaire'],['presim','Fournisseur'],['presim','Plan'],['presim','Ressources'],['presim','Licences'],
+  // Global / modal common actions
+  ['global','Fermer'],['global','Enregistrer'],['global','Annuler'],['global','Supprimer'],['global','Effacer'],
+  ['global','Imprimer / PDF'],['global','Enregistrer le fichier HTML']
+].map(([Ecran,Libelle_Defaut])=>({Ecran,Libelle_Defaut,Cle:`${Ecran}.${slugLabel(Libelle_Defaut)}`}));
+
 function collectUILabelCandidates(){
   const uniq=new Map();
-  uiTextNodes().forEach(x=>{const k=`${x.screen}||${x.def}`;if(!uniq.has(k))uniq.set(k,{Ecran:x.screen,Libelle_Defaut:x.def,Cle:`${x.screen}.${slugLabel(x.def)}`})});
-  uiLabelRows().forEach(r=>{const k=`${r.Ecran||'*'}||${r.Libelle_Defaut||''}`;if(!uniq.has(k))uniq.set(k,{Ecran:r.Ecran||'*',Libelle_Defaut:r.Libelle_Defaut||'',Cle:r.Cle||`${r.Ecran}.${slugLabel(r.Libelle_Defaut)}`})});
+  const add=c=>{
+    const screen=String(c.Ecran||'global'),def=String(c.Libelle_Defaut||'').trim();
+    if(!def)return;
+    const k=`${screen}||${def}`;
+    if(!uniq.has(k))uniq.set(k,{Ecran:screen,Libelle_Defaut:def,Cle:c.Cle||`${screen}.${slugLabel(def)}`});
+  };
+  uiTextNodes().forEach(x=>add({Ecran:x.screen,Libelle_Defaut:x.def}));
+  UI_LABEL_CATALOG_V65.forEach(add);
+  uiLabelRows().forEach(r=>add({Ecran:r.Ecran||'*',Libelle_Defaut:r.Libelle_Defaut||'',Cle:r.Cle}));
   return [...uniq.values()].sort((a,b)=>String(a.Ecran).localeCompare(String(b.Ecran),'fr')||String(a.Libelle_Defaut).localeCompare(String(b.Libelle_Defaut),'fr'));
 }
 
@@ -2409,7 +2665,7 @@ function renderLabelsAdmin(){
 
   <article class="card labels-panel ${LABEL_ADMIN_TAB==='screens'?'':'hidden'}" data-label-panel="screens">
     <div class="cardhead"><div><h3>Textes des écrans</h3>
-      <p>Titres, boutons, KPI, filtres, en-têtes et textes d'aide détectés dans les écrans du widget.</p>
+      <p>Tous les textes visibles de l’application sont détectés automatiquement. Les fenêtres temporaires et rapports HTML sont aussi enregistrés dans un catalogue permanent afin qu’aucun libellé ne dépende de l’ouverture préalable d’un écran.</p>
     </div><div class="table-actions"><select id="labelScreenFilter" class="admin-input">${screenOptions}</select><input id="labelSearch" class="admin-input" placeholder="Rechercher un libellé"><button id="saveUILabels" class="btn primary">Enregistrer les textes</button></div></div>
     <div class="tablewrap labels-admin-wrap"><table class="labels-admin-table"><thead><tr><th>Écran</th><th>Clé</th><th>Valeur par défaut</th><th>Libellé affiché</th><th>Actif</th></tr></thead>
     <tbody id="uiLabelsBody">${candidates.map(c=>{const r=byPair.get(`${c.Ecran}||${c.Libelle_Defaut}`);return `<tr data-label-id="${r?.id||''}" data-screen="${esc(c.Ecran)}" data-default="${esc(c.Libelle_Defaut)}"><td><code>${esc(c.Ecran)}</code></td><td><code>${esc(r?.Cle||c.Cle)}</code></td><td>${esc(c.Libelle_Defaut)}</td><td><input class="admin-input wide" data-f="Libelle" value="${esc(r?.Libelle||c.Libelle_Defaut)}"></td><td><input type="checkbox" data-f="Actif" ${r?.Actif===false?'':'checked'}></td></tr>`}).join('')}</tbody></table></div>
@@ -2494,9 +2750,10 @@ const FINOPS_ACL_RESOURCES=[
   {tableId:"Allocations",colIds:"*",kind:"domain",mode:"userEdit"},
   {tableId:"Baseline_N_1",colIds:"*",kind:"domain",mode:"userEdit"},
   {tableId:"Baseline_N_1_Details",colIds:"*",kind:"domain",mode:"userEdit"},
-  {tableId:"Pre_Simulations",colIds:"*",kind:"domain",mode:"userEdit"},
-  {tableId:"Pre_Simulation_Ressources",colIds:"*",kind:"presimdomain",mode:"userEdit"},
-  {tableId:"Pre_Simulation_Equipes",colIds:"*",kind:"presimdomain",mode:"userEdit"},
+  {tableId:"Pre_Simulations",colIds:"*",kind:"presimroot",mode:"presimroot"},
+  {tableId:"Pre_Simulation_Ressources",colIds:"*",kind:"presimchild",mode:"presimchild"},
+  {tableId:"Pre_Simulation_Equipes",colIds:"*",kind:"presimchild",mode:"presimchild"},
+  {tableId:"Pre_Simulation_Droits",colIds:"*",kind:"presimrights",mode:"presimrights"},
   {tableId:"Enterprise",colIds:"*",kind:"domain",mode:"read"},
   {tableId:"Forfaits_Individuels",colIds:"*",kind:"domain",mode:"read"},
   {tableId:"Domaines",colIds:"*",kind:"domains",mode:"domains"},
@@ -2535,6 +2792,8 @@ function aclFormulaFor(kind,roles){
   if(kind==="global"||kind==="scenario"||kind==="presence"||kind==="selfidentity"||kind==="ownersentinel"||kind==="legacyidentity"||kind==="chatmessages"||kind==="chatreads")return base;
   if(kind==="domain")return `${base} and rec.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="presimdomain")return `${base} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`;
+  if(kind==="presimroot")return `${base} and rec.Domaine in user.Droits.Domaines_Autorises`;
+  if(kind==="presimchild"||kind==="presimrights")return `${base} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`;
   if(kind==="domains")return `${base} and rec.id in user.Droits.Domaines_Autorises`;
   if(kind==="rights")return base;
   return "False";
@@ -2542,6 +2801,27 @@ function aclFormulaFor(kind,roles){
 function aclRulesForSpec(spec){
   const reader=["LECTEUR","CONTRIBUTEUR","OBSERVATEUR","CONTRIBUTEUR_AVANCE","ADMINISTRATEUR"];
   const contributors=["CONTRIBUTEUR","CONTRIBUTEUR_AVANCE","ADMINISTRATEUR"];
+  if(spec.mode==="presimroot"){
+    const accessRead=`("|" + user.Email.lower() + "|") in rec.Acces_Lecture_Emails`;
+    const accessWrite=`("|" + user.Email.lower() + "|") in rec.Acces_Modification_Emails`;
+    return [
+      {roles:contributors,perm:"+CRUD",tag:"PRESIM_WRITE",formula:`${aclRoleFormula(contributors)} and rec.Domaine in user.Droits.Domaines_Autorises and ${accessWrite}`},
+      {roles:reader,perm:"+R",tag:"PRESIM_READ",formula:`${aclRoleFormula(reader)} and rec.Domaine in user.Droits.Domaines_Autorises and (${accessRead} or ${accessWrite})`}
+    ];
+  }
+  if(spec.mode==="presimchild"){
+    const accessRead=`("|" + user.Email.lower() + "|") in rec.Pre_Simulation.Acces_Lecture_Emails`;
+    const accessWrite=`("|" + user.Email.lower() + "|") in rec.Pre_Simulation.Acces_Modification_Emails`;
+    return [
+      {roles:contributors,perm:"+CRUD",tag:"PRESIM_CHILD_WRITE",formula:`${aclRoleFormula(contributors)} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises and ${accessWrite}`},
+      {roles:reader,perm:"+R",tag:"PRESIM_CHILD_READ",formula:`${aclRoleFormula(reader)} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises and (${accessRead} or ${accessWrite})`}
+    ];
+  }
+  if(spec.mode==="presimrights"){
+    return [
+      {roles:["ADMINISTRATEUR"],perm:"+CRUD",tag:"PRESIM_RIGHTS_ADMIN",formula:`${aclRoleFormula(["ADMINISTRATEUR"])} and rec.Pre_Simulation.Domaine in user.Droits.Domaines_Autorises`}
+    ];
+  }
   if(spec.mode==="userEdit"){
     return [
       {roles:contributors,perm:"+CRUD",tag:"WRITE"},
