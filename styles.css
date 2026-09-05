@@ -1104,3 +1104,56 @@ textarea{
 .roi-primary-kpi{border-width:2px!important;font-weight:700}
 .roi-primary-kpi b{font-size:1.12em!important}
 .roi-kpis .kpi:last-child{border-width:2px;font-weight:700}
+
+/* V89 — ROI domaine horizontal, même langage visuel que la lecture économique */
+.domain-roi-strip{
+  display:grid !important;
+  grid-template-columns:repeat(6,minmax(0,1fr)) !important;
+  gap:0 !important;
+  margin:0 14px 14px !important;
+  padding:14px 0 0 !important;
+  border-top:1px solid #e4e7ec;
+  background:#fff;
+}
+.domain-roi-strip>div{
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:center;
+  min-width:0;
+  gap:7px !important;
+  padding:4px 16px 10px !important;
+  border-left:1px solid #e4e7ec;
+  background:#fff !important;
+}
+.domain-roi-strip>div:first-child{border-left:0}
+.domain-roi-strip span{
+  display:block;
+  color:#667085;
+  font-size:11px;
+  line-height:1.3;
+}
+.domain-roi-strip b{
+  display:block;
+  color:#10213e;
+  font-size:15px;
+  line-height:1.2;
+  white-space:nowrap;
+}
+.domain-roi-strip .negative b{color:#c62828}
+.domain-roi-strip .roi-primary-kpi{
+  background:#f8f7ff !important;
+}
+@media(max-width:1050px){
+  .domain-roi-strip{
+    grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+    row-gap:12px !important;
+  }
+  .domain-roi-strip>div:nth-child(4){border-left:0}
+}
+@media(max-width:650px){
+  .domain-roi-strip{
+    grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+  }
+  .domain-roi-strip>div:nth-child(odd){border-left:0}
+  .domain-roi-strip>div:nth-child(4){border-left:1px solid #e4e7ec}
+}

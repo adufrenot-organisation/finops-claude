@@ -1629,6 +1629,42 @@ function scenarioHtmlDocumentV41(m){
     @media(max-width:760px){.scenario-roi-grid,.domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.detail-domain-budget-row{grid-template-columns:1fr}.detail-domain-budget-values{align-items:flex-start}.domain-annual-equivalent{justify-content:flex-start}.domain-totals{grid-template-columns:1fr;text-align:left}}
     @media print{.domain-detail-card.is-collapsed .domain-detail-body{display:block!important}.domain-toggle,.domain-summary-link{display:none!important}.pricing-details:not([open]) .pricing-details-content{display:block!important}}
 
+
+    /* V89 — ROI domaine horizontal */
+    .domain-roi-strip{
+      display:grid!important;
+      grid-template-columns:repeat(6,minmax(0,1fr))!important;
+      gap:0!important;
+      margin:0 14px 14px!important;
+      padding:14px 0 0!important;
+      border-top:1px solid var(--line)!important;
+      background:#fff!important;
+    }
+    .domain-roi-strip>div{
+      display:flex!important;
+      flex-direction:column!important;
+      justify-content:center!important;
+      min-width:0!important;
+      gap:7px!important;
+      padding:4px 16px 10px!important;
+      border-left:1px solid var(--line)!important;
+      background:#fff!important;
+    }
+    .domain-roi-strip>div:first-child{border-left:0!important}
+    .domain-roi-strip span{display:block!important;color:var(--muted)!important;font-size:10px!important;line-height:1.3!important}
+    .domain-roi-strip b{display:block!important;color:var(--navy)!important;font-size:14px!important;line-height:1.2!important;white-space:nowrap!important}
+    .domain-roi-strip .negative b{color:#c62828!important}
+    .domain-roi-strip .roi-primary-kpi{background:var(--violet-soft)!important}
+    @media(max-width:1050px){
+      .domain-roi-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important;row-gap:12px!important}
+      .domain-roi-strip>div:nth-child(4){border-left:0!important}
+    }
+    @media(max-width:650px){
+      .domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      .domain-roi-strip>div:nth-child(odd){border-left:0!important}
+      .domain-roi-strip>div:nth-child(4){border-left:1px solid var(--line)!important}
+    }
+
     .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
     .html-report-toolbar>div:first-child{display:flex;flex-direction:column;gap:2px}.html-report-toolbar span{font-size:11px;color:#cbd5e1}
     .html-report-actions{display:flex;gap:8px;flex-wrap:wrap}.html-report-actions button{border:0;border-radius:9px;padding:9px 13px;font-weight:700;cursor:pointer}.html-report-actions button:first-child{background:#fff;color:#10213e}.html-report-actions button:last-child{background:#635bdb;color:#fff}
@@ -1818,6 +1854,42 @@ function synthesisHtmlDocumentV42(ms){
     @media(max-width:1100px){.scenario-roi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.detail-budget-grid{grid-template-columns:1fr}.domain-roi-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
     @media(max-width:760px){.scenario-roi-grid,.domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.detail-domain-budget-row{grid-template-columns:1fr}.detail-domain-budget-values{align-items:flex-start}.domain-annual-equivalent{justify-content:flex-start}.domain-totals{grid-template-columns:1fr;text-align:left}}
     @media print{.domain-detail-card.is-collapsed .domain-detail-body{display:block!important}.domain-toggle,.domain-summary-link{display:none!important}.pricing-details:not([open]) .pricing-details-content{display:block!important}}
+
+
+    /* V89 — ROI domaine horizontal */
+    .domain-roi-strip{
+      display:grid!important;
+      grid-template-columns:repeat(6,minmax(0,1fr))!important;
+      gap:0!important;
+      margin:0 14px 14px!important;
+      padding:14px 0 0!important;
+      border-top:1px solid var(--line)!important;
+      background:#fff!important;
+    }
+    .domain-roi-strip>div{
+      display:flex!important;
+      flex-direction:column!important;
+      justify-content:center!important;
+      min-width:0!important;
+      gap:7px!important;
+      padding:4px 16px 10px!important;
+      border-left:1px solid var(--line)!important;
+      background:#fff!important;
+    }
+    .domain-roi-strip>div:first-child{border-left:0!important}
+    .domain-roi-strip span{display:block!important;color:var(--muted)!important;font-size:10px!important;line-height:1.3!important}
+    .domain-roi-strip b{display:block!important;color:var(--navy)!important;font-size:14px!important;line-height:1.2!important;white-space:nowrap!important}
+    .domain-roi-strip .negative b{color:#c62828!important}
+    .domain-roi-strip .roi-primary-kpi{background:var(--violet-soft)!important}
+    @media(max-width:1050px){
+      .domain-roi-strip{grid-template-columns:repeat(3,minmax(0,1fr))!important;row-gap:12px!important}
+      .domain-roi-strip>div:nth-child(4){border-left:0!important}
+    }
+    @media(max-width:650px){
+      .domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+      .domain-roi-strip>div:nth-child(odd){border-left:0!important}
+      .domain-roi-strip>div:nth-child(4){border-left:1px solid var(--line)!important}
+    }
 
     .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
     .html-report-toolbar>div:first-child{display:flex;flex-direction:column;gap:2px}.html-report-toolbar span{font-size:11px;color:#cbd5e1}
