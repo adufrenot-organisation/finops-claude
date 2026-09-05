@@ -1007,3 +1007,12 @@ textarea{
 .domain-team-budget-head small{margin-top:3px;color:#667085}
 .domain-team-budget-table{margin:0}
 .domain-team-budget-note{margin:10px 0 0;font-size:12px;color:#667085;line-height:1.45}
+
+/* V75 — Synthèse scénario : ventilation budgétaire par équipe */
+.scenario-team-budget{margin-top:14px;padding:14px;border:1px solid #dfe5ec;border-radius:12px;background:#f8fafc}
+.scenario-team-budget-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:10px}
+.scenario-team-budget-head h4{margin:3px 0 3px;font-size:15px}
+.scenario-team-budget-head p{margin:0;color:#667085;font-size:12px}
+.scenario-team-budget-table{background:#fff}
+.scenario-team-budget-note{margin:10px 0 0;color:#667085;font-size:12px;line-height:1.45}
+@media(max-width:760px){.scenario-team-budget-head{flex-direction:column}}

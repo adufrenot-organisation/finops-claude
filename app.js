@@ -795,9 +795,12 @@ function switchView(v){
   const page=document.getElementById('sessionPage');if(page)page.textContent=label;
   const scenarioField=document.getElementById('scenarioSelect')?.closest('.field');
   const refresh=document.getElementById('refresh');
-  const hideTop=['presim','claudeenterprise','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','appsettings','acladmin'].includes(v);
-  if(scenarioField)scenarioField.style.display=hideTop?'none':'';
-  if(refresh)refresh.style.display=hideTop?'none':'';
+  // V75 : sur Synthèse/Comparaison, les scénarios se sélectionnent déjà dans l'écran.
+  // Le sélecteur global du bandeau est donc masqué pour éviter un double filtre.
+  const hideScenario=['compare','presim','claudeenterprise','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','appsettings','acladmin'].includes(v);
+  const hideRefresh=['presim','claudeenterprise','scenarios','offers','offersadmin','domains','rights','menuadmin','labelsadmin','appsettings','acladmin'].includes(v);
+  if(scenarioField)scenarioField.style.display=hideScenario?'none':'';
+  if(refresh)refresh.style.display=hideRefresh?'none':'';
   PRESENCE_CURRENT_VIEW=v;
   enforceRolePermissions();
   heartbeatPresence(true);
@@ -880,26 +883,46 @@ function dashboardFilterOptions(){
   return{domains,providers};
 }
 
-function savedPreSimWithTeamsForScenarioDomain(scenarioId,domainId){
-  const matches=preSimMatchesForScenarioDomain(scenarioId,domainId)
-    .filter(f=>{
-      const teams=preTeamRows().filter(t=>+t.Pre_Simulation===+f.id&&t.Actif!==false);
-      const resources=preResourceRows().filter(r=>+r.Pre_Simulation===+f.id&&r.Actif!==false);
-      return teams.length&&resources.length;
+function preSimRefId(v){
+  if(Array.isArray(v)){
+    const a=v[0]==="L"?v.slice(1):v;
+    const n=a.map(Number).find(Number.isFinite);
+    return n||0;
+  }
+  const n=Number(v);return Number.isFinite(n)?n:0;
+}
+function savedPreSimWithTeamsForDomain(scenarioId,domainId){
+  // V75 : le besoin est lié au DOMAINE.
+  // On préfère une pré-simulation du scénario détaillé, puis on retombe sur
+  // la pré-simulation enregistrée la plus récente du domaine ayant équipes + ressources.
+  const candidates=scopedPreSimulations()
+    .filter(f=>+f.Domaine===+domainId && f.Actif!==false)
+    .sort((a,b)=>{
+      const am=+a.Scenario_Reference===+scenarioId?1:0;
+      const bm=+b.Scenario_Reference===+scenarioId?1:0;
+      return bm-am || (+b.id)-(+a.id);
     });
-  return matches[0]||null; // preSimMatchesForScenarioDomain est trié de la plus récente à la plus ancienne.
+  return candidates.find(f=>{
+    const teams=preTeamRows().filter(t=>preSimRefId(t.Pre_Simulation)===+f.id&&t.Actif!==false);
+    const resources=preResourceRows().filter(r=>preSimRefId(r.Pre_Simulation)===+f.id&&r.Actif!==false);
+    return teams.length>0 && resources.length>0;
+  })||null;
 }
 function domainTeamBudgetBreakdown(m,domainId){
   const scenarioId=+m?.s?.id||0;
-  const fiche=savedPreSimWithTeamsForScenarioDomain(scenarioId,+domainId);
+  const fiche=savedPreSimWithTeamsForDomain(scenarioId,+domainId);
   if(!fiche)return null;
 
-  const teams=preTeamRows().filter(t=>+t.Pre_Simulation===+fiche.id&&t.Actif!==false);
-  const resources=preResourceRows().filter(r=>+r.Pre_Simulation===+fiche.id&&r.Actif!==false);
+  const teams=preTeamRows().filter(t=>preSimRefId(t.Pre_Simulation)===+fiche.id&&t.Actif!==false);
+  const resources=preResourceRows().filter(r=>preSimRefId(r.Pre_Simulation)===+fiche.id&&r.Actif!==false);
   if(!teams.length||!resources.length)return null;
 
   const teamById=Object.fromEntries(teams.map(t=>[+t.id,t]));
   const allocs=(m.alloc||[]).filter(a=>+a.Domaine===+domainId);
+  if(!allocs.length)return null;
+
+  // Budget complet par offre du scénario : Budget_Total_USD inclut les composantes
+  // calculées par FinOps (fixe + usage/variable selon les formules Grist).
   const allocByOffer=new Map();
   for(const a of allocs){
     const oid=+a.Offre||0;if(!oid)continue;
@@ -909,30 +932,32 @@ function domainTeamBudgetBreakdown(m,domainId){
     allocByOffer.set(oid,cur);
   }
 
-  // Compte les licences nominatives de la pré-simulation par équipe + offre.
-  const counts=new Map(), totalPreByOffer=new Map();
+  // Nombre de personnes/licences pré-simulées par équipe et par offre effective.
+  const counts=new Map(), preByOffer=new Map();
   for(const r of resources){
-    const tid=+r.Equipe||0, oid=effectivePreSimOfferId(r,teamById);
+    const tid=preSimRefId(r.Equipe), oid=effectivePreSimOfferId(r,teamById);
     if(!tid||!oid||!teamById[tid])continue;
-    const k=`${tid}|${oid}`;
-    counts.set(k,(counts.get(k)||0)+1);
-    totalPreByOffer.set(oid,(totalPreByOffer.get(oid)||0)+1);
+    const key=`${tid}|${oid}`;
+    counts.set(key,(counts.get(key)||0)+1);
+    preByOffer.set(oid,(preByOffer.get(oid)||0)+1);
   }
 
   const byTeam=new Map();
-  let allocatedBudget=0, representedLicenses=0, modelLicenses=0;
+  let allocatedBudget=0;
   for(const [oid,a] of allocByOffer){
-    modelLicenses+=a.licenses;
-    const preCount=totalPreByOffer.get(oid)||0;
-    if(!preCount)continue;
-    representedLicenses+=Math.min(a.licenses||preCount,preCount);
+    const totalNamed=preByOffer.get(oid)||0;
+    if(!totalNamed)continue; // offre du scénario sans équivalent dans la pré-simulation
     for(const t of teams){
       const n=counts.get(`${+t.id}|${oid}`)||0;
       if(!n)continue;
-      // Répartition analytique du budget complet de l'offre au prorata
-      // des licences nominatives de la pré-simulation pour cette offre.
-      const share=a.budget*(n/preCount);
-      const row=byTeam.get(+t.id)||{teamId:+t.id,team:t.Nom||`Équipe #${t.id}`,licenses:0,budget:0,order:+t.Ordre||9999};
+      const share=a.budget*(n/totalNamed);
+      const row=byTeam.get(+t.id)||{
+        teamId:+t.id,
+        team:t.Nom||`Équipe #${t.id}`,
+        licenses:0,
+        budget:0,
+        order:+t.Ordre||9999
+      };
       row.licenses+=n;
       row.budget+=share;
       allocatedBudget+=share;
@@ -941,41 +966,46 @@ function domainTeamBudgetBreakdown(m,domainId){
   }
 
   const domainBudget=allocs.reduce((s,a)=>s+(+a.Budget_Total_USD||0),0);
-  const rows=[...byTeam.values()].sort((a,b)=>a.order-b.order||String(a.team).localeCompare(String(b.team),'fr'));
+  const scenarioLicenses=allocs.reduce((s,a)=>s+(+a.Nb_Licences||0),0);
+  const matchedNamed=[...preByOffer.entries()]
+    .filter(([oid])=>allocByOffer.has(oid))
+    .reduce((s,[,n])=>s+n,0);
+
   return{
     fiche,
-    rows,
+    rows:[...byTeam.values()].sort((a,b)=>a.order-b.order||String(a.team).localeCompare(String(b.team),'fr')),
     domainBudget,
     allocatedBudget,
     unallocatedBudget:Math.max(0,domainBudget-allocatedBudget),
-    modelLicenses,
+    scenarioLicenses,
     preSimLicenses:resources.length,
-    coverage:modelLicenses?Math.min(1,resources.length/modelLicenses):1
+    matchedNamed,
+    exactScenario:+fiche.Scenario_Reference===scenarioId
   };
 }
-function renderDomainTeamBudgetDetail(m,domainRow){
-  const x=domainTeamBudgetBreakdown(m,+domainRow.d.id);
-  if(!x||!x.rows.length)return '';
-  const rate=+m.rate||0;
-  const coveragePct=Math.round(x.coverage*100);
-  return `<tr class="domain-team-detail-row hidden" data-domain-team-detail="${domainRow.d.id}">
-    <td colspan="4">
-      <div class="domain-team-budget-detail">
-        <div class="domain-team-budget-head">
-          <div><strong>Répartition budgétaire par équipe</strong><small>Pré-simulation : ${esc(x.fiche.Nom||`#${x.fiche.id}`)} · ${x.preSimLicenses} licence(s) nominative(s)</small></div>
-          <span class="badge ${coveragePct>=100?'ok':'warn'}">Couverture licences : ${coveragePct}%</span>
-        </div>
-        <div class="tablewrap"><table class="domain-team-budget-table">
-          <thead><tr><th>Équipe</th><th>Licences pré-simulées</th><th>Budget réparti USD</th><th>Budget réparti EUR</th><th>Part du domaine</th></tr></thead>
-          <tbody>
-            ${x.rows.map(r=>`<tr><td><b>${esc(r.team)}</b></td><td class="num">${num(r.licenses)}</td><td class="num"><b>${money(r.budget)}</b></td><td class="num">${money(r.budget*rate,'EUR')}</td><td class="num">${pct(x.domainBudget?r.budget/x.domainBudget:0)}</td></tr>`).join('')}
-            <tr class="total"><td>TOTAL RÉPARTI</td><td class="num">${num(x.rows.reduce((s,r)=>s+r.licenses,0))}</td><td class="num">${money(x.allocatedBudget)}</td><td class="num">${money(x.allocatedBudget*rate,'EUR')}</td><td class="num">${pct(x.domainBudget?x.allocatedBudget/x.domainBudget:0)}</td></tr>
-          </tbody>
-        </table></div>
-        <p class="domain-team-budget-note">Le budget complet de chaque allocation d’offre (fixe + usage inclus + consommation supplémentaire) est réparti au prorata des licences nominatives de cette offre dans la pré-simulation.${x.unallocatedBudget>0.01?` <b>${money(x.unallocatedBudget)}</b> restent non répartis car la pré-simulation ne couvre pas tout le budget/licences du domaine.`:''}</p>
+function scenarioDomainTeamBudgetHtml(m,domainId){
+  const x=domainTeamBudgetBreakdown(m,+domainId);
+  if(!x||!x.rows.length)return "";
+  const coverage=x.scenarioLicenses?Math.min(1,x.matchedNamed/x.scenarioLicenses):1;
+  const coveragePct=Math.round(coverage*100);
+  return `<div class="scenario-team-budget">
+    <div class="scenario-team-budget-head">
+      <div>
+        <span class="domain-label">PRÉ-SIMULATION</span>
+        <h4>Répartition budgétaire par équipe</h4>
+        <p>${esc(x.fiche.Nom||`Pré-simulation #${x.fiche.id}`)} · ${x.preSimLicenses} ressource(s) nominative(s)${x.exactScenario?" · liée à ce scénario":" · dernière pré-simulation disponible pour ce domaine"}</p>
       </div>
-    </td>
-  </tr>`;
+      <span class="badge ${coveragePct>=100?'ok':'warn'}">Couverture : ${coveragePct}%</span>
+    </div>
+    <div class="tablewrap"><table class="scenario-team-budget-table">
+      <thead><tr><th>Équipe</th><th>Licences</th><th>Budget USD</th><th>Budget EUR</th><th>Part du domaine</th></tr></thead>
+      <tbody>
+        ${x.rows.map(r=>`<tr><td><b>${esc(r.team)}</b></td><td class="num">${num(r.licenses)}</td><td class="num"><b>${money(r.budget)}</b></td><td class="num">${money(r.budget*(+m.rate||0),'EUR')}</td><td class="num">${pct(x.domainBudget?r.budget/x.domainBudget:0)}</td></tr>`).join("")}
+        <tr class="total"><td>TOTAL RÉPARTI</td><td class="num">${num(x.rows.reduce((s,r)=>s+r.licenses,0))}</td><td class="num">${money(x.allocatedBudget)}</td><td class="num">${money(x.allocatedBudget*(+m.rate||0),'EUR')}</td><td class="num">${pct(x.domainBudget?x.allocatedBudget/x.domainBudget:0)}</td></tr>
+      </tbody>
+    </table></div>
+    <p class="scenario-team-budget-note">Répartition analytique : pour chaque offre du domaine, le budget complet du scénario est ventilé entre les équipes au prorata des licences nominatives de cette offre dans la pré-simulation.${x.unallocatedBudget>0.01?` <b>${money(x.unallocatedBudget)}</b> restent non répartis (offres ou licences non couvertes par la pré-simulation).`:""}</p>
+  </div>`;
 }
 
 function renderDashboard(){
@@ -989,7 +1019,7 @@ function renderDashboard(){
   const activeProvider=opts.providers.find(p=>+p.id===+DASH_FILTER.providerId);
   const domainSummary=activeDomains.length?activeDomains.map(d=>d.Nom).join(', '):'Tous les domaines';
   const filterSummary=[`Domaines : ${esc(domainSummary)}`,activeProvider?`Fournisseur : ${esc(activeProvider.Nom)}`:'Tous les fournisseurs'].join(' · ');
-  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><div class="field dash-domain-field"><span class="field-label">Domaines</span><div class="dash-domain-picker"><button id="dashDomainPickerBtn" class="btn secondary dash-domain-btn">${activeDomains.length?`${activeDomains.length} domaine(s) sélectionné(s)`:'Tous les domaines'} ▾</button><div id="dashDomainMenu" class="dash-domain-menu hidden"><div class="dash-domain-actions"><button id="dashAllDomains" class="mini-btn">Tous</button><button id="dashNoDomains" class="mini-btn">Aucun</button></div>${opts.domains.map(d=>`<label class="dash-domain-option"><input type="checkbox" data-dash-domain="${d.id}" ${selectedDomainSet.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></div></div><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><p>Lorsqu’une pré-simulation enregistrée contient des équipes, le détail permet de répartir le budget du domaine par équipe.</p><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>{const teamDetail=domainTeamBudgetBreakdown(m,+x.d.id);return `<tr><td><b>${esc(x.d.Nom)}</b>${teamDetail&&teamDetail.rows.length?` <button type="button" class="domain-team-toggle mini-btn" data-domain-team-toggle="${x.d.id}">Détail équipes ▾</button>`:''}</td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>${renderDomainTeamBudgetDetail(m,x)}`}).join('')}</tbody></table></div></article>`;
+  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><div class="field dash-domain-field"><span class="field-label">Domaines</span><div class="dash-domain-picker"><button id="dashDomainPickerBtn" class="btn secondary dash-domain-btn">${activeDomains.length?`${activeDomains.length} domaine(s) sélectionné(s)`:'Tous les domaines'} ▾</button><div id="dashDomainMenu" class="dash-domain-menu hidden"><div class="dash-domain-actions"><button id="dashAllDomains" class="mini-btn">Tous</button><button id="dashNoDomains" class="mini-btn">Aucun</button></div>${opts.domains.map(d=>`<label class="dash-domain-option"><input type="checkbox" data-dash-domain="${d.id}" ${selectedDomainSet.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></div></div><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;
   const pf=document.getElementById('dashProviderFilter'),reset=document.getElementById('dashResetFilters');
   const pickerBtn=document.getElementById('dashDomainPickerBtn'),menu=document.getElementById('dashDomainMenu');
   pickerBtn.onclick=e=>{e.stopPropagation();menu.classList.toggle('hidden')};
@@ -1009,14 +1039,6 @@ function renderDashboard(){
   };
   pf.onchange=()=>{DASH_FILTER.providerId=+pf.value||0;renderDashboard()};
   reset.onclick=()=>{DASH_FILTER={domainIds:[],providerId:0};renderDashboard()};
-  document.querySelectorAll("[data-domain-team-toggle]").forEach(btn=>btn.onclick=()=>{
-    const id=btn.dataset.domainTeamToggle;
-    const row=document.querySelector(`[data-domain-team-detail="${id}"]`);
-    if(!row)return;
-    const opening=row.classList.contains("hidden");
-    row.classList.toggle("hidden",!opening);
-    btn.textContent=opening?"Masquer équipes ▴":"Détail équipes ▾";
-  });
   renderCharts(m);scheduleUILabelApply();
 }
 function renderCharts(m){
@@ -1143,6 +1165,7 @@ function scenarioDetailRows(m){
     const p=D.providerById[o.Fournisseur]||{};
     const fixedBasis=fixedCostBasis(a,o);
     return {
+      domainId:+a.Domaine||0,
       domain:d.Nom||'Domaine',
       provider:p.Nom||'—',
       offer:o.Nom||'—',
@@ -1171,7 +1194,9 @@ function scenarioDomainGroups(m){
     (groups[r.domain]??=[]).push(r);
   }
   return Object.entries(groups).map(([domain,rows])=>({
-    domain,rows,
+    domain,
+    domainId:+rows[0]?.domainId||0,
+    rows,
     licenses:rows.reduce((s,r)=>s+r.licenses,0),
     fixed:rows.reduce((s,r)=>s+r.fixed,0),
     variable:rows.reduce((s,r)=>s+r.variable,0),
@@ -1311,6 +1336,7 @@ function scenarioDetailHtmlV36(m,printMode=false){
     <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
       <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}</div></div>
       <div class="tablewrap"><table class="detail-table"><thead><tr><th>${compareLabelV71("Fournisseur")}</th><th>${compareLabelV71("Offre")}</th><th>${compareLabelV71("Licences")}</th><th>${compareLabelV71("Prix forfait")}</th><th>${compareLabelV71("Base calcul fixe")}</th><th>${compareLabelV71("Engagement")}</th><th>${compareLabelV71("Mois facturés")}</th><th>${compareLabelV71("Fixe")}</th><th>${compareLabelV71("Variable")}</th><th>${compareLabelV71("Total")}</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?` <span class="badge warn">${compareLabelV71("À confirmer")}</span>`:''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' '+uiLabelValue("compare","mois"):'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">${compareLabelV71("Sous-total")} ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
+      ${g.domainId?scenarioDomainTeamBudgetHtml(m,g.domainId):""}
     </section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
     <div class="detail-grand-total"><div><span>${esc(uiLabelValue("compare","Total scénario"))}</span><small>${num(m.licenses)} ${compareLabelV71("licences")} · ${groups.length} ${compareLabelV71("domaines")}</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
   </div>`;
