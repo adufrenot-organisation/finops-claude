@@ -1579,38 +1579,48 @@ function offerDisplayName(offerId){
   const p=D.providerById[+o.Fournisseur];
   return `${p?.Nom||''} — ${o.Nom||''}`;
 }
-function preSimSummary(resources,teamById){
+function preSimPricingContext(fiche){
+  const scenario=D.scenarioById[+fiche?.Scenario_Reference]||{};
+  return {months:+scenario.Nb_Mois||12,rate:+scenario.Taux_USD_EUR||0};
+}
+function preSimOfferPrice(offer){
+  if(!offer)return {amount:0,period:'',source:'À confirmer',kind:'monthly'};
+  const monthly=[[+offer.Tarif_Negocie_Mensuel||0,'Négocié offre'],[+offer.Tarif_Reference_Mensuel||0,'Référence interne'],[+offer.Tarif_Catalogue_Mensuel||0,'Catalogue']].find(([v])=>v>0)||[0,'À confirmer'];
+  const annual=[[+offer.Tarif_Negocie_Annuel||0,'Négocié offre'],[+offer.Tarif_Reference_Annuel||0,'Référence interne'],[+offer.Tarif_Catalogue_Annuel||0,'Catalogue']].find(([v])=>v>0)||[0,'À confirmer'];
+  const periodicity=String(offer.Periodicite_Prix||'').toLowerCase();
+  if(periodicity.includes('annuel')||(!monthly[0]&&annual[0]))return {amount:annual[0],period:'an',source:annual[1],kind:'annual'};
+  return {amount:monthly[0],period:'mois',source:monthly[1],kind:'monthly'};
+}
+function preSimLicenseBudget(offer,count,fiche){
+  const price=preSimOfferPrice(offer),ctx=preSimPricingContext(fiche);
+  const total=price.kind==='annual'?price.amount*count*(ctx.months/12):price.amount*count*ctx.months;
+  return {...price,total,months:ctx.months,rate:ctx.rate,unresolved:!price.amount};
+}
+function preSimSummary(resources,teamById,fiche){
   const map=new Map();
   resources.filter(r=>r.Actif!==false).forEach(r=>{
-    const oid=effectivePreSimOfferId(r,teamById);
-    const offer=D.offerById[oid];if(!offer)return;
-    const provider=D.providerById[+offer.Fournisseur];
-    const key=String(offer.id);
-    const item=map.get(key)||{provider:provider?.Nom||'',offer:offer.Nom||'',count:0};
-    item.count++;map.set(key,item);
+    const oid=effectivePreSimOfferId(r,teamById),offer=D.offerById[oid];if(!offer)return;
+    const provider=D.providerById[+offer.Fournisseur],key=String(offer.id);
+    const item=map.get(key)||{offerId:+offer.id,provider:provider?.Nom||'',offer:offer.Nom||'',count:0,teamIds:new Set()};
+    item.count++;if(+r.Equipe)item.teamIds.add(+r.Equipe);map.set(key,item);
   });
-  return [...map.values()].sort((a,b)=>a.provider.localeCompare(b.provider,'fr')||a.offer.localeCompare(b.offer,'fr'));
+  return [...map.values()].map(x=>({...x,teams:x.teamIds.size,...preSimLicenseBudget(D.offerById[x.offerId],x.count,fiche)})).sort((a,b)=>a.provider.localeCompare(b.provider,'fr')||a.offer.localeCompare(b.offer,'fr'));
 }
-function preSimTeamSummary(resources,teams){
-  const teamById=Object.fromEntries(teams.filter(t=>!t.__draft).map(t=>[+t.id,t]));
-  const map=new Map();
+function preSimTeamSummary(resources,teams,fiche){
+  const teamById=Object.fromEntries(teams.filter(t=>!t.__draft).map(t=>[+t.id,t])),map=new Map();
   resources.filter(r=>r.Actif!==false).forEach(r=>{
-    const tid=+r.Equipe||0;
-    const team=teamById[tid];
-    const oid=effectivePreSimOfferId(r,teamById);
-    const o=D.offerById[oid],p=D.providerById[+o?.Fournisseur];
-    const key=`${tid}|${oid}`;
-    const item=map.get(key)||{
-      team:team?.Nom||'Sans équipe',
-      provider:p?.Nom||'—',
-      offer:o?.Nom||'Non affectée',
-      count:0,
-      teamOrder:+team?.Ordre||9999
-    };
+    const tid=+r.Equipe||0,team=teamById[tid],oid=effectivePreSimOfferId(r,teamById),o=D.offerById[oid],p=D.providerById[+o?.Fournisseur],key=`${tid}|${oid}`;
+    const item=map.get(key)||{teamId:tid,offerId:oid,team:team?.Nom||'Sans équipe',provider:p?.Nom||'—',offer:o?.Nom||'Non affectée',count:0,teamOrder:+team?.Ordre||9999};
     item.count++;map.set(key,item);
   });
-  return [...map.values()].sort((a,b)=>a.teamOrder-b.teamOrder||a.team.localeCompare(b.team,'fr')||a.offer.localeCompare(b.offer,'fr'));
+  return [...map.values()].map(x=>({...x,...preSimLicenseBudget(D.offerById[x.offerId],x.count,fiche)})).sort((a,b)=>a.teamOrder-b.teamOrder||a.team.localeCompare(b.team,'fr')||a.offer.localeCompare(b.offer,'fr'));
 }
+function preSimTeamBudgets(teamSummary){
+  const map=new Map();
+  for(const x of teamSummary){const k=String(x.teamId),v=map.get(k)||{teamId:x.teamId,team:x.team,licenses:0,total:0,unresolved:0,teamOrder:x.teamOrder};v.licenses+=x.count;v.total+=x.total;if(x.unresolved)v.unresolved++;map.set(k,v)}
+  return [...map.values()].sort((a,b)=>a.teamOrder-b.teamOrder||a.team.localeCompare(b.team,'fr'));
+}
+function preSimBudgetMoney(x,rate){return x?`${money(x)}${rate?` <small class="presim-eur">≈ ${money(x*rate,'EUR')}</small>`:''}`:'—'}
 function preSimMatchesForScenarioDomain(scenarioId,domainId){
   return scopedPreSimulations()
     .filter(p=>+p.Scenario_Reference===+scenarioId && +p.Domaine===+domainId)
@@ -1719,7 +1729,7 @@ async function savePreSimRightsV62(){
 function presimHtmlDocumentV62(fiche){
   if(!preSimCanView(fiche))return '';
   const teams=preSimCurrentTeams(fiche),resources=preSimCurrentResources(fiche),teamById=preSimTeamById(fiche);
-  const teamSummary=preSimTeamSummary(resources,teams),summary=preSimSummary(resources,teamById);
+  const teamSummary=preSimTeamSummary(resources,teams,fiche),summary=preSimSummary(resources,teamById,fiche),teamBudgets=preSimTeamBudgets(teamSummary),pricing=preSimPricingContext(fiche);
   const domain=D.domainById[+fiche.Domaine]?.Nom||'';
   const scenario=D.scenarioById[+fiche.Scenario_Reference]?.Nom||'Aucun';
   const resp=rightUserEmail(+fiche.Responsable_User)||fiche.Responsable_Email||'—';
@@ -1733,8 +1743,8 @@ function presimHtmlDocumentV62(fiche){
   <main class="page"><div class="hero"><div><small>FINOPS IA · PRÉ-SIMULATION NOMINATIVE</small><h1>${esc(fiche.Nom)}</h1><div class="meta"><span>Domaine : ${esc(domain)}</span><span>Scénario : ${esc(scenario)}</span><span>${esc(uiLabelValue("presim","Auteur"))} : ${esc(resp)}</span><span>Statut : ${esc(fiche.Statut||'')}</span></div></div><div>Édité le ${new Date().toLocaleDateString('fr-FR')}</div></div>
   <section class="section"><h2>${esc(uiLabelValue("presim","Équipes"))}</h2><table><thead><tr><th>Équipe</th><th>Plan par défaut</th><th>Ressources actives</th></tr></thead><tbody>${teams.filter(t=>t.Actif!==false).map(t=>`<tr><td><b>${esc(t.Nom||'')}</b></td><td>${esc(offerDisplayName(t.Offre_Defaut))}</td><td class="num">${resources.filter(r=>r.Actif!==false&&+r.Equipe===+t.id).length}</td></tr>`).join('')||'<tr><td colspan="3">Aucune équipe</td></tr>'}</tbody></table></section>
   <section class="section"><h2>${esc(uiLabelValue("presim","Ressources nominatives"))}</h2><table><thead><tr><th>Ressource</th><th>Profil</th><th>Équipe</th><th>Plan individuel</th><th>Plan effectif</th><th>Commentaire</th></tr></thead><tbody>${resourceRows||'<tr><td colspan="6">Aucune ressource active</td></tr>'}</tbody></table></section>
-  <section class="section"><h2>${esc(uiLabelValue("presim","Synthèse par équipe"))}</h2><table><thead><tr><th>Équipe</th><th>Fournisseur</th><th>Plan</th><th>Ressources</th></tr></thead><tbody>${teamSummary.map(x=>`<tr><td>${esc(x.team)}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join('')||'<tr><td colspan="4">Aucune donnée</td></tr>'}</tbody></table></section>
-  <section class="section"><h2>${esc(uiLabelValue("presim","Synthèse consolidée des licences"))}</h2><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th></tr></thead><tbody>${summary.map(x=>`<tr><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join('')||'<tr><td colspan="3">Aucune donnée</td></tr>'}</tbody></table></section>
+  <section class="section"><h2>${esc(uiLabelValue("presim","Synthèse par équipe"))}</h2><table><thead><tr><th>Équipe</th><th>Fournisseur</th><th>Plan</th><th>Licences</th><th>Prix unitaire</th><th>Budget offre / équipe</th></tr></thead><tbody>${teamSummary.map(x=>`<tr><td>${esc(x.team)}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td><td class="num">${x.amount?money(x.amount)+' / '+esc(x.period):'À confirmer'}</td><td class="num"><b>${x.unresolved?'À confirmer':preSimBudgetMoney(x.total,pricing.rate)}</b></td></tr>`).join('')||'<tr><td colspan="6">Aucune donnée</td></tr>'}</tbody></table><h3>Budget global par équipe</h3><table><thead><tr><th>Équipe</th><th>Licences</th><th>Budget global</th></tr></thead><tbody>${teamBudgets.map(x=>`<tr><td><b>${esc(x.team)}</b></td><td class="num">${x.licenses}</td><td class="num"><b>${x.unresolved?'Partiellement à confirmer':preSimBudgetMoney(x.total,pricing.rate)}</b></td></tr>`).join('')||'<tr><td colspan="3">Aucune donnée</td></tr>'}</tbody></table></section>
+  <section class="section"><h2>${esc(uiLabelValue("presim","Synthèse consolidée des licences"))}</h2><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Équipes</th><th>Licences</th><th>Prix unitaire</th><th>Budget offre</th></tr></thead><tbody>${summary.map(x=>`<tr><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num">${x.teams}</td><td class="num"><b>${x.count}</b></td><td class="num">${x.amount?money(x.amount)+' / '+esc(x.period):'À confirmer'}</td><td class="num"><b>${x.unresolved?'À confirmer':preSimBudgetMoney(x.total,pricing.rate)}</b></td></tr>`).join('')||'<tr><td colspan="6">Aucune donnée</td></tr>'}</tbody></table></section>
   <div class="sig">FinOps IA — Réalisé par Alex Dufrenot</div></main>`;
   const js=`const F=${JSON.stringify(filename)};document.getElementById('print').onclick=()=>window.print();document.getElementById('save').onclick=()=>{const b=new Blob(['<!doctype html>\\n'+document.documentElement.outerHTML],{type:'text/html;charset=utf-8'}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=F;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)};`;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(fiche.Nom)}</title><style>${css}</style></head><body>${body}<script>${js}<\/script></body></html>`;
@@ -1763,8 +1773,9 @@ function renderPreSimulation(){
   const teams=preSimCurrentTeams(fiche);
   const resources=preSimCurrentResources(fiche);
   const teamById=preSimTeamById(fiche);
-  const summary=preSimSummary(resources,teamById);
-  const teamSummary=preSimTeamSummary(resources,teams);
+  const summary=preSimSummary(resources,teamById,fiche);
+  const teamSummary=preSimTeamSummary(resources,teams,fiche);
+  const teamBudgets=preSimTeamBudgets(teamSummary),pricing=preSimPricingContext(fiche);
 
   const ficheOptions=fiches.map(x=>`<option value="${x.id}" ${!PRESIM_DRAFT&&+x.id===+fiche.id?'selected':''}>${esc(x.Nom||'Sans nom')} — ${esc(D.domainById[+x.Domaine]?.Nom||'')}</option>`).join('');
   const domainOptions=scopedDomains().map(d=>`<option value="${d.id}" ${+fiche.Domaine===+d.id?'selected':''}>${esc(d.Nom||'')}</option>`).join('');
@@ -1847,16 +1858,17 @@ function renderPreSimulation(){
   </article>
 
   <article class="card">
-    <div class="cardhead"><div><h3>Synthèse par équipe</h3><p>Récapitulatif des ressources actives et de leur plan effectif au sein du domaine.</p></div></div>
-    <div class="tablewrap"><table><thead><tr><th>Équipe</th><th>Fournisseur</th><th>Plan / offre effective</th><th>Ressources</th></tr></thead>
-      <tbody>${teamSummary.length?teamSummary.map(x=>`<tr><td><span class="team-summary-name"><span class="team-dot"></span><b>${esc(x.team)}</b></span></td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join(''):'<tr><td colspan="4">Aucune ressource active pour le moment.</td></tr>'}</tbody>
+    <div class="cardhead"><div><h3>Synthèse par équipe</h3><p>Licences, coût par offre et budget global de chaque équipe. Budget calculé sur ${pricing.months} mois${fiche.Scenario_Reference?' selon le scénario de référence':' (12 mois par défaut)'}.</p></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Équipe</th><th>Fournisseur</th><th>Plan / offre effective</th><th>Licences</th><th>Prix unitaire</th><th>Budget offre / équipe</th></tr></thead>
+      <tbody>${teamSummary.length?teamSummary.map(x=>`<tr><td><span class="team-summary-name"><span class="team-dot"></span><b>${esc(x.team)}</b></span></td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td><td class="num">${x.amount?`${money(x.amount)}<small class="presim-price-period">/ licence / ${esc(x.period)}</small><small class="presim-price-source">${esc(x.source)}</small>`:'<span class="badge warn">À confirmer</span>'}</td><td class="num"><b>${x.unresolved?'À confirmer':preSimBudgetMoney(x.total,pricing.rate)}</b></td></tr>`).join(''):'<tr><td colspan="6">Aucune ressource active pour le moment.</td></tr>'}</tbody>
     </table></div>
+    <div class="presim-team-budget-grid">${teamBudgets.map(x=>`<div class="presim-team-budget"><span>${esc(x.team)}</span><small>${x.licenses} licence(s)</small><b>${x.unresolved?'Budget partiel · tarif à confirmer':preSimBudgetMoney(x.total,pricing.rate)}</b></div>`).join('')}</div>
   </article>
 
   <article class="card">
-    <div class="cardhead"><div><h3>Synthèse des licences nominatives</h3><p>Comptage consolidé des plans effectifs de la fiche, toutes équipes confondues.</p></div></div>
-    <div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Licences nominatives</th></tr></thead>
-      <tbody>${summary.length?summary.map(x=>`<tr><td>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num"><b>${x.count}</b></td></tr>`).join(''):'<tr><td colspan="4">Aucun plan effectif pour le moment.</td></tr>'}</tbody>
+    <div class="cardhead"><div><h3>Synthèse des licences nominatives</h3><p>Consolidation par offre : équipes concernées, licences et budget prévisionnel.</p></div></div>
+    <div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Fournisseur</th><th>Offre</th><th>Équipes</th><th>Licences</th><th>Prix unitaire</th><th>Budget offre</th></tr></thead>
+      <tbody>${summary.length?summary.map(x=>`<tr><td>${esc(D.domainById[+fiche.Domaine]?.Nom||'')}</td><td>${esc(x.provider)}</td><td>${esc(x.offer)}</td><td class="num">${x.teams}</td><td class="num"><b>${x.count}</b></td><td class="num">${x.amount?`${money(x.amount)}<small class="presim-price-period">/ licence / ${esc(x.period)}</small><small class="presim-price-source">${esc(x.source)}</small>`:'<span class="badge warn">À confirmer</span>'}</td><td class="num"><b>${x.unresolved?'À confirmer':preSimBudgetMoney(x.total,pricing.rate)}</b></td></tr>`).join(''):'<tr><td colspan="7">Aucun plan effectif pour le moment.</td></tr>'}</tbody>
     </table></div>
   </article>`;
 

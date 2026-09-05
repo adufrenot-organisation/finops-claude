@@ -994,3 +994,6 @@ textarea{
     grid-template-columns:1fr;
   }
 }
+
+/* V72 — budgets pré-simulation par offre et équipe */
+.presim-team-budget-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-top:14px}.presim-team-budget{border:1px solid #e1e7ef;border-radius:12px;padding:12px;background:#f8fafc;display:flex;flex-direction:column;gap:3px}.presim-team-budget span{font-weight:800}.presim-team-budget small,.presim-price-period,.presim-price-source,.presim-eur{display:block;color:#667085;font-size:11px}.presim-team-budget b{margin-top:5px;font-size:15px}.presim-eur{font-weight:600}
