@@ -1648,6 +1648,12 @@ function scenarioHtmlDocumentV41(m){
     }
     .domain-totals-html{grid-template-columns:auto!important}
 
+
+    /* V92 — ROI annuel : rectangle autonome */
+    .domain-roi-heading{margin:14px 14px 0!important;padding:13px 16px 11px!important;background:var(--soft)!important;border:1px solid var(--line)!important;border-bottom:0!important;border-radius:12px 12px 0 0!important}
+    .domain-roi-strip{margin:0 14px 14px!important;padding:0!important;border:1px solid var(--line)!important;border-top:1px solid var(--line)!important;border-radius:0 0 12px 12px!important;overflow:hidden!important;box-shadow:0 1px 2px rgba(16,33,62,.04)}
+    .domain-roi-strip>div{padding:14px 16px!important}
+
     /* V89 — ROI domaine horizontal */
     .domain-roi-strip{
       display:grid!important;
@@ -1887,6 +1893,12 @@ function synthesisHtmlDocumentV42(ms){
       display:none!important;
     }
     .domain-totals-html{grid-template-columns:auto!important}
+
+
+    /* V92 — ROI annuel : rectangle autonome */
+    .domain-roi-heading{margin:14px 14px 0!important;padding:13px 16px 11px!important;background:var(--soft)!important;border:1px solid var(--line)!important;border-bottom:0!important;border-radius:12px 12px 0 0!important}
+    .domain-roi-strip{margin:0 14px 14px!important;padding:0!important;border:1px solid var(--line)!important;border-top:1px solid var(--line)!important;border-radius:0 0 12px 12px!important;overflow:hidden!important;box-shadow:0 1px 2px rgba(16,33,62,.04)}
+    .domain-roi-strip>div{padding:14px 16px!important}
 
     /* V89 — ROI domaine horizontal */
     .domain-roi-strip{
