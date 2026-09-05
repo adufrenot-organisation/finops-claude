@@ -1342,7 +1342,7 @@ function drawCompare(){
   out.querySelectorAll('[data-open-scenario]').forEach(x=>x.onclick=()=>openScenarioDetailV36(+x.dataset.openScenario));
 }
 
-function scenarioBudgetViewsV67(m){
+function scenarioBudgetViewsV67(m,htmlMode=false){
   const domainRows=Object.values(m.bd||{})
     .filter(x=>(+x.total||0)>0)
     .sort((a,b)=>(+b.total||0)-(+a.total||0));
@@ -1360,13 +1360,15 @@ function scenarioBudgetViewsV67(m){
       ${domainRows.length?domainRows.map(x=>{
         const total=+x.total||0,eur=total*(+m.rate||0);
         const share=m.total?total/m.total:0;
+        const detailId=`domain-detail-${+x.d?.id||0}`;
         return `<div class="detail-domain-budget-row">
           <div class="detail-domain-budget-label"><b>${esc(x.d?.Nom||'')}</b><span>${pct(share)}</span></div>
           <div class="detail-domain-budget-track"><span style="width:${Math.max(1,total/domainMax*100)}%"></span></div>
           <div class="detail-domain-budget-values">
             ${synthesisMoneyV64(total,m.rate,{strong:true})}
-            <small class="domain-annual-equivalent">Coût équiv. annuel : <b>${money(+x.budgetAnnualized||0,'EUR')}</b> ${roiTip("Coût d'achat des licences ramené sur 12 mois.")}</small>
+            <small class="domain-annual-equivalent"><span>Coût équiv. annuel</span><b>${money(+x.budgetAnnualized||0,'EUR')}</b></small>
           </div>
+          ${htmlMode?`<button type="button" class="domain-summary-link no-print" data-open-domain="${detailId}">Voir détail</button>`:''}
         </div>`;
       }).join(''):`<div class="empty-state">${esc(uiLabelValue("compare","Aucun budget par domaine."))}</div>`}
     </div>
@@ -1464,13 +1466,12 @@ function scenarioDetailHtmlV36(m,printMode=false){
       <div><span>${esc(uiLabelValue("compare","Coûts fixes"))}</span>${synthesisMoneyV64(m.fixed,m.rate,{strong:true})}</div>
       <div><span>${esc(uiLabelValue("compare","Coûts variables"))}</span>${synthesisMoneyV64(m.over,m.rate,{strong:true})}</div>
       <div><span>${esc(uiLabelValue("compare","Budget EUR"))}</span><b>${money(m.total*m.rate,'EUR')}</b></div>
-      <div><span>ROI / gain %</span><b class="${roi.roiPct<0?'negative':''}">${pct(roi.roiPct)}</b></div>
     </div>
-    <div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>${compareLabelV71("Lecture du coût fixe")}</b><p>${compareLabelV71("Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.")}</p></div></div>
-    ${scenarioBudgetViewsV67(m)}
-    <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${esc(uiLabelValue("compare","Offres, licences, coûts annuels et ROI. Le détail par équipe n'apparaît que lorsqu'une pré-simulation du domaine contient effectivement des équipes ; le niveau Service reste conditionné à la présence de services dans cette pré-simulation."))}</p></div></div>
-    <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
-      <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}<span class="domain-annual-kpi">Coût équivalent annuel ${roiTip("Coût d'achat des licences ramené sur 12 mois.")} <b>${money(g.annualEquivalentEUR,'EUR')}</b></span></div></div>
+    ${printMode?`<details class="pricing-explainer pricing-details"><summary>${compareLabelV71("Comment est calculé le coût fixe ?")}</summary><div class="pricing-details-content"><p>${compareLabelV71("Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.")}</p></div></details>`:`<div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>${compareLabelV71("Lecture du coût fixe")}</b><p>${compareLabelV71("Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.")}</p></div></div>`}
+    ${scenarioBudgetViewsV67(m,printMode)}
+    <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${printMode?"Chaque domaine est compact par défaut. Ouvre le détail pour voir les offres, les licences, le ROI et, lorsqu'elle existe, la répartition par équipe.":esc(uiLabelValue("compare","Offres, licences, coûts annuels et ROI."))}</p></div></div>
+    <div class="domain-detail-list">${groups.length?groups.map(g=>`<section id="domain-detail-${g.domainId}" class="domain-detail-card ${printMode?'is-collapsed':''}">
+      <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}<span class="domain-annual-kpi"><span>Coût équivalent annuel</span><b>${money(g.annualEquivalentEUR,'EUR')}</b></span>${printMode?`<button type="button" class="domain-toggle no-print" data-target="domain-detail-${g.domainId}" aria-expanded="false">Voir le détail</button>`:''}</div></div><div class="domain-detail-body">
       ${(()=>{const dr=roiRhDomainAggregateV85(m,g.domainId);return `<div class="domain-roi-strip">
         <div><span>RH N-1</span><b>${money(dr.n1,'EUR')}</b></div>
         <div><span>RH N</span><b>${money(dr.n,'EUR')}</b></div>
@@ -1481,7 +1482,7 @@ function scenarioDetailHtmlV36(m,printMode=false){
       </div>`})()}
       <div class="tablewrap"><table class="detail-table"><thead><tr><th>${compareLabelV71("Fournisseur")}</th><th>${compareLabelV71("Offre")}</th><th>${compareLabelV71("Licences")}</th><th>${compareLabelV71("Prix forfait")}</th><th>${compareLabelV71("Base calcul fixe")}</th><th>${compareLabelV71("Engagement")}</th><th>${compareLabelV71("Mois facturés")}</th><th>${compareLabelV71("Fixe")}</th><th>${compareLabelV71("Variable")}</th><th>${compareLabelV71("Total")}</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?` <span class="badge warn">${compareLabelV71("À confirmer")}</span>`:''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' '+uiLabelValue("compare","mois"):'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">${compareLabelV71("Sous-total")} ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
       ${g.domainId?scenarioDomainTeamBudgetHtml(m,g.domainId):""}
-    </section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
+    </div></section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
     <div class="detail-grand-total"><div><span>${esc(uiLabelValue("compare","Total scénario"))}</span><small>${num(m.licenses)} ${compareLabelV71("licences")} · ${groups.length} ${compareLabelV71("domaines")}</small></div><div><b>${money(m.total)}</b><span>${money(m.total*m.rate,'EUR')}</span></div></div>
   </div>`;
 }
@@ -1517,6 +1518,41 @@ function scenarioHtmlDocumentV41(m){
     <footer class="report-publisher">${esc(uiLabelValue("compare","Éditeur de l’outil"))} : <b>Alex Dufrenot</b></footer></main>`;
   const screenCss=`
     body{background:#eef2f7;padding:0 0 36px;font-size:12px}
+
+    :root{--navy:#10213e;--ink:#172033;--muted:#667085;--line:#e4e7ec;--soft:#f8fafc;--violet:#635bdb;--violet-soft:#f4f3ff}
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink)}
+    .html-report-toolbar{padding:14px 24px}
+    .html-report-page{width:min(1360px,calc(100% - 32px));padding:28px}
+    .print-cover{align-items:center;margin-bottom:22px;padding-bottom:16px}.print-cover h1{font-size:28px;letter-spacing:-.02em}
+    .detail-hero{padding:22px 24px;border:1px solid #e2e7f0;background:linear-gradient(135deg,#f7f8ff,#fff)}
+    .detail-meta span{padding:5px 9px}.detail-total small{margin-bottom:7px}.detail-total strong{font-size:28px;margin:0 0 6px}
+    .scenario-roi-summary{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff;margin:0 0 14px}
+    .scenario-roi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+    .scenario-roi-kpi{display:flex;flex-direction:column;gap:7px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}
+    .scenario-roi-kpi span{font-size:10px;color:var(--muted)}.scenario-roi-kpi b{font-size:14px}.scenario-roi-kpi.roi-primary-kpi{background:var(--violet-soft);border-color:#ddd8ff}
+    .detail-kpis{grid-template-columns:repeat(3,1fr);margin:10px 0 16px}.detail-kpis>div{display:flex;flex-direction:column;gap:7px}
+    .pricing-details{display:block;border:1px solid var(--line);border-radius:10px;padding:0;background:#fff;margin:0 0 16px}
+    .pricing-details summary{cursor:pointer;padding:10px 12px;font-weight:700;color:#344054;list-style:none}.pricing-details summary::-webkit-details-marker{display:none}
+    .pricing-details summary:after{content:"+";float:right;color:var(--violet);font-size:16px}.pricing-details[open] summary:after{content:"–"}
+    .pricing-details-content{padding:0 12px 12px;color:var(--muted);line-height:1.5}
+    .detail-budget-grid{grid-template-columns:minmax(0,.95fr) minmax(0,1.35fr);gap:14px}.detail-budget-card{padding:14px;border-radius:12px}
+    .detail-domain-budget{gap:4px}.detail-domain-budget-row{grid-template-columns:minmax(115px,.9fr) minmax(120px,1.2fr) minmax(170px,.95fr) auto;gap:12px;padding:10px 4px;border-top:1px solid #edf0f4}
+    .detail-domain-budget-row:first-child{border-top:0}.detail-domain-budget-label{align-items:center;column-gap:12px}.detail-domain-budget-label b{margin-right:8px}
+    .detail-domain-budget-values{display:flex;flex-direction:column;align-items:flex-end;gap:7px;line-height:1.25}.domain-annual-equivalent{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:2px;color:var(--muted);font-size:9px}
+    .domain-summary-link,.domain-toggle{border:1px solid #d7ddea;background:#fff;color:#344054;border-radius:8px;padding:7px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .domain-summary-link:hover,.domain-toggle:hover{border-color:#b9b1ff;background:var(--violet-soft);color:#4e45c7}
+    .detail-section-title{margin:22px 0 10px}.detail-section-title>span{font-size:16px}.detail-section-title h3{font-size:17px;margin-bottom:4px}.detail-section-title p{max-width:850px;line-height:1.5}
+    .domain-detail-card{border-radius:14px;margin-bottom:10px;overflow:hidden;background:#fff}.domain-detail-head{align-items:center;padding:14px 16px;margin-bottom:0;background:#fbfcfe}
+    .domain-detail-head h3{font-size:18px}.domain-totals{display:grid;grid-template-columns:auto auto auto auto;align-items:center;column-gap:18px;row-gap:7px;text-align:right}.domain-totals>span{padding:0 4px}
+    .domain-annual-kpi{display:inline-flex!important;align-items:center;gap:8px;font-size:10px;padding:5px 8px;border-radius:8px;background:var(--violet-soft)}.domain-annual-kpi b{margin-left:4px}
+    .domain-detail-body{display:block}.domain-detail-card.is-collapsed .domain-detail-body{display:none}.domain-detail-card:not(.is-collapsed){box-shadow:0 10px 26px rgba(16,33,62,.07)}
+    .domain-roi-strip{padding:12px 14px 2px;grid-template-columns:repeat(6,minmax(0,1fr))}.domain-roi-strip>div{display:flex;flex-direction:column;gap:7px;background:#fff}
+    .synth-money{gap:4px}.scenario-team-total-card{display:flex;flex-direction:column;gap:6px}.scenario-team-budget-note{display:none}
+    .detail-grand-total>div:last-child{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+    @media(max-width:1100px){.scenario-roi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.detail-budget-grid{grid-template-columns:1fr}.domain-roi-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:760px){.scenario-roi-grid,.domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.detail-domain-budget-row{grid-template-columns:1fr}.detail-domain-budget-values{align-items:flex-start}.domain-annual-equivalent{justify-content:flex-start}.domain-totals{grid-template-columns:1fr;text-align:left}}
+    @media print{.domain-detail-card.is-collapsed .domain-detail-body{display:block!important}.domain-toggle,.domain-summary-link{display:none!important}.pricing-details:not([open]) .pricing-details-content{display:block!important}}
+
     .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
     .html-report-toolbar>div:first-child{display:flex;flex-direction:column;gap:2px}.html-report-toolbar span{font-size:11px;color:#cbd5e1}
     .html-report-actions{display:flex;gap:8px;flex-wrap:wrap}.html-report-actions button{border:0;border-radius:9px;padding:9px 13px;font-weight:700;cursor:pointer}.html-report-actions button:first-child{background:#fff;color:#10213e}.html-report-actions button:last-child{background:#635bdb;color:#fff}
@@ -1534,6 +1570,21 @@ function scenarioHtmlDocumentV41(m){
       const a=document.createElement('a');a.href=url;a.download=REPORT_FILENAME;document.body.appendChild(a);a.click();a.remove();
       setTimeout(()=>URL.revokeObjectURL(url),1500);
     });
+    function setDomainOpen(card,open){
+      if(!card)return;
+      card.classList.toggle('is-collapsed',!open);
+      const btn=card.querySelector('.domain-toggle');
+      if(btn){btn.textContent=open?'Masquer le détail':'Voir le détail';btn.setAttribute('aria-expanded',open?'true':'false');}
+    }
+    document.querySelectorAll('.domain-toggle').forEach(btn=>btn.addEventListener('click',()=>{
+      const card=document.getElementById(btn.dataset.target);
+      setDomainOpen(card,card?.classList.contains('is-collapsed'));
+    }));
+    document.querySelectorAll('[data-open-domain]').forEach(btn=>btn.addEventListener('click',()=>{
+      const card=document.getElementById(btn.dataset.openDomain);
+      setDomainOpen(card,true);
+      card?.scrollIntoView({behavior:'smooth',block:'start'});
+    }));
   `;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(reportTitle)}</title><style>${PRINT_CSS_V36}${screenCss}</style></head><body>${body}<script>${js}<\/script></body></html>`;
 }
@@ -1581,6 +1632,41 @@ function synthesisHtmlDocumentV42(ms){
 
   const screenCss=`
     body{background:#eef2f7;padding:0 0 36px;font-size:12px}
+
+    :root{--navy:#10213e;--ink:#172033;--muted:#667085;--line:#e4e7ec;--soft:#f8fafc;--violet:#635bdb;--violet-soft:#f4f3ff}
+    body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink)}
+    .html-report-toolbar{padding:14px 24px}
+    .html-report-page{width:min(1360px,calc(100% - 32px));padding:28px}
+    .print-cover{align-items:center;margin-bottom:22px;padding-bottom:16px}.print-cover h1{font-size:28px;letter-spacing:-.02em}
+    .detail-hero{padding:22px 24px;border:1px solid #e2e7f0;background:linear-gradient(135deg,#f7f8ff,#fff)}
+    .detail-meta span{padding:5px 9px}.detail-total small{margin-bottom:7px}.detail-total strong{font-size:28px;margin:0 0 6px}
+    .scenario-roi-summary{border:1px solid var(--line);border-radius:14px;padding:16px;background:#fff;margin:0 0 14px}
+    .scenario-roi-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+    .scenario-roi-kpi{display:flex;flex-direction:column;gap:7px;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--soft)}
+    .scenario-roi-kpi span{font-size:10px;color:var(--muted)}.scenario-roi-kpi b{font-size:14px}.scenario-roi-kpi.roi-primary-kpi{background:var(--violet-soft);border-color:#ddd8ff}
+    .detail-kpis{grid-template-columns:repeat(3,1fr);margin:10px 0 16px}.detail-kpis>div{display:flex;flex-direction:column;gap:7px}
+    .pricing-details{display:block;border:1px solid var(--line);border-radius:10px;padding:0;background:#fff;margin:0 0 16px}
+    .pricing-details summary{cursor:pointer;padding:10px 12px;font-weight:700;color:#344054;list-style:none}.pricing-details summary::-webkit-details-marker{display:none}
+    .pricing-details summary:after{content:"+";float:right;color:var(--violet);font-size:16px}.pricing-details[open] summary:after{content:"–"}
+    .pricing-details-content{padding:0 12px 12px;color:var(--muted);line-height:1.5}
+    .detail-budget-grid{grid-template-columns:minmax(0,.95fr) minmax(0,1.35fr);gap:14px}.detail-budget-card{padding:14px;border-radius:12px}
+    .detail-domain-budget{gap:4px}.detail-domain-budget-row{grid-template-columns:minmax(115px,.9fr) minmax(120px,1.2fr) minmax(170px,.95fr) auto;gap:12px;padding:10px 4px;border-top:1px solid #edf0f4}
+    .detail-domain-budget-row:first-child{border-top:0}.detail-domain-budget-label{align-items:center;column-gap:12px}.detail-domain-budget-label b{margin-right:8px}
+    .detail-domain-budget-values{display:flex;flex-direction:column;align-items:flex-end;gap:7px;line-height:1.25}.domain-annual-equivalent{display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:2px;color:var(--muted);font-size:9px}
+    .domain-summary-link,.domain-toggle{border:1px solid #d7ddea;background:#fff;color:#344054;border-radius:8px;padding:7px 10px;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
+    .domain-summary-link:hover,.domain-toggle:hover{border-color:#b9b1ff;background:var(--violet-soft);color:#4e45c7}
+    .detail-section-title{margin:22px 0 10px}.detail-section-title>span{font-size:16px}.detail-section-title h3{font-size:17px;margin-bottom:4px}.detail-section-title p{max-width:850px;line-height:1.5}
+    .domain-detail-card{border-radius:14px;margin-bottom:10px;overflow:hidden;background:#fff}.domain-detail-head{align-items:center;padding:14px 16px;margin-bottom:0;background:#fbfcfe}
+    .domain-detail-head h3{font-size:18px}.domain-totals{display:grid;grid-template-columns:auto auto auto auto;align-items:center;column-gap:18px;row-gap:7px;text-align:right}.domain-totals>span{padding:0 4px}
+    .domain-annual-kpi{display:inline-flex!important;align-items:center;gap:8px;font-size:10px;padding:5px 8px;border-radius:8px;background:var(--violet-soft)}.domain-annual-kpi b{margin-left:4px}
+    .domain-detail-body{display:block}.domain-detail-card.is-collapsed .domain-detail-body{display:none}.domain-detail-card:not(.is-collapsed){box-shadow:0 10px 26px rgba(16,33,62,.07)}
+    .domain-roi-strip{padding:12px 14px 2px;grid-template-columns:repeat(6,minmax(0,1fr))}.domain-roi-strip>div{display:flex;flex-direction:column;gap:7px;background:#fff}
+    .synth-money{gap:4px}.scenario-team-total-card{display:flex;flex-direction:column;gap:6px}.scenario-team-budget-note{display:none}
+    .detail-grand-total>div:last-child{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+    @media(max-width:1100px){.scenario-roi-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.detail-budget-grid{grid-template-columns:1fr}.domain-roi-strip{grid-template-columns:repeat(3,minmax(0,1fr))}}
+    @media(max-width:760px){.scenario-roi-grid,.domain-roi-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.detail-domain-budget-row{grid-template-columns:1fr}.detail-domain-budget-values{align-items:flex-start}.domain-annual-equivalent{justify-content:flex-start}.domain-totals{grid-template-columns:1fr;text-align:left}}
+    @media print{.domain-detail-card.is-collapsed .domain-detail-body{display:block!important}.domain-toggle,.domain-summary-link{display:none!important}.pricing-details:not([open]) .pricing-details-content{display:block!important}}
+
     .html-report-toolbar{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:16px;padding:12px 18px;background:#10213e;color:#fff;box-shadow:0 5px 18px rgba(15,23,42,.18)}
     .html-report-toolbar>div:first-child{display:flex;flex-direction:column;gap:2px}.html-report-toolbar span{font-size:11px;color:#cbd5e1}
     .html-report-actions{display:flex;gap:8px;flex-wrap:wrap}.html-report-actions button{border:0;border-radius:9px;padding:9px 13px;font-weight:700;cursor:pointer}.html-report-actions button:first-child{background:#fff;color:#10213e}.html-report-actions button:last-child{background:#635bdb;color:#fff}
@@ -1598,6 +1684,21 @@ function synthesisHtmlDocumentV42(ms){
       const a=document.createElement('a');a.href=url;a.download=REPORT_FILENAME;document.body.appendChild(a);a.click();a.remove();
       setTimeout(()=>URL.revokeObjectURL(url),1500);
     });
+    function setDomainOpen(card,open){
+      if(!card)return;
+      card.classList.toggle('is-collapsed',!open);
+      const btn=card.querySelector('.domain-toggle');
+      if(btn){btn.textContent=open?'Masquer le détail':'Voir le détail';btn.setAttribute('aria-expanded',open?'true':'false');}
+    }
+    document.querySelectorAll('.domain-toggle').forEach(btn=>btn.addEventListener('click',()=>{
+      const card=document.getElementById(btn.dataset.target);
+      setDomainOpen(card,card?.classList.contains('is-collapsed'));
+    }));
+    document.querySelectorAll('[data-open-domain]').forEach(btn=>btn.addEventListener('click',()=>{
+      const card=document.getElementById(btn.dataset.openDomain);
+      setDomainOpen(card,true);
+      card?.scrollIntoView({behavior:'smooth',block:'start'});
+    }));
   `;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(reportTitle)}</title><style>${PRINT_CSS_V36}${screenCss}</style></head><body>${body}<script>${js}<\/script></body></html>`;
 }
