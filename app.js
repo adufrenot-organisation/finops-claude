@@ -890,7 +890,7 @@ function renderDashboard(){
   const activeProvider=opts.providers.find(p=>+p.id===+DASH_FILTER.providerId);
   const domainSummary=activeDomains.length?activeDomains.map(d=>d.Nom).join(', '):'Tous les domaines';
   const filterSummary=[`Domaines : ${esc(domainSummary)}`,activeProvider?`Fournisseur : ${esc(activeProvider.Nom)}`:'Tous les fournisseurs'].join(' · ');
-  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><div class="field dash-domain-field"><span class="field-label">Domaines</span><div class="dash-domain-picker"><button id="dashDomainPickerBtn" class="btn secondary dash-domain-btn">${activeDomains.length?`${activeDomains.length} domaine(s) sélectionné(s)`:'Tous les domaines'} ▾</button><div id="dashDomainMenu" class="dash-domain-menu hidden"><div class="dash-domain-actions"><button id="dashAllDomains" class="mini-btn">Tous</button><button id="dashNoDomains" class="mini-btn">Aucun</button></div>${opts.domains.map(d=>`<label class="dash-domain-option"><input type="checkbox" data-dash-domain="${d.id}" ${selectedDomainSet.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></div></div><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':'<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>'}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;
+  el.innerHTML=`<div class="dashboard-filters read-only-exempt"><div class="filter-title"><b>Filtres du tableau de bord</b><span>${filterSummary}</span></div><div class="field dash-domain-field"><span class="field-label">Domaines</span><div class="dash-domain-picker"><button id="dashDomainPickerBtn" class="btn secondary dash-domain-btn">${activeDomains.length?`${activeDomains.length} domaine(s) sélectionné(s)`:'Tous les domaines'} ▾</button><div id="dashDomainMenu" class="dash-domain-menu hidden"><div class="dash-domain-actions"><button id="dashAllDomains" class="mini-btn">Tous</button><button id="dashNoDomains" class="mini-btn">Aucun</button></div>${opts.domains.map(d=>`<label class="dash-domain-option"><input type="checkbox" data-dash-domain="${d.id}" ${selectedDomainSet.has(+d.id)?'checked':''}><span>${esc(d.Nom)}</span></label>`).join('')}</div></div></div><label class="field">Fournisseur<select id="dashProviderFilter"><option value="0">Tous les fournisseurs</option>${opts.providers.map(p=>`<option value="${p.id}" ${+DASH_FILTER.providerId===+p.id?'selected':''}>${esc(p.Nom)}</option>`).join('')}</select></label><button id="dashResetFilters" class="btn secondary">Réinitialiser</button></div><div class="kpis"><div class="kpi"><div class="v">${num(m.licenses)}</div><div class="l">Licences</div></div><div class="kpi"><div class="v">${money(m.fixed)}</div><div class="l">Abonnements fixes</div></div><div class="kpi"><div class="v">${money(m.included)}</div><div class="l">Usage inclus valorisé</div></div><div class="kpi"><div class="v">${money(m.over)}</div><div class="l">Consommation supplémentaire</div></div><div class="kpi"><div class="v">${money(m.total)}</div><div class="l">Budget connu USD</div></div><div class="kpi"><div class="v">${money(m.total*m.rate,'EUR')}</div><div class="l">Budget connu EUR</div></div></div><div class="kpis roi-kpis"><div class="kpi roi"><div class="v">${money(m.baselineAnnual,'EUR')}</div><div class="l">Baseline N-1 annuelle</div></div><div class="kpi roi"><div class="v">${money(m.budgetAnnualizedEUR,'EUR')}</div><div class="l">Licences annualisées</div></div><div class="kpi roi"><div class="v ${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</div><div class="l">Économie annuelle</div></div><div class="kpi roi"><div class="v ${m.savingPct<0?'negative':''}">${pct(m.savingPct)}</div><div class="l">Taux d'économie</div></div></div><div class="card">${unresolved}</div><div class="grid2"><article class="card"><h3>Budget par fournisseur</h3><div id="providerDonut" class="donutlayout"></div></article><article class="card"><h3>Budget par domaine</h3><div id="domainBars"></div></article></div><article class="card"><h3>Vue budgétaire par offre</h3><p>Abonnement fixe, usage inclus, overage et ventilation fournisseur.</p><div class="tablewrap"><table><thead><tr><th>Fournisseur</th><th>Offre</th><th>Licences</th><th>Fixe</th><th>Usage inclus</th><th>Overage</th><th>Total USD</th><th>Total EUR</th><th>Statut</th></tr></thead><tbody>${offers.map(x=>`<tr class="${x.unresolved?'unresolved':''}"><td class="provider">${esc(x.p.Nom)}</td><td>${esc(x.o.Nom)}</td><td class="num">${num(x.licenses)}</td><td class="num">${money(x.fixed)}</td><td class="num">${money(x.included)}</td><td class="num">${money(x.over)}</td><td class="num"><b>${money(x.total)}</b></td><td class="num">${money(x.total*m.rate,'EUR')}</td><td>${x.unresolved?'<span class="badge warn">Devis à confirmer</span>':`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</td></tr>`).join('')}<tr class="total"><td colspan="6">TOTAL CONNU</td><td class="num">${money(m.total)}</td><td class="num">${money(m.total*m.rate,'EUR')}</td><td>${unresolved}</td></tr></tbody></table></div></article><article class="card"><h3>Ventilation par domaine</h3><div class="tablewrap"><table><thead><tr><th>Domaine</th><th>Budget USD</th><th>Budget EUR</th><th>Part</th></tr></thead><tbody>${domains.map(x=>`<tr><td><b>${esc(x.d.Nom)}</b></td><td class="num">${money(x.total)}</td><td class="num">${money(x.eur,'EUR')}</td><td class="num">${pct(m.total?x.total/m.total:0)}</td></tr>`).join('')}</tbody></table></div></article>`;
   const pf=document.getElementById('dashProviderFilter'),reset=document.getElementById('dashResetFilters');
   const pickerBtn=document.getElementById('dashDomainPickerBtn'),menu=document.getElementById('dashDomainMenu');
   pickerBtn.onclick=e=>{e.stopPropagation();menu.classList.toggle('hidden')};
@@ -969,6 +969,15 @@ function ensureSynthesisCurrencyStylesV64(){
     .cost-split-labels .synth-money{display:inline-flex;align-items:flex-start}
     .detail-kpis .synth-money{align-items:flex-start}
     .domain-totals .synth-money,.detail-grand-total .synth-money{align-items:flex-end}
+    .detail-budget-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:12px;margin:14px 0 18px}
+    .detail-budget-card{border:1px solid #dbe3ef;border-radius:12px;padding:12px;background:#fff;min-width:0}
+    .detail-section-title.compact{margin:0 0 10px}.detail-section-title.compact>span{font-size:.72rem}
+    .detail-domain-budget{display:flex;flex-direction:column;gap:10px}.detail-domain-budget-row{display:grid;grid-template-columns:minmax(130px,1fr) minmax(100px,1.8fr) auto;align-items:center;gap:10px}
+    .detail-domain-budget-label{display:flex;justify-content:space-between;gap:8px;min-width:0}.detail-domain-budget-label b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.detail-domain-budget-label span{color:#667085;font-size:.72rem}
+    .detail-domain-budget-track{height:9px;border-radius:99px;background:#edf1f6;overflow:hidden}.detail-domain-budget-track>span{display:block;height:100%;border-radius:99px;background:#635bdb}
+    .detail-domain-budget-values{text-align:right}.detail-budget-offer-table tfoot td{font-weight:800;background:#f8fafc}
+    @media(max-width:980px){.detail-budget-grid{grid-template-columns:1fr}.detail-domain-budget-row{grid-template-columns:minmax(120px,1fr) minmax(90px,1.5fr) auto}}
+    @media(max-width:620px){.detail-domain-budget-row{grid-template-columns:1fr auto}.detail-domain-budget-track{grid-column:1/-1}.detail-budget-card{padding:9px}}
     @media(max-width:720px){.synth-eur{font-size:.68em}}
   `;document.head.appendChild(st);
 }
@@ -1092,7 +1101,7 @@ function drawCompare(){
     const domainCount=Object.values(m.bd).filter(x=>x.total>0).length;
     const offerCount=Object.keys(m.bo).length;
     return `<button type="button" class="comparecard synthesis-scenario-card tone-${idx%5}" data-open-scenario="${m.s.id}">
-      <div class="scenario-card-top"><div><span class="scenario-eyebrow">${esc(uiLabelValue("compare","SCÉNARIO"))}</span><h4>${esc(m.s.Nom)}</h4></div>${m.unresolved?`<span class="badge warn">${m.unresolved} à confirmer</span>`:'<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>'}</div>
+      <div class="scenario-card-top"><div><span class="scenario-eyebrow">${esc(uiLabelValue("compare","SCÉNARIO"))}</span><h4>${esc(m.s.Nom)}</h4></div>${m.unresolved?`<span class="badge warn">${m.unresolved} à confirmer</span>`:`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</div>
       <div class="scenario-budget">${money(m.total)}</div>
       <div class="scenario-eur">${money(m.total*m.rate,'EUR')}</div>
       <div class="scenario-metrics"><span><b>${num(m.licenses)}</b> ${esc(uiLabelValue("compare","licences"))}</span><span><b>${domainCount}</b> ${esc(uiLabelValue("compare","domaines"))}</span><span><b>${offerCount}</b> ${esc(uiLabelValue("compare","offres"))}</span></div>
@@ -1103,12 +1112,83 @@ function drawCompare(){
   `;
   out.querySelectorAll('[data-open-scenario]').forEach(x=>x.onclick=()=>openScenarioDetailV36(+x.dataset.openScenario));
 }
+
+function scenarioBudgetViewsV67(m){
+  const domainRows=Object.values(m.bd||{})
+    .filter(x=>(+x.total||0)>0)
+    .sort((a,b)=>(+b.total||0)-(+a.total||0));
+  const offerRows=Object.values(m.bo||{})
+    .filter(x=>(+x.total||0)>0 || (+x.fixed||0)>0 || (+x.over||0)>0)
+    .sort((a,b)=>(+b.total||0)-(+a.total||0));
+  const domainMax=Math.max(1,...domainRows.map(x=>+x.total||0));
+
+  const domainHtml=`<section class="detail-budget-card">
+    <div class="detail-section-title compact"><span>01A</span><div>
+      <h3>${esc(uiLabelValue("compare","Vue budgétaire par domaine"))}</h3>
+      <p>${esc(uiLabelValue("compare","Répartition du budget du scénario par domaine."))}</p>
+    </div></div>
+    <div class="detail-domain-budget">
+      ${domainRows.length?domainRows.map(x=>{
+        const total=+x.total||0,eur=total*(+m.rate||0);
+        const share=m.total?total/m.total:0;
+        return `<div class="detail-domain-budget-row">
+          <div class="detail-domain-budget-label"><b>${esc(x.d?.Nom||'')}</b><span>${pct(share)}</span></div>
+          <div class="detail-domain-budget-track"><span style="width:${Math.max(1,total/domainMax*100)}%"></span></div>
+          <div class="detail-domain-budget-values">${synthesisMoneyV64(total,m.rate,{strong:true})}</div>
+        </div>`;
+      }).join(''):`<div class="empty-state">${esc(uiLabelValue("compare","Aucun budget par domaine."))}</div>`}
+    </div>
+  </section>`;
+
+  const offerHtml=`<section class="detail-budget-card">
+    <div class="detail-section-title compact"><span>01B</span><div>
+      <h3>${esc(uiLabelValue("compare","Vue budgétaire par offre"))}</h3>
+      <p>${esc(uiLabelValue("compare","Abonnement fixe, variable et poids de chaque offre dans le scénario."))}</p>
+    </div></div>
+    <div class="tablewrap"><table class="detail-budget-offer-table">
+      <thead><tr>
+        <th>${esc(uiLabelValue("compare","Fournisseur"))}</th>
+        <th>${esc(uiLabelValue("compare","Offre"))}</th>
+        <th>${esc(uiLabelValue("compare","Licences"))}</th>
+        <th>${esc(uiLabelValue("compare","Fixe"))}</th>
+        <th>${esc(uiLabelValue("compare","Variable"))}</th>
+        <th>${esc(uiLabelValue("compare","Total USD"))}</th>
+        <th>${esc(uiLabelValue("compare","Total EUR"))}</th>
+        <th>${esc(uiLabelValue("compare","Part"))}</th>
+      </tr></thead>
+      <tbody>${offerRows.length?offerRows.map(x=>{
+        const total=+x.total||0;
+        return `<tr>
+          <td><b>${esc(x.p?.Nom||'')}</b></td>
+          <td>${esc(x.o?.Nom||'')}</td>
+          <td class="num">${num(x.licenses||0)}</td>
+          <td class="num">${synthesisMoneyV64(+x.fixed||0,m.rate)}</td>
+          <td class="num">${synthesisMoneyV64(+x.over||0,m.rate)}</td>
+          <td class="num"><b>${money(total)}</b></td>
+          <td class="num">${money(total*(+m.rate||0),'EUR')}</td>
+          <td class="num">${pct(m.total?total/m.total:0)}</td>
+        </tr>`;
+      }).join(''):`<tr><td colspan="8">${esc(uiLabelValue("compare","Aucune offre budgétée."))}</td></tr>`}</tbody>
+      ${offerRows.length?`<tfoot><tr>
+        <td colspan="3">${esc(uiLabelValue("compare","TOTAL CONNU"))}</td>
+        <td class="num">${synthesisMoneyV64(m.fixed,m.rate)}</td>
+        <td class="num">${synthesisMoneyV64(m.over,m.rate)}</td>
+        <td class="num"><b>${money(m.total)}</b></td>
+        <td class="num">${money(m.total*(+m.rate||0),'EUR')}</td>
+        <td class="num">100 %</td>
+      </tr></tfoot>`:''}
+    </table></div>
+  </section>`;
+
+  return `<div class="detail-budget-grid">${domainHtml}${offerHtml}</div>`;
+}
+
 function scenarioDetailHtmlV36(m,printMode=false){
   const groups=scenarioDomainGroups(m);
   const offerCount=Object.keys(m.bo).length;
   return `<div class="scenario-detail-document ${printMode?'print-document':''}">
     <div class="detail-hero">
-      <div><span class="scenario-eyebrow">SYNTHÈSE FINOPS IA</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} ${esc(uiLabelValue("compare","licences"))}</span><span>${groups.length} ${esc(uiLabelValue("compare","domaines"))}</span><span>${offerCount} ${esc(uiLabelValue("compare","offres"))}</span>${m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:'<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>'}</div></div>
+      <div><span class="scenario-eyebrow">SYNTHÈSE FINOPS IA</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} ${esc(uiLabelValue("compare","licences"))}</span><span>${groups.length} ${esc(uiLabelValue("compare","domaines"))}</span><span>${offerCount} ${esc(uiLabelValue("compare","offres"))}</span>${m.unresolved?`<span class="badge warn">${m.unresolved} tarif(s) à confirmer</span>`:`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</div></div>
       <div class="detail-total"><small>${esc(uiLabelValue("compare","Budget total"))}</small><strong>${money(m.total)}</strong><span>${money(m.total*m.rate,'EUR')}</span></div>
     </div>
     <div class="detail-kpis">
@@ -1118,6 +1198,7 @@ function scenarioDetailHtmlV36(m,printMode=false){
       <div><span>Économie annuelle</span><b class="${m.savingAnnual<0?'negative':''}">${money(m.savingAnnual,'EUR')}</b></div>
     </div>
     <div class="pricing-explainer"><div class="pricing-icon">$</div><div><b>Lecture du coût fixe</b><p>Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.</p></div></div>
+    ${scenarioBudgetViewsV67(m)}
     <div class="detail-section-title"><span>02</span><div><h3>${esc(uiLabelValue("compare","Détail par domaine"))}</h3><p>${esc(uiLabelValue("compare","Offres, licences, prix du forfait, engagements et structure des coûts."))}</p></div></div>
     <div class="domain-detail-list">${groups.length?groups.map(g=>`<section class="domain-detail-card">
       <div class="domain-detail-head"><div><span class="domain-label">${esc(uiLabelValue("compare","DOMAINE"))}</span><h3>${esc(g.domain)}</h3></div><div class="domain-totals"><span>${num(g.licenses)} ${esc(uiLabelValue("compare","licences"))}</span>${synthesisMoneyV64(g.total,m.rate,{strong:true})}</div></div>
@@ -1242,7 +1323,8 @@ const PRINT_CSS_V36=`
 *{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#10213e;margin:0;background:#fff;font-size:10px}
 .synth-money{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}.synth-eur{display:block;margin-top:2px;font-size:8px;font-weight:600;color:#64748b;white-space:nowrap}
 h1,h2,h3,p{margin-top:0}.print-cover{display:flex;justify-content:space-between;align-items:end;border-bottom:3px solid #5b4df5;padding-bottom:12px;margin-bottom:18px}.print-cover h1{font-size:26px;margin-bottom:4px}.print-cover p{color:#64748b;margin:0}
-.scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}.pricing-explainer{display:flex;gap:8px;padding:9px;border:1px solid #dedcff;border-radius:9px;margin-bottom:12px;background:#f8f7ff}.pricing-icon{width:25px;height:25px;border-radius:7px;background:#635bdb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}.pricing-explainer p{margin:2px 0 0;color:#64748b}.price-period,.price-source{display:block;font-size:7px;color:#64748b}.price-source{color:#635bdb}.fixed-basis{font-size:8px;line-height:1.3}
+.scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}
+.detail-budget-grid{display:grid;grid-template-columns:38% 62%;gap:8px;margin:12px 0}.detail-budget-card{border:1px solid #dbe3ef;border-radius:10px;padding:9px}.detail-domain-budget{display:flex;flex-direction:column;gap:6px}.detail-domain-budget-row{display:grid;grid-template-columns:35% 40% 25%;align-items:center;gap:5px}.detail-domain-budget-label{display:flex;justify-content:space-between;gap:4px}.detail-domain-budget-label span{color:#64748b}.detail-domain-budget-track{height:7px;background:#edf1f6;border-radius:99px;overflow:hidden}.detail-domain-budget-track>span{display:block;height:100%;background:#635bdb}.detail-domain-budget-values{text-align:right}.detail-budget-offer-table tfoot td{font-weight:700;background:#f8fafc}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}.pricing-explainer{display:flex;gap:8px;padding:9px;border:1px solid #dedcff;border-radius:9px;margin-bottom:12px;background:#f8f7ff}.pricing-icon{width:25px;height:25px;border-radius:7px;background:#635bdb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}.pricing-explainer p{margin:2px 0 0;color:#64748b}.price-period,.price-source{display:block;font-size:7px;color:#64748b}.price-source{color:#635bdb}.fixed-basis{font-size:8px;line-height:1.3}
 .domain-detail-card{border:1px solid #dbe3ef;border-radius:12px;margin:0 0 12px;overflow:hidden;break-inside:avoid}.domain-detail-head{display:flex;justify-content:space-between;padding:10px 12px;background:#f8fafc}.domain-detail-head h3{margin:2px 0 0}.domain-totals{text-align:right}.domain-totals span,.domain-totals b{display:block}
 table{width:100%;border-collapse:collapse}th,td{padding:7px 8px;border-top:1px solid #e7edf5;text-align:left}th{font-size:8px;text-transform:uppercase;color:#64748b;background:#fbfcfe}td.num,th.num{text-align:right}tfoot td{font-weight:700;background:#fbfcfe}.detail-grand-total{display:flex;justify-content:space-between;align-items:center;border-top:3px solid #10213e;padding:12px 4px;margin-top:16px}.detail-grand-total span,.detail-grand-total small{display:block}.detail-grand-total b{font-size:22px}.negative{color:#c62828}.badge{display:inline-block;padding:2px 5px;border-radius:99px;font-size:8px}.badge.ok{background:#eaf8ef;color:#08783d}.badge.warn{background:#fff4dd;color:#955900}
 .summary-table{width:100%;margin-bottom:22px}.summary-table th,.summary-table td{padding:9px}.summary-table tbody tr{break-inside:avoid}.summary-total{font-weight:800;background:#f5f7ff}.page-break{break-before:page}.print-section-title{font-size:18px;margin:18px 0 10px}
@@ -2599,7 +2681,7 @@ const UI_LABEL_CATALOG_V65=[
   ['compare','Sous-total'],['compare','Total scénario'],['compare','Aucune allocation sur ce scénario.'],
   ['compare','Synthèse FinOps IA'],['compare','Rapport HTML autonome'],['compare','Imprimer / PDF'],
   ['compare','Enregistrer le fichier HTML'],['compare','Synthèse'],['compare','Détails des scénarios'],
-  ['compare','Scénario'],['compare','Budget USD'],['compare','Économie annuelle'],
+  ['compare','Scénario'],['compare','Budget USD'],['compare','Économie annuelle'],['compare','Vue budgétaire par domaine'],['compare','Répartition du budget du scénario par domaine.'],['compare','Vue budgétaire par offre'],['compare','Abonnement fixe, variable et poids de chaque offre dans le scénario.'],['compare','Total USD'],['compare','Total EUR'],['compare','Part'],['compare','TOTAL CONNU'],['compare','Aucun budget par domaine.'],['compare','Aucune offre budgétée.'],
   // Pré-simulation HTML / sécurité
   ['presim','Pré-simulation nominative'],['presim','Ouvrir en HTML'],['presim','Imprimer / PDF'],
   ['presim','Enregistrer le fichier HTML'],['presim','Équipes'],['presim','Ressources nominatives'],
