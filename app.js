@@ -1354,7 +1354,7 @@ function scenarioBudgetViewsV67(m,htmlMode=false){
   const domainHtml=`<section class="detail-budget-card">
     <div class="detail-section-title compact"><span>01A</span><div>
       <h3>${esc(uiLabelValue("compare","Vue budgétaire par domaine"))}</h3>
-      <p>${esc(uiLabelValue("compare","Répartition du budget du scénario par domaine."))}</p>
+      <p>${htmlMode?"Budget du scénario par domaine. Utilise « Voir détail » pour ouvrir le domaine.":esc(uiLabelValue("compare","Répartition du budget du scénario par domaine."))}</p>
     </div></div>
     <div class="detail-domain-budget">
       ${domainRows.length?domainRows.map(x=>{
@@ -1414,7 +1414,7 @@ function scenarioBudgetViewsV67(m,htmlMode=false){
     </table></div>
   </section>`;
 
-  return `<div class="detail-budget-grid">${domainHtml}${offerHtml}</div>`;
+  return `<div class="detail-budget-grid ${htmlMode?'html-budget-stack':''}">${domainHtml}${offerHtml}</div>`;
 }
 
 function compareLabelV71(def){return esc(uiLabelValue("compare",def))}
@@ -1520,6 +1520,82 @@ function scenarioHtmlDocumentV41(m){
     body{background:#eef2f7;padding:0 0 36px;font-size:12px}
 
     :root{--navy:#10213e;--ink:#172033;--muted:#667085;--line:#e4e7ec;--soft:#f8fafc;--violet:#635bdb;--violet-soft:#f4f3ff}
+
+    /* V88 — 01A et 01B en pleine largeur, sans chevauchement */
+    .html-budget-stack{
+      display:grid!important;
+      grid-template-columns:1fr!important;
+      gap:16px!important;
+      margin:14px 0 18px!important;
+    }
+    .html-budget-stack>.detail-budget-card{
+      width:100%!important;
+      min-width:0!important;
+      overflow:hidden!important;
+    }
+    .html-budget-stack .detail-domain-budget-row{
+      display:grid!important;
+      grid-template-columns:minmax(140px,1.05fr) minmax(180px,1.7fr) minmax(210px,1.15fr) 112px!important;
+      align-items:center!important;
+      gap:16px!important;
+      width:100%!important;
+      padding:12px 6px!important;
+    }
+    .html-budget-stack .detail-domain-budget-label{
+      min-width:0!important;
+    }
+    .html-budget-stack .detail-domain-budget-label b{
+      overflow:hidden!important;
+      text-overflow:ellipsis!important;
+      white-space:nowrap!important;
+    }
+    .html-budget-stack .detail-domain-budget-track{
+      width:100%!important;
+      min-width:0!important;
+    }
+    .html-budget-stack .detail-domain-budget-values{
+      min-width:0!important;
+      text-align:right!important;
+      padding-right:4px!important;
+    }
+    .html-budget-stack .domain-summary-link{
+      width:100%!important;
+      max-width:112px!important;
+      justify-self:end!important;
+      box-sizing:border-box!important;
+    }
+    .html-budget-stack .detail-budget-offer-table{
+      width:100%!important;
+      table-layout:auto!important;
+    }
+    .html-budget-stack .detail-budget-offer-table th,
+    .html-budget-stack .detail-budget-offer-table td{
+      white-space:normal!important;
+    }
+    @media(max-width:900px){
+      .html-budget-stack .detail-domain-budget-row{
+        grid-template-columns:minmax(110px,.9fr) minmax(130px,1.3fr) minmax(180px,1fr) 100px!important;
+        gap:10px!important;
+      }
+    }
+    @media(max-width:680px){
+      .html-budget-stack .detail-domain-budget-row{
+        grid-template-columns:1fr!important;
+      }
+      .html-budget-stack .detail-domain-budget-values{
+        align-items:flex-start!important;
+        text-align:left!important;
+      }
+      .html-budget-stack .domain-annual-equivalent{
+        justify-content:flex-start!important;
+      }
+      .html-budget-stack .domain-summary-link{
+        justify-self:start!important;
+        width:auto!important;
+        max-width:none!important;
+      }
+    }
+
     body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink)}
     .html-report-toolbar{padding:14px 24px}
     .html-report-page{width:min(1360px,calc(100% - 32px));padding:28px}
@@ -1634,6 +1710,82 @@ function synthesisHtmlDocumentV42(ms){
     body{background:#eef2f7;padding:0 0 36px;font-size:12px}
 
     :root{--navy:#10213e;--ink:#172033;--muted:#667085;--line:#e4e7ec;--soft:#f8fafc;--violet:#635bdb;--violet-soft:#f4f3ff}
+
+    /* V88 — 01A et 01B en pleine largeur, sans chevauchement */
+    .html-budget-stack{
+      display:grid!important;
+      grid-template-columns:1fr!important;
+      gap:16px!important;
+      margin:14px 0 18px!important;
+    }
+    .html-budget-stack>.detail-budget-card{
+      width:100%!important;
+      min-width:0!important;
+      overflow:hidden!important;
+    }
+    .html-budget-stack .detail-domain-budget-row{
+      display:grid!important;
+      grid-template-columns:minmax(140px,1.05fr) minmax(180px,1.7fr) minmax(210px,1.15fr) 112px!important;
+      align-items:center!important;
+      gap:16px!important;
+      width:100%!important;
+      padding:12px 6px!important;
+    }
+    .html-budget-stack .detail-domain-budget-label{
+      min-width:0!important;
+    }
+    .html-budget-stack .detail-domain-budget-label b{
+      overflow:hidden!important;
+      text-overflow:ellipsis!important;
+      white-space:nowrap!important;
+    }
+    .html-budget-stack .detail-domain-budget-track{
+      width:100%!important;
+      min-width:0!important;
+    }
+    .html-budget-stack .detail-domain-budget-values{
+      min-width:0!important;
+      text-align:right!important;
+      padding-right:4px!important;
+    }
+    .html-budget-stack .domain-summary-link{
+      width:100%!important;
+      max-width:112px!important;
+      justify-self:end!important;
+      box-sizing:border-box!important;
+    }
+    .html-budget-stack .detail-budget-offer-table{
+      width:100%!important;
+      table-layout:auto!important;
+    }
+    .html-budget-stack .detail-budget-offer-table th,
+    .html-budget-stack .detail-budget-offer-table td{
+      white-space:normal!important;
+    }
+    @media(max-width:900px){
+      .html-budget-stack .detail-domain-budget-row{
+        grid-template-columns:minmax(110px,.9fr) minmax(130px,1.3fr) minmax(180px,1fr) 100px!important;
+        gap:10px!important;
+      }
+    }
+    @media(max-width:680px){
+      .html-budget-stack .detail-domain-budget-row{
+        grid-template-columns:1fr!important;
+      }
+      .html-budget-stack .detail-domain-budget-values{
+        align-items:flex-start!important;
+        text-align:left!important;
+      }
+      .html-budget-stack .domain-annual-equivalent{
+        justify-content:flex-start!important;
+      }
+      .html-budget-stack .domain-summary-link{
+        justify-self:start!important;
+        width:auto!important;
+        max-width:none!important;
+      }
+    }
+
     body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:var(--ink)}
     .html-report-toolbar{padding:14px 24px}
     .html-report-page{width:min(1360px,calc(100% - 32px));padding:28px}
