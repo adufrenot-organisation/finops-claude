@@ -2266,6 +2266,19 @@ function preTeamRows(){ return D[T.preTeams]||[]; }
 
 
 function preSimEmail(){return String(ACCESS.currentEmail||currentRightRow()?.Email||'').trim().toLowerCase()}
+function preSimAuthorIdentityV104(){
+  // Non-Owner: l'identité vient de FinOps_Identites / Droits_Utilisateurs.
+  const row=currentRightRow();
+  const email=String(ACCESS.currentEmail||row?.Email||'').trim().toLowerCase();
+  if(email)return {userId:+row?.id||0,email,label:email};
+
+  // Owner: l'architecture FinOps identifie volontairement le propriétaire par le
+  // sentinel ACL, sans ligne obligatoire dans Droits_Utilisateurs. Il ne faut donc
+  // pas bloquer la création/duplication faute de Responsable_User.
+  if(isOwner())return {userId:0,email:'owner-grist',label:'Owner Grist'};
+
+  return {userId:0,email:'',label:''};
+}
 function tokenHasEmail(token,email=preSimEmail()){
   const e=String(email||'').trim().toLowerCase();if(!e)return false;
   return String(token||'').toLowerCase().includes(`|${e}|`);
@@ -2319,10 +2332,10 @@ function newPreSimulationDraft(){
     Scenario_Reference:0,
     Statut:'Travail',
     Responsable:'',
-    Responsable_User:+currentRightRow()?.id||0,
-    Responsable_Email:preSimEmail(),
-    Acces_Lecture_Emails:preSimEmail()?`|${preSimEmail()}|`:'',
-    Acces_Modification_Emails:preSimEmail()?`|${preSimEmail()}|`:'',
+    Responsable_User:preSimAuthorIdentityV104().userId,
+    Responsable_Email:preSimAuthorIdentityV104().label,
+    Acces_Lecture_Emails:preSimAuthorIdentityV104().email?`|${preSimAuthorIdentityV104().email}|`:'',
+    Acces_Modification_Emails:preSimAuthorIdentityV104().email?`|${preSimAuthorIdentityV104().email}|`:'',
     Commentaire:''
   };
 }
@@ -2639,7 +2652,7 @@ function renderPreSimulation(){
       <label class="field">Domaine obligatoire<select id="psDomain" class="admin-input">${domainOptions}</select></label>
       <label class="field">Scénario de référence <small>navigation informative</small><select id="psScenario" class="admin-input">${scenarioOptions}</select></label>
       <label class="field">Statut<input id="psStatus" class="admin-input" value="${esc(fiche.Statut||'Travail')}"></label>
-      <label class="field">Auteur <small>utilisateur connecté</small><input id="psAuthor" class="admin-input" value="${esc(fiche.__draft?preSimEmail():(fiche.Responsable_Email||rightUserEmail(+fiche.Responsable_User)||''))}" readonly></label>
+      <label class="field">Auteur <small>utilisateur connecté</small><input id="psAuthor" class="admin-input" value="${esc(fiche.__draft?preSimAuthorIdentityV104().label:(fiche.Responsable_Email||rightUserEmail(+fiche.Responsable_User)||''))}" readonly></label>
     </div>
     <label class="field presim-comment">Commentaire<textarea id="psComment" class="admin-input" rows="2">${esc(fiche.Commentaire||'')}</textarea></label>
   </article>
@@ -2750,14 +2763,18 @@ async function duplicatePreSimulationV103(source){
   const name=prompt('Nom de la pré-simulation dupliquée :',proposed);
   if(name===null)return;
   if(!name.trim()){toast('Le nom de la copie est obligatoire.',true);return}
-  const authorId=+currentRightRow()?.id||0,authorEmail=preSimEmail();
-  if(!authorId||!authorEmail){toast("Impossible d’identifier l’utilisateur connecté comme auteur.",true);return}
+  const author=preSimAuthorIdentityV104();
+  if(!author.label){toast("Impossible d’identifier l’utilisateur connecté comme auteur.",true);return}
   try{
     // La copie est privée : auteur connecté + Owner, sans droits supplémentaires recopiés.
+    // Pour le véritable Owner Grist, Responsable_User peut rester vide : son accès
+    // est garanti par le sentinel Owner et non par Droits_Utilisateurs.
     await apply([["AddRecord",T.preSim,null,{
       Nom:name.trim(),Domaine:+source.Domaine||0,Scenario_Reference:+source.Scenario_Reference||0,
-      Statut:source.Statut||'Travail',Responsable:authorEmail,Responsable_User:authorId,Responsable_Email:authorEmail,
-      Acces_Lecture_Emails:`|${authorEmail}|`,Acces_Modification_Emails:`|${authorEmail}|`,Commentaire:source.Commentaire||''
+      Statut:source.Statut||'Travail',Responsable:author.label,Responsable_User:author.userId,Responsable_Email:author.label,
+      Acces_Lecture_Emails:author.email?`|${author.email}|`:'',
+      Acces_Modification_Emails:author.email?`|${author.email}|`:'',
+      Commentaire:source.Commentaire||''
     }]]);
     await reload();
     const target=preSimulationRows().filter(x=>x.Nom===name.trim()&&+x.Domaine===+source.Domaine).sort((a,b)=>+b.id-+a.id)[0];
@@ -2776,14 +2793,15 @@ async function duplicatePreSimulationV103(source){
       await reload();
     }
     resetPreSimDraftStateV62();PRESIM_SELECTED_ID=+target.id;renderPreSimulation();
-    toast('Pré-simulation dupliquée. La copie est privée et vous en êtes l’auteur.');
+    toast(`Pré-simulation dupliquée. Auteur : ${preSimAuthorIdentityV104().label}.`);
   }catch(e){toast('Duplication impossible : '+(e.message||String(e)),true)}
 }
 
 function readPreSimulationFields(){
   const fiche=selectedPreSimulation();
-  const authorId=fiche?.__draft?(+currentRightRow()?.id||0):(+fiche?.Responsable_User||0);
-  const authorEmail=fiche?.__draft?preSimEmail():(String(fiche?.Responsable_Email||rightUserEmail(authorId)||'').trim().toLowerCase());
+  const connectedAuthor=preSimAuthorIdentityV104();
+  const authorId=fiche?.__draft?connectedAuthor.userId:(+fiche?.Responsable_User||0);
+  const authorEmail=fiche?.__draft?connectedAuthor.label:(String(fiche?.Responsable_Email||rightUserEmail(authorId)||'').trim());
   return {
     Nom:document.getElementById('psNom')?.value.trim()||'',
     Domaine:+document.getElementById('psDomain')?.value||0,
@@ -2800,16 +2818,16 @@ async function savePreSimulationV28(){
   const fiche=selectedPreSimulation(),fields=readPreSimulationFields();
   if(!fields.Nom){toast('Le nom de la pré-simulation est obligatoire.',true);return}
   if(!fields.Domaine){toast('Le domaine est obligatoire.',true);return}
-  if(!fields.Responsable_User){toast('Le responsable de la fiche est obligatoire.',true);return}
-  const responsible=rightUserRow(fields.Responsable_User);
-  if(!userHasDomain(responsible,fields.Domaine)){toast("Le responsable doit être un utilisateur actif ayant accès au domaine de la fiche.",true);return}
+  if(!fields.Responsable_User&&!isOwner()){toast("L’auteur de la fiche est obligatoire.",true);return}
+  const responsible=fields.Responsable_User?rightUserRow(fields.Responsable_User):null;
+  if(!isOwner()&&!userHasDomain(responsible,fields.Domaine)){toast("L’auteur doit être un utilisateur actif ayant accès au domaine de la fiche.",true);return}
   if(!ACCESS.domainIds.includes(fields.Domaine)&&ACCESS.role!=='OWNER'){toast("Ce domaine n'est pas autorisé.",true);return}
   if(fields.Scenario_Reference){
     const duplicate=scopedPreSimulations().find(x=>+x.Scenario_Reference===fields.Scenario_Reference&&+x.Domaine===fields.Domaine&&+x.id!==+fiche.id);
     if(duplicate){toast(`Une pré-simulation est déjà liée à ce scénario pour ce domaine : ${duplicate.Nom}.`,true);return}
   }
   const rights=fiche.__draft?[]:preSimRightsRows(fiche);
-  const tokens=buildPreSimAccessTokens(fields.Responsable_User,rights);
+  const tokens=isOwner()&&!fields.Responsable_User?{read:'',modify:'',resp:fields.Responsable_Email}:buildPreSimAccessTokens(fields.Responsable_User,rights);
   fields.Responsable=fields.Responsable_Email; // compatibilité historique
   fields.Acces_Lecture_Emails=tokens.read;
   fields.Acces_Modification_Emails=tokens.modify;
