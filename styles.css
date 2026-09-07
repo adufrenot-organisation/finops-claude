@@ -1024,6 +1024,10 @@ textarea{
 .scenario-team-total-card small{color:#667085;margin-top:2px}
 .scenario-team-total-card b{margin-top:5px}
 .scenario-team-total-card b small{display:inline;color:#667085;font-weight:600}
+.scenario-team-eur{display:block;margin-top:2px;color:#667085;font-size:10px;font-weight:600;white-space:nowrap}
+.scenario-team-card-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px;padding-top:7px;border-top:1px solid #edf0f4}
+.scenario-team-card-split>span{font-size:11px;color:#667085;font-weight:600}.scenario-team-card-split b{display:block;margin-top:2px;color:#182230;font-size:13px}.scenario-team-card-split small{display:block;margin-top:1px;color:#667085;font-size:10px}
+.scenario-team-card-total{padding-top:7px;border-top:1px solid #edf0f4}
 
 /* V78 — synthèse annuelle par domaine / équipe */
 .scenario-team-annual{margin-top:14px;padding-top:12px;border-top:1px solid #dfe5ec}
