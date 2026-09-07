@@ -1208,3 +1208,24 @@ textarea{
 .ce-reco-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:10px}
 @media(max-width:850px){.ce-reco-grid{grid-template-columns:1fr}}
 \n/* V120 - tableau FinOps lisible + infobulles non tronquees */\n.ce-layout .tablewrap{overflow-x:auto;overflow-y:visible;padding-top:150px;margin-top:-150px;}\n.ce-layout .tablewrap table{min-width:1420px;table-layout:auto;}\n.ce-layout .tablewrap th{white-space:normal;line-height:1.25;vertical-align:bottom;min-width:110px;padding:10px 12px;}\n.ce-layout .tablewrap th:first-child{min-width:170px;}\n.ce-layout .tablewrap th:nth-child(2),\n.ce-layout .tablewrap th:nth-child(3),\n.ce-layout .tablewrap th:nth-child(4),\n.ce-layout .tablewrap th:nth-child(5),\n.ce-layout .tablewrap th:nth-child(6),\n.ce-layout .tablewrap th:nth-child(7),\n.ce-layout .tablewrap th:nth-child(8){min-width:135px;}\n.ce-layout .tablewrap th:nth-child(9){min-width:125px;}\n.ce-layout .tablewrap th:nth-child(10){min-width:110px;}\n.ce-info{position:relative;display:inline-flex;align-items:center;justify-content:center;margin-left:4px;width:18px;height:18px;border-radius:50%;cursor:help;font-weight:700;font-size:13px;line-height:1;vertical-align:middle;outline:none;}\n.ce-info>.ce-tip{visibility:hidden;opacity:0;position:absolute;z-index:99999;left:50%;bottom:calc(100% + 10px);transform:translateX(-50%);width:420px;max-width:calc(100vw - 40px);padding:16px 18px;border-radius:12px;background:#171a1f;color:#fff;font-size:14px;line-height:1.6;font-weight:400;text-align:left;white-space:normal;overflow-wrap:break-word;box-shadow:0 14px 36px rgba(0,0,0,.38);border:1px solid rgba(255,255,255,.15);pointer-events:none;}\n.ce-info:hover>.ce-tip,.ce-info:focus>.ce-tip,.ce-info:focus-visible>.ce-tip{visibility:visible;opacity:1;}\n.ce-tip-title{display:block;margin-bottom:8px;font-size:15px;line-height:1.3;color:#fff;}\n.ce-tip-body{display:block;color:#f5f7fa;}\n@media(max-width:900px){.ce-layout .tablewrap table{min-width:1320px}.ce-info>.ce-tip{position:fixed;left:16px!important;right:16px!important;bottom:16px;top:auto;width:auto;max-width:none;transform:none!important}.ce-info>.ce-tip::after{display:none}}\n
+
+/* V121 — aide FinOps au clic, panneau lisible */
+.ce-info-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-left:5px;padding:0;border:1.5px solid #64748b;border-radius:50%;background:#fff;color:#475569;font:700 13px/1 system-ui,sans-serif;cursor:pointer;vertical-align:middle;box-shadow:none}
+.ce-info-btn:hover,.ce-info-btn:focus{border-color:#2563eb;color:#2563eb;background:#eff6ff;outline:none}
+.ce-info-modal{position:fixed;inset:0;z-index:1000000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(15,23,42,.32);backdrop-filter:blur(2px)}
+.ce-info-panel{width:min(760px,calc(100vw - 40px));max-height:calc(100vh - 48px);overflow:auto;background:#fff;border:1px solid #d6deea;border-radius:16px;box-shadow:0 24px 70px rgba(15,23,42,.28)}
+.ce-info-panel-head{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:20px 24px;background:#102b52;color:#fff;border-radius:15px 15px 0 0}
+.ce-info-panel-head h3{margin:0;color:#fff;font-size:24px;line-height:1.2}
+.ce-info-close{border:0;background:transparent;color:#fff;font-size:36px;line-height:1;cursor:pointer;padding:0 2px;font-weight:300}
+.ce-info-panel-body{padding:22px 28px 26px;color:#10213e;font-size:16px;line-height:1.55}
+.ce-info-definition{margin:0 0 18px;font-size:17px}
+.ce-info-formula{display:grid;grid-template-columns:130px 1fr;gap:16px;align-items:center;padding:14px 18px;margin:0 0 16px;background:#eef5ff;border-radius:10px;color:#123d7a}
+.ce-info-formula span{font-weight:600}.ce-info-formula b{font-size:16px}
+.ce-info-example{padding:16px 18px;margin:0 0 18px;background:#f0f9f6;border:1px solid #d8eee7;border-radius:10px}
+.ce-info-example>b{display:block;margin-bottom:10px;font-size:17px}
+.ce-info-example-grid{display:grid;grid-template-columns:minmax(150px,1fr) minmax(220px,2fr);gap:5px 18px}
+.ce-info-example-grid span{color:#475569}.ce-info-example-grid b{color:#10213e}
+.ce-info-note{display:flex;gap:12px;align-items:flex-start;color:#2563eb}.ce-info-note>span{font-size:22px;line-height:1.3}.ce-info-note p{margin:0}
+/* anciennes infobulles désactivées : le clic ouvre désormais un panneau */
+.ce-info,.ce-tip{display:none!important}
+@media(max-width:650px){.ce-info-modal{padding:12px}.ce-info-panel{width:100%;max-height:calc(100vh - 24px)}.ce-info-panel-head{padding:16px 18px}.ce-info-panel-head h3{font-size:20px}.ce-info-panel-body{padding:18px;font-size:15px}.ce-info-formula{grid-template-columns:1fr;gap:4px}.ce-info-example-grid{grid-template-columns:1fr;gap:2px}.ce-info-example-grid b{margin-bottom:7px}}
