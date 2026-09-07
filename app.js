@@ -1260,6 +1260,40 @@ function ensureSynthesisCurrencyStylesV64(){
     .detail-domain-budget-values{text-align:right}.detail-budget-offer-table tfoot td{font-weight:800;background:#f8fafc}
     @media(max-width:980px){.detail-budget-grid{grid-template-columns:1fr}.detail-domain-budget-row{grid-template-columns:minmax(120px,1fr) minmax(90px,1.5fr) auto}}
     @media(max-width:620px){.detail-domain-budget-row{grid-template-columns:1fr auto}.detail-domain-budget-track{grid-column:1/-1}.detail-budget-card{padding:9px}}
+
+    /* V116 — styles écran réellement injectés pour les cartes équipes V115 */
+    .scenario-team-totals{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(360px,1fr))!important;gap:14px!important;margin-top:14px!important}
+    .scenario-team-total-card.compact-v115{padding:16px!important;gap:12px!important;border:1px solid #dfe5ec!important;border-radius:14px!important;background:#fff!important;box-shadow:0 8px 24px rgba(16,33,62,.06)!important}
+    .scenario-team-card-head{display:flex!important;align-items:center!important;gap:12px!important;padding-bottom:12px!important;border-bottom:1px solid #edf0f4!important}
+    .scenario-team-card-icon{width:34px!important;height:34px!important;flex:0 0 34px!important;border-radius:11px!important;background:#f1f2ff!important;display:flex!important;align-items:center!important;justify-content:center!important;font-size:17px!important}
+    .scenario-team-card-titlewrap{min-width:0!important;display:flex!important;flex-direction:column!important;gap:3px!important}
+    .scenario-team-card-title{font-weight:800!important;font-size:15px!important;color:#182230!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+    .scenario-team-card-titlewrap small{font-size:10px!important;color:#667085!important}
+
+    .scenario-team-budget-kpis{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+    .team-budget-kpi{background:#f8fafc!important;border-radius:10px!important;padding:10px!important;display:flex!important;flex-direction:column!important;gap:3px!important}
+    .team-budget-kpi span{font-size:10px!important;color:#667085!important}
+    .team-budget-kpi b{font-size:13px!important;color:#182230!important;white-space:nowrap!important}
+    .team-budget-kpi small{font-size:9px!important;color:#667085!important}
+    .team-budget-total{background:#f4f3ff!important}.team-budget-total b{color:#4338ca!important}
+
+    .scenario-team-roi{margin-top:0!important;padding-top:12px!important;border-top:1px solid #edf0f4!important}
+    .scenario-team-roi-title{font-size:12px!important;font-weight:800!important;color:#182230!important;margin-bottom:8px!important}
+    .scenario-team-roi-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+    .scenario-team-roi-grid>span{display:flex!important;flex-direction:column!important;gap:3px!important;padding:9px!important;border-radius:9px!important;background:#f8fafc!important;min-width:0!important}
+    .scenario-team-roi-grid small{font-size:9px!important;color:#667085!important;line-height:1.2!important}
+    .scenario-team-roi-grid b{font-size:12px!important;color:#182230!important;white-space:nowrap!important}
+    .scenario-team-roi-primary{background:#f4f3ff!important}
+    .scenario-team-roi-grid .positive{background:#f1fbf5!important}.scenario-team-roi-grid .positive b{color:#0b7a3b!important}
+    .scenario-team-roi-grid .negative{background:#fff3f3!important}.scenario-team-roi-grid .negative b{color:#c62828!important}
+
+    @media(max-width:900px){
+      .scenario-team-totals{grid-template-columns:1fr!important}
+      .scenario-team-budget-kpis,.scenario-team-roi-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+    }
+    @media(max-width:620px){
+      .scenario-team-budget-kpis,.scenario-team-roi-grid{grid-template-columns:1fr!important}
+    }
     @media(max-width:720px){.synth-eur{font-size:.68em}}
   `;document.head.appendChild(st);
 }
