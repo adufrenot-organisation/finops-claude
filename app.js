@@ -1503,16 +1503,15 @@ function roiRhScenarioAggregateV85(m){
   return {n1,n,lic,hrSaving,totalN,gain,roiPct,...status};
 }
 
-function roiRhServicesDetailHtmlV111(m,domainId){
-  const teams=teamRowsForDomainScenario(m,+domainId)
-    .filter(t=>String(t.Service||'').trim());
+function roiRhTeamsDetailHtmlV112(m,domainId){
+  const teams=teamRowsForDomainScenario(m,+domainId);
   if(!teams.length)return '';
 
   const rows=teams.map(t=>{
     const x=roiRhComputed(m,+domainId,+t.id);
     return {
       id:+t.id,
-      service:String(t.Service||'').trim(),
+      label:String(t.Nom||t.Service||`Équipe #${t.id}`).trim(),
       n1:+x.n1.cost||0,
       n:+x.n.cost||0,
       hrSaving:+x.hrSaving||0,
@@ -1524,12 +1523,12 @@ function roiRhServicesDetailHtmlV111(m,domainId){
 
   return `<div class="domain-service-roi">
     <div class="domain-service-roi-head">
-      <span class="scenario-eyebrow">ROI PAR SERVICE</span>
-      <h4>ROI par service du domaine</h4>
+      <span class="scenario-eyebrow">ROI PAR ÉQUIPE</span>
+      <h4>ROI par équipe du domaine</h4>
     </div>
     <div class="domain-service-roi-grid">
       ${rows.map(r=>`<article class="service-roi-card">
-        <div class="service-roi-title">${esc(r.service)}</div>
+        <div class="service-roi-title">${esc(r.label)}</div>
         <div class="service-roi-metrics">
           <div><span>RH N-1</span><b>${money(r.n1,'EUR')}</b></div>
           <div><span>RH N</span><b>${money(r.n,'EUR')}</b></div>
@@ -1542,6 +1541,7 @@ function roiRhServicesDetailHtmlV111(m,domainId){
     </div>
   </div>`;
 }
+
 
 function roiRhDomainAggregateV85(m,domainId){
   const teams=teamRowsForDomainScenario(m,+domainId);
@@ -1602,7 +1602,7 @@ function scenarioDetailHtmlV36(m,printMode=false){
         <div class="${dr.gain<0?'negative':''}"><span>Gain net annuel</span><b>${money(dr.gain,'EUR')}</b></div>
         <div class="roi-primary-kpi ${dr.roiPct<0?'negative':''}"><span>ROI / gain %</span><b>${pct(dr.roiPct)}</b></div>
       </div>
-      ${roiRhServicesDetailHtmlV111(m,g.domainId)}`})()}
+      ${roiRhTeamsDetailHtmlV112(m,g.domainId)}`})()}
       <div class="tablewrap"><table class="detail-table"><thead><tr><th>${compareLabelV71("Fournisseur")}</th><th>${compareLabelV71("Offre")}</th><th>${compareLabelV71("Licences")}</th><th>${compareLabelV71("Prix forfait")}</th><th>${compareLabelV71("Base calcul fixe")}</th><th>${compareLabelV71("Engagement")}</th><th>${compareLabelV71("Mois facturés")}</th><th>${compareLabelV71("Fixe")}</th><th>${compareLabelV71("Variable")}</th><th>${compareLabelV71("Total")}</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?` <span class="badge warn">${compareLabelV71("À confirmer")}</span>`:''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' '+uiLabelValue("compare","mois"):'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">${compareLabelV71("Sous-total")} ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
       ${g.domainId?scenarioDomainTeamBudgetHtml(m,g.domainId):""}
     </div></section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
@@ -3762,7 +3762,7 @@ const UI_LABEL_CATALOG_V65=[
   ['compare','Base calcul fixe'],['compare','Engagement'],['compare','Mois facturés'],['compare','Total'],
   ['compare','Sous-total'],['compare','Total scénario'],['compare','Aucune allocation sur ce scénario.'],
   ['compare','Synthèse FinOps IA'],['compare','Rapport HTML autonome'],['compare','Imprimer / PDF'],
-  ['compare','Enregistrer le fichier HTML'],['compare','Éditeur de l’outil'],['compare','ROI par service du domaine'],['compare','ROI PAR SERVICE'],['compare','Synthèse'],['compare','Détails des scénarios'],
+  ['compare','Enregistrer le fichier HTML'],['compare','Éditeur de l’outil'],['compare','ROI par équipe du domaine'],['compare','ROI PAR ÉQUIPE'],['compare','Synthèse'],['compare','Détails des scénarios'],
   ['compare','Scénario'],['compare','Budget USD'],['compare','Économie annuelle'],['compare','Vue budgétaire par domaine'],['compare','Répartition du budget du scénario par domaine.'],['compare','Vue budgétaire par offre'],['compare','Abonnement fixe, variable et poids de chaque offre dans le scénario.'],['compare','Total USD'],['compare','Total EUR'],['compare','Part'],['compare','TOTAL CONNU'],['compare','Aucun budget par domaine.'],['compare','Aucune offre budgétée.'],['compare','PRÉ-SIMULATION'],['compare','Répartition budgétaire par équipe et par offre'],['compare','Équipe'],['compare','Type d’offre'],['compare','Part du domaine'],['compare','TOTAL RÉPARTI'],['compare','Coût équivalent annuel par équipe'],['compare','Coût équivalent annuel'],['compare','Synthèse des scénarios'],['compare','scénario(s) sélectionné(s)'],['compare','scénario(s)'],['compare','Édité le'],['compare','tarif(s) à confirmer'],['compare','Lecture du coût fixe'],['compare','Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.'],['compare','À confirmer'],['compare','mois'],
   // Pré-simulation HTML / sécurité
   ['presim','Pré-simulation nominative'],['presim','Ouvrir en HTML'],['presim','Imprimer / PDF'],
