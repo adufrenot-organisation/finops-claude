@@ -2633,7 +2633,7 @@ function renderPreSimulation(){
     <div class="cardhead"><div><h3>Pré-simulation nominative</h3>
       <p>Le domaine est obligatoire. Le scénario de référence reste informatif pour le budget, mais permet depuis Simulation d'ouvrir directement cette fiche pour le domaine concerné.</p></div>
       <div class="table-actions"><select id="preSimSelect" class="admin-input"><option value="">Choisir une fiche</option>${ficheOptions}</select>
-        <button id="newPreSim" class="btn secondary">+ Nouvelle fiche</button>${fiche.__draft?'':`<button id="openPreSimHtml" class="btn secondary">🌐 ${esc(uiLabelValue("compare","Ouvrir en HTML"))}</button>`}<button id="savePreSim" class="btn primary">Enregistrer la fiche</button></div></div>
+        <button id="newPreSim" class="btn secondary">+ Nouvelle fiche</button>${fiche.__draft?'':`<button id="duplicatePreSim" class="btn secondary">⧉ Dupliquer</button><button id="openPreSimHtml" class="btn secondary">🌐 ${esc(uiLabelValue("compare","Ouvrir en HTML"))}</button>`}<button id="savePreSim" class="btn primary">Enregistrer la fiche</button></div></div>
     <div class="presim-meta">
       <label class="field">Nom de la fiche<input id="psNom" class="admin-input" value="${esc(fiche.Nom||'')}"></label>
       <label class="field">Domaine obligatoire<select id="psDomain" class="admin-input">${domainOptions}</select></label>
@@ -2702,6 +2702,7 @@ function renderPreSimulation(){
     el.querySelector('tr[data-pr-key]:last-of-type input[data-f="Nom_Ressource"]')?.focus();
   };
   document.getElementById('savePreSim').onclick=savePreSimulationV28;
+  document.getElementById('duplicatePreSim')?.addEventListener('click',()=>duplicatePreSimulationV103(fiche));
   document.getElementById('openPreSimHtml')?.addEventListener('click',openPreSimHtmlV62);
   document.getElementById('addPreSimRight')?.addEventListener('click',addPreSimRightDraftV62);
   document.getElementById('savePreSimRights')?.addEventListener('click',savePreSimRightsV62);
@@ -2741,6 +2742,42 @@ function renderPreSimulation(){
     tr.querySelector('[data-f="Equipe"]')?.addEventListener('change',()=>updateEffective(tr));
     tr.querySelector('[data-f="Offre"]')?.addEventListener('change',()=>updateEffective(tr));
   });
+}
+
+async function duplicatePreSimulationV103(source){
+  if(!source||source.__draft)return;
+  const proposed=`Copie de ${source.Nom||'Pré-simulation'}`;
+  const name=prompt('Nom de la pré-simulation dupliquée :',proposed);
+  if(name===null)return;
+  if(!name.trim()){toast('Le nom de la copie est obligatoire.',true);return}
+  const authorId=+currentRightRow()?.id||0,authorEmail=preSimEmail();
+  if(!authorId||!authorEmail){toast("Impossible d’identifier l’utilisateur connecté comme auteur.",true);return}
+  try{
+    // La copie est privée : auteur connecté + Owner, sans droits supplémentaires recopiés.
+    await apply([["AddRecord",T.preSim,null,{
+      Nom:name.trim(),Domaine:+source.Domaine||0,Scenario_Reference:+source.Scenario_Reference||0,
+      Statut:source.Statut||'Travail',Responsable:authorEmail,Responsable_User:authorId,Responsable_Email:authorEmail,
+      Acces_Lecture_Emails:`|${authorEmail}|`,Acces_Modification_Emails:`|${authorEmail}|`,Commentaire:source.Commentaire||''
+    }]]);
+    await reload();
+    const target=preSimulationRows().filter(x=>x.Nom===name.trim()&&+x.Domaine===+source.Domaine).sort((a,b)=>+b.id-+a.id)[0];
+    if(!target)throw new Error('La copie de la fiche a été créée mais n’a pas pu être retrouvée.');
+
+    const srcTeams=preTeamRows().filter(t=>+t.Pre_Simulation===+source.id).sort((a,b)=>+a.id-+b.id);
+    if(srcTeams.length){
+      await apply(srcTeams.map(t=>["AddRecord",T.preTeams,null,{Pre_Simulation:+target.id,Nom:t.Nom||'',Service:t.Service||'',Offre_Defaut:+t.Offre_Defaut||0,Ordre:+t.Ordre||0,Actif:t.Actif!==false,Commentaire:t.Commentaire||''}]));
+      await reload();
+    }
+    const newTeams=preTeamRows().filter(t=>+t.Pre_Simulation===+target.id).sort((a,b)=>+a.id-+b.id);
+    const teamMap={};srcTeams.forEach((t,i)=>teamMap[+t.id]=+newTeams[i]?.id||0);
+    const srcRes=preResourceRows().filter(r=>+r.Pre_Simulation===+source.id).sort((a,b)=>+a.id-+b.id);
+    if(srcRes.length){
+      await apply(srcRes.map(r=>["AddRecord",T.preRes,null,{Pre_Simulation:+target.id,Nom_Ressource:r.Nom_Ressource||'',Profil:r.Profil||'',Equipe:teamMap[+r.Equipe]||0,Offre:+r.Offre||0,Commentaire:r.Commentaire||'',Actif:r.Actif!==false}]));
+      await reload();
+    }
+    resetPreSimDraftStateV62();PRESIM_SELECTED_ID=+target.id;renderPreSimulation();
+    toast('Pré-simulation dupliquée. La copie est privée et vous en êtes l’auteur.');
+  }catch(e){toast('Duplication impossible : '+(e.message||String(e)),true)}
 }
 
 function readPreSimulationFields(){
@@ -2919,12 +2956,13 @@ function scenarioRowHtml(s){
   if(draft){
     action=`<button type="button" class="btn ghost cancelScenarioDraft" data-key="${esc(s.__key)}">Annuler</button>`;
   }else{
+    const duplicate=`<button type="button" class="btn secondary small scenario-duplicate" data-duplicate-scenario="${s.id}" title="Dupliquer le scénario et ses allocations">⧉ Dupliquer</button> `;
     const usage=scenarioUsage(s.id);
     if(!canDeleteScenario(s.id)){
-      action=`<button type="button" class="btn ghost small scenario-delete blocked" data-delete-scenario="${s.id}" disabled title="${esc('Suppression impossible : '+scenarioUsageReason(s.id))}">🔒 Allocations</button>`;
+      action=duplicate+`<button type="button" class="btn ghost small scenario-delete blocked" data-delete-scenario="${s.id}" disabled title="${esc('Suppression impossible : '+scenarioUsageReason(s.id))}">🔒 Allocations</button>`;
     }else{
       const extra=usage.preSimulations?' · les pré-simulations liées seront détachées':'';
-      action=`<button type="button" class="btn danger small scenario-delete" data-delete-scenario="${s.id}" title="Supprimer ce scénario sans allocation${esc(extra)}">Supprimer</button>`;
+      action=duplicate+`<button type="button" class="btn danger small scenario-delete" data-delete-scenario="${s.id}" title="Supprimer ce scénario sans allocation${esc(extra)}">Supprimer</button>`;
     }
   }
   return `<tr ${attrs}>
@@ -2937,6 +2975,33 @@ function scenarioRowHtml(s){
     <td><input class="admin-input" data-f="Statut" value="${esc(s.Statut||'')}"></td>
     <td class="scenario-action">${action}</td>
   </tr>`;
+}
+
+async function duplicateScenarioV103(scenarioId){
+  const source=(D[T.scenarios]||[]).find(x=>+x.id===+scenarioId);if(!source)return;
+  if(!canEditView('scenarios')){toast(readOnlyMessage(),true);return}
+  const proposed=`Copie de ${source.Nom||'Scénario'}`;
+  const name=prompt('Nom du scénario dupliqué :',proposed);if(name===null)return;
+  if(!name.trim()){toast('Le nom de la copie est obligatoire.',true);return}
+  try{
+    const fields={Nom:name.trim(),Annee:+source.Annee||new Date().getFullYear(),Nb_Mois:+source.Nb_Mois||12,
+      Taux_USD_EUR:+source.Taux_USD_EUR||0,Taux_Utilisation:+source.Taux_Utilisation||0,
+      Nb_Jours_Ouvres_Annuels:+source.Nb_Jours_Ouvres_Annuels||218,Statut:source.Statut||'Travail',Commentaire:source.Commentaire||''};
+    await apply([["AddRecord",T.scenarios,null,fields]]);await reload();
+    const target=(D[T.scenarios]||[]).filter(x=>x.Nom===name.trim()&&+x.Annee===+fields.Annee).sort((a,b)=>+b.id-+a.id)[0];
+    if(!target)throw new Error('Le scénario dupliqué n’a pas pu être retrouvé.');
+    const allocations=(D[T.alloc]||[]).filter(a=>+a.Scenario===+source.id);
+    if(allocations.length){
+      const skip=new Set(['id','Scenario','Budget_Fixe_USD','Budget_Overage_USD','Budget_Total_USD','Tarif_A_Confirmer']);
+      const actions=allocations.map(a=>{
+        const f={Scenario:+target.id};Object.keys(a).forEach(k=>{if(!skip.has(k)&&!k.startsWith('$'))f[k]=a[k]});
+        return ["AddRecord",T.alloc,null,f];
+      });
+      await apply(actions);await reload();
+    }
+    SCENARIO_FILTER={q:'',scenarioId:String(target.id),year:'',status:''};renderScenarios();
+    toast(`Scénario dupliqué avec ${allocations.length} allocation(s).`);
+  }catch(e){toast('Duplication impossible : '+(e.message||String(e)),true)}
 }
 
 function renderScenarios(){
@@ -3028,6 +3093,9 @@ function renderScenarios(){
 
   el.querySelectorAll('.scenario-delete:not(.blocked)').forEach(btn=>{
     btn.onclick=()=>deleteScenarioV35(+btn.dataset.deleteScenario);
+  });
+  el.querySelectorAll('.scenario-duplicate').forEach(btn=>{
+    btn.onclick=()=>duplicateScenarioV103(+btn.dataset.duplicateScenario);
   });
 
   document.getElementById('addScenario').onclick=()=>{
