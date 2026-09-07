@@ -1503,22 +1503,33 @@ function roiRhScenarioAggregateV85(m){
   return {n1,n,lic,hrSaving,totalN,gain,roiPct,...status};
 }
 
-function roiRhTeamsDetailHtmlV112(m,domainId){
-  const teams=teamRowsForDomainScenario(m,+domainId);
+function roiRhTeamsDetailHtmlV113(m,domainId){
+  const breakdown=domainTeamBudgetBreakdown(m,+domainId);
+  if(!breakdown?.rows?.length)return '';
+
+  // One ROI card per actual team present in the synthesis breakdown.
+  // This is the same source that feeds "Répartition budgétaire par équipe".
+  const byTeam=new Map();
+  for(const r of breakdown.rows){
+    const teamId=+r.teamId||0;
+    if(!teamId)continue;
+    if(!byTeam.has(teamId))byTeam.set(teamId,{
+      teamId,
+      label:String(r.teamName||r.team||`Équipe #${teamId}`).trim(),
+      annualLicense:0
+    });
+    byTeam.get(teamId).annualLicense+=(+r.annualEquivalentEUR||0);
+  }
+  const teams=[...byTeam.values()];
   if(!teams.length)return '';
 
   const rows=teams.map(t=>{
-    const x=roiRhComputed(m,+domainId,+t.id);
-    return {
-      id:+t.id,
-      label:String(t.Nom||t.Service||`Équipe #${t.id}`).trim(),
-      n1:+x.n1.cost||0,
-      n:+x.n.cost||0,
-      hrSaving:+x.hrSaving||0,
-      lic:+x.licenseAnnual||0,
-      gain:+x.gain||0,
-      roiPct:+x.roiPct||0
-    };
+    const x=roiRhComputed(m,+domainId,+t.teamId);
+    // Keep the license cost exactly aligned with the synthesis team allocation.
+    const lic=+t.annualLicense||+x.licenseAnnual||0;
+    const n1=+x.n1.cost||0,n=+x.n.cost||0,hrSaving=n1-n;
+    const totalN=n+lic,gain=n1-totalN,roiPct=n1?gain/n1:0;
+    return {label:t.label,n1,n,hrSaving,lic,gain,roiPct};
   });
 
   return `<div class="domain-service-roi">
@@ -1602,7 +1613,7 @@ function scenarioDetailHtmlV36(m,printMode=false){
         <div class="${dr.gain<0?'negative':''}"><span>Gain net annuel</span><b>${money(dr.gain,'EUR')}</b></div>
         <div class="roi-primary-kpi ${dr.roiPct<0?'negative':''}"><span>ROI / gain %</span><b>${pct(dr.roiPct)}</b></div>
       </div>
-      ${roiRhTeamsDetailHtmlV112(m,g.domainId)}`})()}
+      ${roiRhTeamsDetailHtmlV113(m,g.domainId)}`})()}
       <div class="tablewrap"><table class="detail-table"><thead><tr><th>${compareLabelV71("Fournisseur")}</th><th>${compareLabelV71("Offre")}</th><th>${compareLabelV71("Licences")}</th><th>${compareLabelV71("Prix forfait")}</th><th>${compareLabelV71("Base calcul fixe")}</th><th>${compareLabelV71("Engagement")}</th><th>${compareLabelV71("Mois facturés")}</th><th>${compareLabelV71("Fixe")}</th><th>${compareLabelV71("Variable")}</th><th>${compareLabelV71("Total")}</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?` <span class="badge warn">${compareLabelV71("À confirmer")}</span>`:''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' '+uiLabelValue("compare","mois"):'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">${compareLabelV71("Sous-total")} ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
       ${g.domainId?scenarioDomainTeamBudgetHtml(m,g.domainId):""}
     </div></section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
