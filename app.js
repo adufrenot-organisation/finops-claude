@@ -2284,7 +2284,13 @@ async function deleteRoiRhPalierV84(id){
 
 function renderROI(){
   const el=document.getElementById('v-roi'),m=CURRENT;
-  const domains=Object.values(m.bd||{}).map(x=>x.d).filter(Boolean);
+  // V109 : l'écran ROI ne montre que les domaines réellement présents
+  // dans la Simulation du scénario courant.
+  const participatingDomainIds=[...new Set((m.alloc||[]).map(a=>+a.Domaine).filter(Boolean))];
+  const domains=participatingDomainIds
+    .map(id=>D.domainById[+id])
+    .filter(Boolean)
+    .sort((a,b)=>String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));
   const cards=[];
   for(const d of domains){
     const teams=teamRowsForDomainScenario(m,+d.id);
@@ -2307,8 +2313,8 @@ function renderROI(){
     </div>`:roiRhMissingHtmlV106(globalRoi);
 
   el.innerHTML=`
-    ${globalHtml}
-    <article class="card roi-rh-explainer">
+    ${domains.length?globalHtml:`<article class="card"><div class="empty-state">Aucun domaine ne participe à la simulation de ce scénario. Ajoute d’abord une allocation dans Simulation.</div></article>`}
+    ${domains.length?`<article class="card roi-rh-explainer">`:'<article class="card roi-rh-explainer hidden">'}
       <div class="cardhead"><div><h3>Comparaison RH N-1 / N</h3><p>Scénario → Simulation → ROI : les coûts licences ci-dessous proviennent uniquement des lignes de simulation du scénario <b>${esc(m.s?.Nom||'')}</b>. Chaque ligne RH représente un regroupement de ressources partageant un même TJM.</p></div><button id="saveRoiRh" class="btn primary read-only-exempt">Enregistrer les modifications</button></div>
       <div class="roi-formulas">
         <span>Économie RH = RH N-1 − RH N</span>
