@@ -1203,6 +1203,15 @@ function ensureSynthesisCurrencyStylesV64(){
     .cost-split-labels .synth-money{display:inline-flex;align-items:flex-start}
     .detail-kpis .synth-money{align-items:flex-start}
     .domain-totals .synth-money,.detail-grand-total .synth-money{align-items:flex-end}
+    .domain-service-roi{margin:14px 0 16px;padding:12px;border:1px solid #e2e8f0;border-radius:12px;background:#fbfcfe}
+    .domain-service-roi-head{display:flex;align-items:baseline;gap:10px;margin-bottom:10px}.domain-service-roi-head h4{margin:0;font-size:14px}
+    .domain-service-roi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+    .service-roi-card{border:1px solid #e5e7eb;border-radius:10px;background:#fff;padding:10px}
+    .service-roi-title{font-weight:800;margin-bottom:8px}
+    .service-roi-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+    .service-roi-metrics>div{background:#f8fafc;border-radius:8px;padding:7px;display:flex;flex-direction:column;gap:2px}
+    .service-roi-metrics span{font-size:10px;color:#667085}.service-roi-metrics b{font-size:12px}
+    @media(max-width:720px){.service-roi-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
     .detail-budget-grid{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:12px;margin:14px 0 18px}
     .detail-budget-card{border:1px solid #dbe3ef;border-radius:12px;padding:12px;background:#fff;min-width:0}
     .detail-section-title.compact{margin:0 0 10px}.detail-section-title.compact>span{font-size:.72rem}
@@ -1493,6 +1502,47 @@ function roiRhScenarioAggregateV85(m){
   const hrSaving=n1-n,totalN=n+lic,gain=n1-totalN,roiPct=n1?gain/n1:0;
   return {n1,n,lic,hrSaving,totalN,gain,roiPct,...status};
 }
+
+function roiRhServicesDetailHtmlV111(m,domainId){
+  const teams=teamRowsForDomainScenario(m,+domainId)
+    .filter(t=>String(t.Service||'').trim());
+  if(!teams.length)return '';
+
+  const rows=teams.map(t=>{
+    const x=roiRhComputed(m,+domainId,+t.id);
+    return {
+      id:+t.id,
+      service:String(t.Service||'').trim(),
+      n1:+x.n1.cost||0,
+      n:+x.n.cost||0,
+      hrSaving:+x.hrSaving||0,
+      lic:+x.licenseAnnual||0,
+      gain:+x.gain||0,
+      roiPct:+x.roiPct||0
+    };
+  });
+
+  return `<div class="domain-service-roi">
+    <div class="domain-service-roi-head">
+      <span class="scenario-eyebrow">ROI PAR SERVICE</span>
+      <h4>ROI par service du domaine</h4>
+    </div>
+    <div class="domain-service-roi-grid">
+      ${rows.map(r=>`<article class="service-roi-card">
+        <div class="service-roi-title">${esc(r.service)}</div>
+        <div class="service-roi-metrics">
+          <div><span>RH N-1</span><b>${money(r.n1,'EUR')}</b></div>
+          <div><span>RH N</span><b>${money(r.n,'EUR')}</b></div>
+          <div><span>Économie RH</span><b>${money(r.hrSaving,'EUR')}</b></div>
+          <div><span>Coût annuel licences</span><b>${money(r.lic,'EUR')}</b></div>
+          <div class="${r.gain<0?'negative':''}"><span>Gain net annuel</span><b>${money(r.gain,'EUR')}</b></div>
+          <div class="roi-primary-kpi ${r.roiPct<0?'negative':''}"><span>ROI / gain %</span><b>${pct(r.roiPct)}</b></div>
+        </div>
+      </article>`).join('')}
+    </div>
+  </div>`;
+}
+
 function roiRhDomainAggregateV85(m,domainId){
   const teams=teamRowsForDomainScenario(m,+domainId);
   const scopes=teams.length?teams.map(t=>roiRhComputed(m,+domainId,+t.id)):[roiRhComputed(m,+domainId,0)];
@@ -1551,7 +1601,8 @@ function scenarioDetailHtmlV36(m,printMode=false){
         <div><span>Coût annuel licences</span><b>${money(dr.lic,'EUR')}</b></div>
         <div class="${dr.gain<0?'negative':''}"><span>Gain net annuel</span><b>${money(dr.gain,'EUR')}</b></div>
         <div class="roi-primary-kpi ${dr.roiPct<0?'negative':''}"><span>ROI / gain %</span><b>${pct(dr.roiPct)}</b></div>
-      </div>`})()}
+      </div>
+      ${roiRhServicesDetailHtmlV111(m,g.domainId)}`})()}
       <div class="tablewrap"><table class="detail-table"><thead><tr><th>${compareLabelV71("Fournisseur")}</th><th>${compareLabelV71("Offre")}</th><th>${compareLabelV71("Licences")}</th><th>${compareLabelV71("Prix forfait")}</th><th>${compareLabelV71("Base calcul fixe")}</th><th>${compareLabelV71("Engagement")}</th><th>${compareLabelV71("Mois facturés")}</th><th>${compareLabelV71("Fixe")}</th><th>${compareLabelV71("Variable")}</th><th>${compareLabelV71("Total")}</th></tr></thead><tbody>${g.rows.map(r=>`<tr><td><b>${esc(r.provider)}</b></td><td>${esc(r.offer)}${r.unresolved?` <span class="badge warn">${compareLabelV71("À confirmer")}</span>`:''}</td><td class="num">${num(r.licenses)}</td><td class="num">${r.unitPrice?synthesisMoneyV64(r.unitPrice,m.rate,{strong:true}):'—'}${r.unitPrice?`<small class="price-period">/ licence / ${esc(r.unitPeriod)}</small><small class="price-source">${esc(r.priceSource)}</small>`:''}</td><td><span class="fixed-basis">${esc(r.fixedBasis)}</span></td><td class="num">${r.engagement?num(r.engagement)+' '+uiLabelValue("compare","mois"):'—'}</td><td class="num">${r.billed?num(r.billed):'—'}</td><td class="num">${synthesisMoneyV64(r.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(r.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(r.total,m.rate,{strong:true})}</td></tr>`).join('')}</tbody><tfoot><tr><td colspan="7">${compareLabelV71("Sous-total")} ${esc(g.domain)}</td><td class="num">${synthesisMoneyV64(g.fixed,m.rate)}</td><td class="num">${synthesisMoneyV64(g.variable,m.rate)}</td><td class="num">${synthesisMoneyV64(g.total,m.rate,{strong:true})}</td></tr></tfoot></table></div>
       ${g.domainId?scenarioDomainTeamBudgetHtml(m,g.domainId):""}
     </div></section>`).join(''):'<div class="empty-state">${esc(uiLabelValue("compare","Aucune allocation sur ce scénario."))}</div>'}</div>
@@ -2062,7 +2113,14 @@ const PRINT_CSS_V36=`
 .synth-money{display:inline-flex;flex-direction:column;align-items:flex-end;line-height:1.15}.synth-eur{display:block;margin-top:2px;font-size:8px;font-weight:600;color:#64748b;white-space:nowrap}.report-publisher{margin-top:22px;padding-top:10px;border-top:1px solid #dbe3ef;color:#64748b;font-size:9px;text-align:right}
 h1,h2,h3,p{margin-top:0}.print-cover{display:flex;justify-content:space-between;align-items:end;border-bottom:3px solid #5b4df5;padding-bottom:12px;margin-bottom:18px}.print-cover h1{font-size:26px;margin-bottom:4px}.print-cover p{color:#64748b;margin:0}
 .scenario-detail-document{max-width:none}.detail-hero{display:flex;justify-content:space-between;gap:20px;padding:18px;border-radius:14px;background:#f5f7ff;margin-bottom:12px}
-.detail-budget-grid{display:grid;grid-template-columns:38% 62%;gap:8px;margin:12px 0}.detail-budget-card{border:1px solid #dbe3ef;border-radius:10px;padding:9px}.detail-domain-budget{display:flex;flex-direction:column;gap:6px}.detail-domain-budget-row{display:grid;grid-template-columns:35% 40% 25%;align-items:center;gap:5px}.detail-domain-budget-label{display:flex;justify-content:space-between;gap:4px}.detail-domain-budget-label span{color:#64748b}.detail-domain-budget-track{height:7px;background:#edf1f6;border-radius:99px;overflow:hidden}.detail-domain-budget-track>span{display:block;height:100%;background:#635bdb}.detail-domain-budget-values{text-align:right}.detail-budget-offer-table tfoot td{font-weight:700;background:#f8fafc}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}.pricing-explainer{display:flex;gap:8px;padding:9px;border:1px solid #dedcff;border-radius:9px;margin-bottom:12px;background:#f8f7ff}.pricing-icon{width:25px;height:25px;border-radius:7px;background:#635bdb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}.pricing-explainer p{margin:2px 0 0;color:#64748b}.price-period,.price-source{display:block;font-size:7px;color:#64748b}.price-source{color:#635bdb}.fixed-basis{font-size:8px;line-height:1.3}
+.detail-budget-grid{display:grid;grid-template-columns:38% 62%;gap:8px;margin:12px 0}.detail-budget-card{border:1px solid #dbe3ef;border-radius:10px;padding:9px}.detail-domain-budget{display:flex;flex-direction:column;gap:6px}.detail-domain-budget-row{display:grid;grid-template-columns:35% 40% 25%;align-items:center;gap:5px}.detail-domain-budget-label{display:flex;justify-content:space-between;gap:4px}.detail-domain-budget-label span{color:#64748b}.detail-domain-budget-track{height:7px;background:#edf1f6;border-radius:99px;overflow:hidden}.detail-domain-budget-track>span{display:block;height:100%;background:#635bdb}.detail-domain-budget-values{text-align:right}.detail-budget-offer-table tfoot td{font-weight:700;background:#f8fafc}
+.domain-service-roi{margin:10px 0 12px;padding:8px;border:1px solid #dbe3ef;border-radius:8px;background:#fbfcfe}
+.domain-service-roi-head{display:flex;align-items:baseline;gap:8px;margin-bottom:7px}.domain-service-roi-head h4{margin:0;font-size:11px}
+.domain-service-roi-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.service-roi-card{border:1px solid #e5e7eb;border-radius:7px;padding:7px;background:#fff;break-inside:avoid}
+.service-roi-title{font-weight:700;margin-bottom:5px}
+.service-roi-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.service-roi-metrics>div{background:#f8fafc;border-radius:5px;padding:4px;display:flex;flex-direction:column}.service-roi-metrics span{font-size:7px;color:#64748b}.service-roi-metrics b{font-size:8px}.scenario-eyebrow,.domain-label{font-size:9px;letter-spacing:.12em;color:#635bdb;font-weight:700}.detail-hero h2{font-size:24px;margin:5px 0}.detail-meta{display:flex;gap:7px;flex-wrap:wrap}.detail-meta span{padding:4px 7px;border-radius:99px;background:#fff;border:1px solid #dbe3ef}.detail-total{text-align:right}.detail-total small,.detail-total span{display:block;color:#64748b}.detail-total strong{display:block;font-size:25px;margin:4px 0}.detail-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 18px}.detail-kpis>div{border:1px solid #dbe3ef;border-radius:10px;padding:10px}.detail-kpis span{display:block;color:#64748b}.detail-kpis b{font-size:15px}.detail-section-title{display:flex;gap:10px;align-items:start;margin:16px 0 8px}.detail-section-title>span{font-size:20px;color:#635bdb;font-weight:800}.detail-section-title h3{margin-bottom:2px}.detail-section-title p{color:#64748b}.pricing-explainer{display:flex;gap:8px;padding:9px;border:1px solid #dedcff;border-radius:9px;margin-bottom:12px;background:#f8f7ff}.pricing-icon{width:25px;height:25px;border-radius:7px;background:#635bdb;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}.pricing-explainer p{margin:2px 0 0;color:#64748b}.price-period,.price-source{display:block;font-size:7px;color:#64748b}.price-source{color:#635bdb}.fixed-basis{font-size:8px;line-height:1.3}
 .domain-detail-card{border:1px solid #dbe3ef;border-radius:12px;margin:0 0 12px;overflow:hidden;break-inside:avoid}.domain-detail-head{display:flex;justify-content:space-between;padding:10px 12px;background:#f8fafc}.domain-detail-head h3{margin:2px 0 0}.domain-totals{text-align:right}.domain-totals span,.domain-totals b{display:block}
 table{width:100%;border-collapse:separate;border-spacing:0}th,td{padding:10px 12px;border-top:1px solid #e7edf5;text-align:center;vertical-align:middle;line-height:1.35}th{font-size:8px;text-transform:uppercase;color:#64748b;background:#fbfcfe;letter-spacing:.03em}td.num,th.num{text-align:center}tfoot td{font-weight:700;background:#fbfcfe;text-align:center}.detail-grand-total{display:flex;justify-content:space-between;align-items:center;border-top:3px solid #10213e;padding:12px 4px;margin-top:16px}.detail-grand-total span,.detail-grand-total small{display:block}.detail-grand-total b{font-size:22px}.negative{color:#c62828}.badge{display:inline-block;padding:2px 5px;border-radius:99px;font-size:8px}.badge.ok{background:#eaf8ef;color:#08783d}.badge.warn{background:#fff4dd;color:#955900}
 .scenario-team-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px}.scenario-team-total-card{border:1px solid #dfe5ec;border-radius:10px;background:#fff;padding:10px;display:flex;flex-direction:column;gap:6px}.scenario-team-total-card>span,.scenario-team-total-card>small,.scenario-team-total-card>b{display:block}.scenario-team-total-card>small{color:#667085}.scenario-team-total-card b small{display:inline;color:#667085;font-weight:600}.scenario-team-eur{display:block!important;margin-top:2px;color:#667085;font-size:9px;font-weight:600;white-space:nowrap}.scenario-team-card-split{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:2px;padding-top:7px;border-top:1px solid #edf0f4}.scenario-team-card-split>span{font-size:9px;color:#667085;font-weight:600}.scenario-team-card-split b{display:block;margin-top:2px;color:#182230;font-size:11px}.scenario-team-card-split small{display:block!important;margin-top:1px;color:#667085;font-size:8px}.scenario-team-card-total{padding-top:7px;border-top:1px solid #edf0f4}.scenario-team-annual{margin-top:14px;padding-top:12px;border-top:1px solid #dfe5ec}.scenario-team-annual-head{margin-bottom:8px}.scenario-team-annual-head h4{margin:0 0 4px;font-size:14px}.scenario-team-annual-head p{margin:0;color:#667085;font-size:10px;line-height:1.45}.scenario-team-budget-table{background:#fff}.scenario-team-budget-table .total{font-weight:800;background:#f5f7ff}.scenario-team-budget-head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;margin-bottom:10px}.scenario-team-budget-head h4{margin:3px 0;font-size:15px}.scenario-team-budget-head p{margin:0;color:#667085;font-size:10px}
@@ -3704,7 +3762,7 @@ const UI_LABEL_CATALOG_V65=[
   ['compare','Base calcul fixe'],['compare','Engagement'],['compare','Mois facturés'],['compare','Total'],
   ['compare','Sous-total'],['compare','Total scénario'],['compare','Aucune allocation sur ce scénario.'],
   ['compare','Synthèse FinOps IA'],['compare','Rapport HTML autonome'],['compare','Imprimer / PDF'],
-  ['compare','Enregistrer le fichier HTML'],['compare','Éditeur de l’outil'],['compare','Synthèse'],['compare','Détails des scénarios'],
+  ['compare','Enregistrer le fichier HTML'],['compare','Éditeur de l’outil'],['compare','ROI par service du domaine'],['compare','ROI PAR SERVICE'],['compare','Synthèse'],['compare','Détails des scénarios'],
   ['compare','Scénario'],['compare','Budget USD'],['compare','Économie annuelle'],['compare','Vue budgétaire par domaine'],['compare','Répartition du budget du scénario par domaine.'],['compare','Vue budgétaire par offre'],['compare','Abonnement fixe, variable et poids de chaque offre dans le scénario.'],['compare','Total USD'],['compare','Total EUR'],['compare','Part'],['compare','TOTAL CONNU'],['compare','Aucun budget par domaine.'],['compare','Aucune offre budgétée.'],['compare','PRÉ-SIMULATION'],['compare','Répartition budgétaire par équipe et par offre'],['compare','Équipe'],['compare','Type d’offre'],['compare','Part du domaine'],['compare','TOTAL RÉPARTI'],['compare','Coût équivalent annuel par équipe'],['compare','Coût équivalent annuel'],['compare','Synthèse des scénarios'],['compare','scénario(s) sélectionné(s)'],['compare','scénario(s)'],['compare','Édité le'],['compare','tarif(s) à confirmer'],['compare','Lecture du coût fixe'],['compare','Le prix du forfait affiché est le tarif effectivement retenu selon la priorité : négocié sur l’allocation → négocié sur l’offre → référence interne → catalogue. La base de calcul montre comment ce prix contribue au coût fixe.'],['compare','À confirmer'],['compare','mois'],
   // Pré-simulation HTML / sécurité
   ['presim','Pré-simulation nominative'],['presim','Ouvrir en HTML'],['presim','Imprimer / PDF'],
