@@ -2143,8 +2143,16 @@ function roiRhGroupCost(rows,period,daysDefault){
   }
   return {rows:periodRows,cost,resources};
 }
+function roiPreSimulationForScenarioDomainV108(m,domainId){
+  const sid=+m?.s?.id||0,did=+domainId||0;
+  // V108 : chemin strict Scénario -> Simulation -> ROI.
+  // Pour le ROI, on ne retombe JAMAIS sur une pré-simulation d'un autre scénario.
+  return scopedPreSimulations()
+    .filter(f=>+f.Scenario_Reference===sid && +f.Domaine===did && f.Actif!==false)
+    .sort((a,b)=>(+b.id||0)-(+a.id||0))[0]||null;
+}
 function teamRowsForDomainScenario(m,domainId){
-  const fiche=savedPreSimWithTeamsForDomain(+m.s?.id||0,+domainId);
+  const fiche=roiPreSimulationForScenarioDomainV108(m,+domainId);
   if(!fiche)return [];
   const teams=preTeamRows().filter(t=>preSimRefId(t.Pre_Simulation)===+fiche.id&&t.Actif!==false);
   const resources=preResourceRows().filter(r=>preSimRefId(r.Pre_Simulation)===+fiche.id&&r.Actif!==false);
@@ -2152,15 +2160,31 @@ function teamRowsForDomainScenario(m,domainId){
   const activeTeamIds=new Set(resources.map(r=>preSimRefId(r.Equipe)).filter(Boolean));
   return teams.filter(t=>activeTeamIds.has(+t.id)).sort((a,b)=>(+a.Ordre||9999)-(+b.Ordre||9999)||String(a.Nom||'').localeCompare(String(b.Nom||''),'fr'));
 }
+function roiSimulationDomainAnnualCostV108(m,domainId){
+  const sid=+m?.s?.id||0,did=+domainId||0;
+  const months=Math.max(1,+m?.months||+m?.s?.Nb_Mois||12);
+  const rate=+m?.rate||+m?.s?.Taux_USD_EUR||0;
+  const lines=(m?.alloc||[]).filter(a=>+a.Scenario===sid && +a.Domaine===did);
+  const periodUSD=lines.reduce((sum,a)=>sum+(+a.Budget_Total_USD||0),0);
+  return periodUSD*rate*12/months;
+}
 function annualLicenseCostForScope(m,domainId,teamId=0){
-  const dm=m.bd?.[+domainId]||{};
-  if(!teamId)return +dm.budgetAnnualized||0;
+  // Source unique du coût ROI : les lignes de Simulation du scénario courant.
+  const domainAnnual=roiSimulationDomainAnnualCostV108(m,+domainId);
+  if(!teamId)return domainAnnual;
+
+  // Pour une équipe, on ventile le coût des lignes du scénario selon la pré-simulation
+  // rattachée à CE MÊME scénario + domaine.
+  const fiche=roiPreSimulationForScenarioDomainV108(m,+domainId);
+  if(!fiche)return 0;
   const x=domainTeamBudgetBreakdown(m,+domainId);
-  if(!x)return 0;
+  if(!x||+x.fiche?.id!==+fiche.id)return 0;
   const row=x.rows.find(r=>+r.teamId===+teamId);
   return +row?.annualEquivalentEUR||0;
 }
 function roiRhComputed(m,domainId,teamId=0){
+  // V108 : m est obligatoirement le modèle de Simulation construit depuis le scénario sélectionné.
+  // Les RH sont rapprochées de ce scénario ; le coût licence vient de ses allocations.
   const dm=m.bd?.[+domainId]||{};
   const daysDefault=+dm.days||+m.s?.Nb_Jours_Ouvres_Annuels||0;
   const rows=roiRhScopeRows(+m.s?.id||0,+domainId,+teamId);
@@ -2285,7 +2309,7 @@ function renderROI(){
   el.innerHTML=`
     ${globalHtml}
     <article class="card roi-rh-explainer">
-      <div class="cardhead"><div><h3>Comparaison RH N-1 / N</h3><p>Chaque ligne représente un regroupement de ressources partageant un même TJM. Le coût RH annuel d'un palier = nombre de ressources × TJM × jours/an.</p></div><button id="saveRoiRh" class="btn primary read-only-exempt">Enregistrer les modifications</button></div>
+      <div class="cardhead"><div><h3>Comparaison RH N-1 / N</h3><p>Scénario → Simulation → ROI : les coûts licences ci-dessous proviennent uniquement des lignes de simulation du scénario <b>${esc(m.s?.Nom||'')}</b>. Chaque ligne RH représente un regroupement de ressources partageant un même TJM.</p></div><button id="saveRoiRh" class="btn primary read-only-exempt">Enregistrer les modifications</button></div>
       <div class="roi-formulas">
         <span>Économie RH = RH N-1 − RH N</span>
         <span>Coût total N = RH N + coût annuel des licences</span>
