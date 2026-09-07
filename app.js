@@ -1436,17 +1436,64 @@ function scenarioBudgetViewsV67(m,htmlMode=false){
 }
 
 function compareLabelV71(def){return esc(uiLabelValue("compare",def))}
-function roiRhScenarioAggregateV85(m){
+
+function roiRhPeriodCompleteV106(computed,period){
+  const block=period==="N-1"?computed.n1:computed.n;
+  return (block?.rows||[]).some(r=>(+r.Nb_Ressources||0)>0 && (+r.TJM_EUR||0)>0);
+}
+function roiRhScopeCompletenessV106(m,domainId,teamId=0,label=''){
+  const x=roiRhComputed(m,+domainId,+teamId);
+  const n1=roiRhPeriodCompleteV106(x,"N-1");
+  const n=roiRhPeriodCompleteV106(x,"N");
+  return {domainId:+domainId,teamId:+teamId,label,n1,n,complete:n1&&n,computed:x};
+}
+function roiRhScenarioCompletenessV106(m){
+  // Un domaine participe au ROI global dès qu'il possède au moins une allocation
+  // dans le scénario. Si une pré-simulation apporte des équipes, chaque équipe
+  // active devient un périmètre RH à compléter ; sinon le domaine est un périmètre.
+  const domainIds=[...new Set((m.alloc||[]).map(a=>+a.Domaine).filter(Boolean))];
   const scopes=[];
-  for(const dm of Object.values(m.bd||{})){
-    const d=dm.d;if(!d)continue;
-    const teams=teamRowsForDomainScenario(m,+d.id);
-    if(teams.length){for(const t of teams)scopes.push(roiRhComputed(m,+d.id,+t.id));}
-    else scopes.push(roiRhComputed(m,+d.id,0));
+  for(const domainId of domainIds){
+    const d=D.domainById[domainId]||{};
+    const teams=teamRowsForDomainScenario(m,domainId);
+    if(teams.length){
+      for(const t of teams){
+        const service=String(t.Service||'').trim();
+        scopes.push(roiRhScopeCompletenessV106(
+          m,domainId,+t.id,
+          `${d.Nom||'Domaine'} · ${service||t.Nom||'Équipe'}`
+        ));
+      }
+    }else{
+      scopes.push(roiRhScopeCompletenessV106(m,domainId,0,d.Nom||`Domaine #${domainId}`));
+    }
   }
+  const complete=scopes.filter(s=>s.complete);
+  const missing=scopes.filter(s=>!s.complete);
+  return {scopes,complete,missing,allComplete:scopes.length>0&&missing.length===0};
+}
+function roiRhMissingHtmlV106(status){
+  if(status.allComplete)return '';
+  const items=status.missing.map(s=>{
+    const miss=[];
+    if(!s.n1)miss.push('RH N-1');
+    if(!s.n)miss.push('RH N');
+    return `<li><b>${esc(s.label)}</b> · ${esc(miss.join(' + '))} manquant${miss.length>1?'s':''}</li>`;
+  }).join('');
+  return `<article class="card roi-global-incomplete">
+    <div class="cardhead"><div>
+      <h3>ROI global incomplet — ${status.complete.length} / ${status.scopes.length} périmètre(s) renseigné(s)</h3>
+      <p>Le ROI global du scénario sera calculé uniquement lorsque tous les domaines/services participants auront renseigné RH N-1 et RH N.</p>
+    </div></div>
+    <ul>${items||'<li>Aucun périmètre participant n’est encore complet.</li>'}</ul>
+  </article>`;
+}
+function roiRhScenarioAggregateV85(m){
+  const status=roiRhScenarioCompletenessV106(m);
+  const scopes=status.scopes.map(s=>s.computed);
   const n1=scopes.reduce((s,x)=>s+x.n1.cost,0),n=scopes.reduce((s,x)=>s+x.n.cost,0),lic=scopes.reduce((s,x)=>s+x.licenseAnnual,0);
   const hrSaving=n1-n,totalN=n+lic,gain=n1-totalN,roiPct=n1?gain/n1:0;
-  return {n1,n,lic,hrSaving,totalN,gain,roiPct};
+  return {n1,n,lic,hrSaving,totalN,gain,roiPct,...status};
 }
 function roiRhDomainAggregateV85(m,domainId){
   const teams=teamRowsForDomainScenario(m,+domainId);
@@ -1464,11 +1511,11 @@ function scenarioDetailHtmlV36(m,printMode=false){
       <div><span class="scenario-eyebrow">${compareLabelV71("SYNTHÈSE FINOPS IA")}</span><h2>${esc(m.s.Nom)}</h2><div class="detail-meta"><span>${esc(String(m.s.Annee||''))}</span><span>${num(m.months)} mois</span><span>${num(m.licenses)} ${esc(uiLabelValue("compare","licences"))}</span><span>${groups.length} ${esc(uiLabelValue("compare","domaines"))}</span><span>${offerCount} ${esc(uiLabelValue("compare","offres"))}</span>${m.unresolved?`<span class="badge warn">${m.unresolved} ${compareLabelV71("tarif(s) à confirmer")}</span>`:`<span class="badge ok">${esc(uiLabelValue("compare","Chiffré"))}</span>`}</div></div>
       <div class="detail-total"><small>${esc(uiLabelValue("compare","Budget total"))}</small><strong>${money(m.total)}</strong><span>${money(m.total*m.rate,'EUR')}</span></div>
     </div>
-    <div class="scenario-roi-summary">
+    ${roi.allComplete?`<div class="scenario-roi-summary">
       <div class="scenario-roi-summary-head">
         <div>
           <span class="scenario-eyebrow">ROI ANNUEL</span>
-          <h3>Lecture économique du scénario</h3>
+          <h3>Lecture économique globale du scénario</h3>
         </div>
       </div>
       <div class="scenario-roi-grid">
@@ -1479,7 +1526,14 @@ function scenarioDetailHtmlV36(m,printMode=false){
         <div class="scenario-roi-kpi ${roi.gain<0?'negative':''}"><span>Gain net annuel</span><b>${money(roi.gain,'EUR')}</b></div>
         <div class="scenario-roi-kpi roi-primary-kpi ${roi.roiPct<0?'negative':''}"><span>ROI / gain %</span><b>${pct(roi.roiPct)}</b></div>
       </div>
-    </div>
+    </div>`:`<div class="scenario-roi-summary roi-global-incomplete">
+      <div class="scenario-roi-summary-head"><div>
+        <span class="scenario-eyebrow">ROI GLOBAL INCOMPLET</span>
+        <h3>${roi.complete.length} / ${roi.scopes.length} périmètre(s) RH renseigné(s)</h3>
+        <p>Le ROI global sera affiché lorsque tous les domaines/services participants auront renseigné RH N-1 et RH N.</p>
+      </div></div>
+      <ul>${roi.missing.map(s=>`<li><b>${esc(s.label)}</b> · ${!s.n1&&!s.n?'RH N-1 + RH N':!s.n1?'RH N-1':'RH N'} manquant</li>`).join('')}</ul>
+    </div>`}
     <div class="detail-kpis">
       <div><span>${esc(uiLabelValue("compare","Coûts fixes"))}</span>${synthesisMoneyV64(m.fixed,m.rate,{strong:true})}</div>
       <div><span>${esc(uiLabelValue("compare","Coûts variables"))}</span>${synthesisMoneyV64(m.over,m.rate,{strong:true})}</div>
@@ -2219,30 +2273,19 @@ function renderROI(){
     }
   }
 
-  const allComputed=[];
-  for(const d of domains){
-    const teams=teamRowsForDomainScenario(m,+d.id);
-    if(teams.length){
-      for(const t of teams)allComputed.push(roiRhComputed(m,+d.id,+t.id));
-    }else allComputed.push(roiRhComputed(m,+d.id,0));
-  }
-
-  const totalN1=allComputed.reduce((s,x)=>s+x.n1.cost,0);
-  const totalN=allComputed.reduce((s,x)=>s+x.n.cost,0);
-  const totalLic=allComputed.reduce((s,x)=>s+x.licenseAnnual,0);
-  const hrSaving=totalN1-totalN;
-  const gain=totalN1-(totalN+totalLic);
-  const roiPct=totalN1?gain/totalN1:0;
+  const globalRoi=roiRhScenarioAggregateV85(m);
+  const globalHtml=globalRoi.allComplete?`
+    <div class="kpis roi-kpis">
+      <div class="kpi roi"><div class="v">${money(globalRoi.n1,'EUR')}</div><div class="l">RH N-1</div></div>
+      <div class="kpi roi"><div class="v">${money(globalRoi.n,'EUR')}</div><div class="l">RH N</div></div>
+      <div class="kpi roi"><div class="v ${globalRoi.hrSaving<0?'negative':''}">${money(globalRoi.hrSaving,'EUR')}</div><div class="l">Économie RH</div></div>
+      <div class="kpi roi"><div class="v">${money(globalRoi.lic,'EUR')}</div><div class="l">Coût annuel licences</div></div>
+      <div class="kpi roi"><div class="v ${globalRoi.gain<0?'negative':''}">${money(globalRoi.gain,'EUR')}</div><div class="l">Gain net annuel</div></div>
+      <div class="kpi roi"><div class="v ${globalRoi.roiPct<0?'negative':''}">${pct(globalRoi.roiPct)}</div><div class="l">ROI global / gain %</div></div>
+    </div>`:roiRhMissingHtmlV106(globalRoi);
 
   el.innerHTML=`
-    <div class="kpis roi-kpis">
-      <div class="kpi roi"><div class="v">${money(totalN1,'EUR')}</div><div class="l">RH N-1</div></div>
-      <div class="kpi roi"><div class="v">${money(totalN,'EUR')}</div><div class="l">RH N</div></div>
-      <div class="kpi roi"><div class="v ${hrSaving<0?'negative':''}">${money(hrSaving,'EUR')}</div><div class="l">Économie RH</div></div>
-      <div class="kpi roi"><div class="v">${money(totalLic,'EUR')}</div><div class="l">Coût annuel licences</div></div>
-      <div class="kpi roi"><div class="v ${gain<0?'negative':''}">${money(gain,'EUR')}</div><div class="l">Gain net annuel</div></div>
-      <div class="kpi roi"><div class="v ${roiPct<0?'negative':''}">${pct(roiPct)}</div><div class="l">ROI / gain %</div></div>
-    </div>
+    ${globalHtml}
     <article class="card roi-rh-explainer">
       <div class="cardhead"><div><h3>Comparaison RH N-1 / N</h3><p>Chaque ligne représente un regroupement de ressources partageant un même TJM. Le coût RH annuel d'un palier = nombre de ressources × TJM × jours/an.</p></div><button id="saveRoiRh" class="btn primary read-only-exempt">Enregistrer les modifications</button></div>
       <div class="roi-formulas">
@@ -3010,9 +3053,19 @@ async function duplicateScenarioV103(scenarioId){
     if(!target)throw new Error('Le scénario dupliqué n’a pas pu être retrouvé.');
     const allocations=(D[T.alloc]||[]).filter(a=>+a.Scenario===+source.id);
     if(allocations.length){
-      const skip=new Set(['id','Scenario','Budget_Fixe_USD','Budget_Overage_USD','Budget_Total_USD','Tarif_A_Confirmer']);
+      // V105 : ne recopier QUE les colonnes saisissables.
+      // Les colonnes calculées Grist (Budget_Total_USD, Cout_Abonnement,
+      // Cout_Overage, Budget_Total_EUR, Usage_Inclus_Total, etc.) doivent être
+      // laissées à Grist, sinon l'API renvoie "can't save value to formula".
+      const writable=[
+        'Domaine','Offre','Nb_Licences','Mois_Factures','Engagement_Mois',
+        'Tarif_Negocie_Mensuel','Tarif_Negocie_Annuel',
+        'Usage_Supplementaire_Prevu_Mois_Licence',
+        'Overage_Autorise','Plafond_Overage_Mois_Licence'
+      ];
       const actions=allocations.map(a=>{
-        const f={Scenario:+target.id};Object.keys(a).forEach(k=>{if(!skip.has(k)&&!k.startsWith('$'))f[k]=a[k]});
+        const f={Scenario:+target.id};
+        writable.forEach(k=>{if(Object.prototype.hasOwnProperty.call(a,k))f[k]=a[k]});
         return ["AddRecord",T.alloc,null,f];
       });
       await apply(actions);await reload();
