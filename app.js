@@ -1485,7 +1485,6 @@ function roiRhMissingHtmlV106(status){
       <h3>ROI global incomplet — ${status.complete.length} / ${status.scopes.length} périmètre(s) renseigné(s)</h3>
       <p>Le ROI global du scénario sera calculé uniquement lorsque tous les domaines/services participants auront renseigné RH N-1 et RH N.</p>
     </div></div>
-    <ul>${items||'<li>Aucun périmètre participant n’est encore complet.</li>'}</ul>
   </article>`;
 }
 function roiRhScenarioAggregateV85(m){
@@ -1532,7 +1531,6 @@ function scenarioDetailHtmlV36(m,printMode=false){
         <h3>${roi.complete.length} / ${roi.scopes.length} périmètre(s) RH renseigné(s)</h3>
         <p>Le ROI global sera affiché lorsque tous les domaines/services participants auront renseigné RH N-1 et RH N.</p>
       </div></div>
-      <ul>${roi.missing.map(s=>`<li><b>${esc(s.label)}</b> · ${!s.n1&&!s.n?'RH N-1 + RH N':!s.n1?'RH N-1':'RH N'} manquant</li>`).join('')}</ul>
     </div>`}
     <div class="detail-kpis">
       <div><span>${esc(uiLabelValue("compare","Coûts fixes"))}</span>${synthesisMoneyV64(m.fixed,m.rate,{strong:true})}</div>
