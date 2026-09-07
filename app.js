@@ -1458,10 +1458,9 @@ function roiRhScenarioCompletenessV106(m){
     const teams=teamRowsForDomainScenario(m,domainId);
     if(teams.length){
       for(const t of teams){
-        const service=String(t.Service||'').trim();
         scopes.push(roiRhScopeCompletenessV106(
           m,domainId,+t.id,
-          `${d.Nom||'Domaine'} · ${service||t.Nom||'Équipe'}`
+          `${d.Nom||'Domaine'} · ${roiRhTeamDisplayLabelV110(t)}`
         ));
       }
     }else{
@@ -2197,7 +2196,12 @@ function roiRhComputed(m,domainId,teamId=0){
   const roiPct=n1.cost?gain/n1.cost:0;
   return {rows,n1,n,licenseAnnual,hrSaving,totalN,gain,roiPct,daysDefault};
 }
+function roiRhTeamDisplayLabelV110(team){
+  const service=String(team?.Service||'').trim();
+  return service||String(team?.Nom||'').trim()||'Équipe';
+}
 function roiRhScopeLabel(domain,team){
+
   return team?`${domain} · ${team}`:domain;
 }
 function roiRhPaliersTable(scopeKey,period,rows,daysDefault){
@@ -2229,11 +2233,13 @@ function roiRhScopeCard(m,domain,team=null){
   const domainId=+domain.id,teamId=+team?.id||0;
   const x=roiRhComputed(m,domainId,teamId);
   const scopeKey=`${domainId}|${teamId}`;
+  const teamLabel=team?roiRhTeamDisplayLabelV110(team):'';
+  const isService=!!String(team?.Service||'').trim();
   return `<article class="card roi-rh-scope" data-roi-rh-scope="${scopeKey}">
     <div class="cardhead">
       <div>
-        <h3>${esc(roiRhScopeLabel(domain.Nom||"Domaine",team?.Nom||""))}</h3>
-        <p>${team?"Comparaison RH par équipe.":"Comparaison RH au niveau du domaine."}</p>
+        <h3>${esc(roiRhScopeLabel(domain.Nom||"Domaine",teamLabel))}</h3>
+        <p>${team?(isService?"Comparaison RH par service.":"Comparaison RH par équipe."):"Comparaison RH au niveau du domaine."}</p>
       </div>
     </div>
     <div class="roi-rh-period-grid">
@@ -2315,7 +2321,7 @@ function renderROI(){
   el.innerHTML=`
     ${domains.length?globalHtml:`<article class="card"><div class="empty-state">Aucun domaine ne participe à la simulation de ce scénario. Ajoute d’abord une allocation dans Simulation.</div></article>`}
     ${domains.length?`<article class="card roi-rh-explainer">`:'<article class="card roi-rh-explainer hidden">'}
-      <div class="cardhead"><div><h3>Comparaison RH N-1 / N</h3><p>Scénario → Simulation → ROI : les coûts licences ci-dessous proviennent uniquement des lignes de simulation du scénario <b>${esc(m.s?.Nom||'')}</b>. Chaque ligne RH représente un regroupement de ressources partageant un même TJM.</p></div><button id="saveRoiRh" class="btn primary read-only-exempt">Enregistrer les modifications</button></div>
+      <div class="cardhead"><div><h3>Comparaison RH N-1 / N</h3><p>Scénario → Simulation → ROI : les coûts licences ci-dessous proviennent uniquement des lignes de simulation du scénario <b>${esc(m.s?.Nom||'')}</b>. Lorsqu’un domaine possède des services dans sa pré-simulation, le ROI les affiche comme périmètres RH ; sinon il reste au niveau équipe ou domaine.</p></div><button id="saveRoiRh" class="btn primary read-only-exempt">Enregistrer les modifications</button></div>
       <div class="roi-formulas">
         <span>Économie RH = RH N-1 − RH N</span>
         <span>Coût total N = RH N + coût annuel des licences</span>
