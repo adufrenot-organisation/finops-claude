@@ -4458,7 +4458,7 @@ function ceRenderOverview(m,pctCap){
   const body=document.getElementById('ceTabBody');
   const accepted=(m.reallocations||[]).filter(r=>r.Statut==='ACCEPTEE');
   const startPeriod=ceScenarioStartPeriod(m);
-  const info=(label,text)=>`${label} <span class="ce-info" tabindex="0">ⓘ<span class="ce-tip">${text}</span></span>`;
+  const info=(label,text)=>`${label} <span class="ce-info" tabindex="0" aria-label="Explication de ${esc(label)}">ⓘ<span class="ce-tip"><b class="ce-tip-title">${esc(label)}</b><span class="ce-tip-body">${text}</span></span></span>`;
   const now=new Date(), nowPeriod=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const monthIndex=(p)=>{const a=/^(\d{4})-(\d{2})$/.exec(startPeriod),b=/^(\d{4})-(\d{2})$/.exec(p);return a&&b?((+b[1]-+a[1])*12+(+b[2]-+a[2])):0};
   const elapsedFor=(months)=>Math.max(1,Math.min(months,monthIndex(nowPeriod)+1));
